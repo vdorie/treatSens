@@ -7,7 +7,7 @@ n10 = 50
 n01 = 100
 n00 = 150
 
-pu = .75
+pu = .5
 
 py = 0.3
 pz = 0.2
@@ -46,13 +46,6 @@ max.phi <- function(n11, n10, n01, n00, pU){
 
 prob.calc <- function(n11, n10, n01, n00, pU, rho_y, rho_z, p10) {
 
-	#Check that specified correlations are valid
-	aaa = max.phi(n11, n10, n01, n00, pU)
-	if(abs(pz) > aaa$z_max)
-		stop("Z-U correlation outside maximum range: (", -aaa$z_max, ",", aaa$z_max,")\n")
-	if(abs(py) > aaa$y_max)
-		stop("Y-U correlation outside maximum range: (", -aaa$y_max, ",", aaa$y_max,")\n")
-
 	#calculate marginal totals
 	n = n11+n10+n01+n00
 	nz1 = n11 + n01
@@ -82,8 +75,16 @@ prob.calc <- function(n11, n10, n01, n00, pU, rho_y, rho_z, p10) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-binaryYZU <- function(n11, n10, n01, n00, pU, rho_y, rho_z)
+binaryYZU <- function(n11, n10, n01, n00, pU, rho_y, rho_z) {
+	#Check that specified correlations are valid
+	aaa = max.phi(n11, n10, n01, n00, pU)
+	if(abs(rho_z) > aaa$z_max)
+		stop("Z-U correlation outside maximum range: (", -aaa$z_max, ",", aaa$z_max,")\n")
+	if(abs(rho_y) > aaa$y_max)
+		stop("Y-U correlation outside maximum range: (", -aaa$y_max, ",", aaa$y_max,")\n")
+
 	ct = 0
+	alpha = prob.calc(n11, n10, n01, n00, pU, rho_y, rho_z, runif(1))
 	while(sum(alpha > 1)+sum(alpha<0) & ct < 1e4) {
 	alpha = prob.calc(n11, n10, n01, n00, pU, rho_y, rho_z, runif(1))
 	ct = ct +1
