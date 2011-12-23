@@ -36,16 +36,70 @@ binaryZcontYU <- function(Y, Z, rho_y, rho_z) {
 	return(U)
 }
 
-tau  = seq(-30, 30, by = 5)
+###############
+#Generate U 
+#Y: continuous response variable
+#Z: continuous treatment variable
+#rho_y, rho_z: desired correlations between U and Y or Z
+###############
+
+contYZU <- function(Y, Z, rho_y, rho_z) {
+
+	n <- length(Y)
+	s_Y <- sd(Y)*sqrt((n-1)/n)
+	s_Z <- sd(Z)*sqrt((n-1)/n)
+	rho <- cor(Y,Z)
+	pi <- (rho_y*rho-rho_z)/(rho_z*rho-rho_y) 
+	delta = s_Y/s_Z*pi
+	s_u = s_Y/rho_y + (delta*s_Z*rho/rho_y)
+	s_e = sqrt(s_u^2-s_Y^2*(1+pi^2+pi*rho))
+
+	U = Y + Z*delta + rnorm(n, 0, s_e)
+	return(U)
+}
+
+###############
+#Generate U 
+#Y: continuous response variable
+#Z: continuous treatment variable
+#rho_y, rho_z: desired correlations between U and Y or Z
+###############
+
+contYZbinaryU <- function(Y, Z, rho_y, rho_z) {
+
+	n <- length(Y)
+	s_Y <- sd(Y)*sqrt((n-1)/n)
+	s_Z <- sd(Z)*sqrt((n-1)/n)
+
+	Y = (Y-mean(Y))/s_Y
+	Z = (Z-mean(Z))/s_Z
+
+s_Y = s_Z = 1
+
+	rho <- cor(Y,Z)
+	pi <- (rho_y*rho-rho_z)/(rho_z*rho-rho_y) 
+	delta = s_Y/s_Z*pi
+	s_u = s_Y/rho_y + (delta*s_Z*rho/rho_y)
+	s_e = sqrt(s_u^2-s_Y^2*(1+pi^2+pi*rho))
+
+	aaa = Y + Z*delta + rnorm(n, 0, s_e)
+	pr1 = 1/(1+exp(-aaa))
+
+	U <- pr1 > median(pr1)
+	return(as.numeric(U))
+}
+
+
+tau  = seq(-3, 3, by = 0.5)
 cYZ = cYU = cZU = vector()
 
 for(j in 1:length(tau)) {
-Z = rbinom(500, 1, .5) 
-Y = tau[j]*Z+ rnorm(500, 10, 10)
+Z = rnorm(500, 10, 5)  #rbinom(500, 1, .5) 
+Y = tau[j]*Z+ rnorm(500, 10, 20)
 
 corr.sim = matrix(NA, nrow = 1000, ncol = 2)
 for(i in 1:1000){
-		U <- binaryZcontYU(Y, Z, p_y, p_z)
+		U <- contYZbinaryU(Y, Z, p_y, p_z)
 		corr.sim[i,] = cor(cbind(U, Y, Z))[1,2:3]
 }
 
@@ -59,7 +113,7 @@ apply(corr.sim,2,sd)
 #Plots
 ##########
 setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
-pdf("BART_SA_continuous.pdf")
+pdf("BART_SA_continuousYZU.pdf")
 
 plot(cYZ, cYU, ylim = c(0.1, 0.4), type = "l")
 lines(cYZ, cZU, col = "red")
