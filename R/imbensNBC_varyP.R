@@ -1,52 +1,157 @@
-normal.lik <- function(beta, tau, sigma2, y, w, x, delta) {
-	#linear model for main response regression
+##############
+#Implementation of Imbens-style sensitivity analysis
+##############
+
+#including linear, logistic forms for response & treatment
+#Allowing Pr(U = 1) to be arbitrary
+
+#Common terms:  Y = response, W = treatment, X = covariates,
+#delta = sensitivity parameter for response, alpha = sens. param for trt
+#beta = coefficients on X in response model, tau = treatment effect (coef on W)
+#gamma = coefficients on X in treatment model
+
+#############
+#likelihood contributions of response model
+#############
+
+resp.lin.lik <- function(beta, tau, sigma2, y, w, x, delta) {
+	#linear model for main response regression. sigma2 = error variance
 	const = (2*pi*sigma2)^(-1/2)
 	exp.part = -(2*sigma2)^(-1)*(y-tau*w-x%*%beta-delta)^2
 	return(const*exp(exp.part))
 }
 
-logistic.lik <- function(gamma, w, x, alpha) {
+resp.log.lik <- function(beta, tau, y, w, x, delta) {
+	#logit model for main response regression
+	aaa <- exp(tau*w-x%*%beta-delta)
+	return(aaa^y/(1+aaa))
+}
+
+#############
+#likelihood contributions of treatment model
+#############
+
+trt.log.lik <- function(gamma, w, x, alpha) {
 	#logit model for treatment regression
 	aaa <- exp(x%*%gamma+alpha)
 	return(aaa^w/(1+aaa))
 }
 
-llik <- function(b, Y, W, X, alpha, delta, p) {
-	#calculate log-likelihood for given values of parameters, alpha, delta
+trt.lin.lik <- function(gamma, s2, w, x, alpha) {
+	#linear model for treatment regression. s2 = error variance
+	const = (2*pi*s2)^(-1/2)
+	exp.part = -(2*s2)^(-1)*(w-x%*%gamma-alpha)^2
+	return(const*exp(exp.part))
+}
+
+###############
+#Calculating log-likelihoods
+#name gives response model.treatment model
+#calculate log-likelihood for given values of parameters, alpha, delta
+#Y = outcome
+#W = treatment indicator (1 = treatment, 0 = not)
+#b = vector of parameter values (contents vary by function)
+################
+
+lin.log.llik <- function(b, Y, W, X, alpha, delta, p) {
 	#b = c(gamma, beta, sigma^2, tau)
-	#Y = outcome
-	#W = treatment indicator (1 = treatment, 0 = not)
 	tau <- b[length(b)]
 	sigma2 <- b[length(b)-1]
 	gamma <- b[1:ncol(X)]
 	beta <- b[(ncol(X)+1):(length(b)-2)]
-	loglik = log((1-p)*normal.lik(beta,tau,sigma2,Y,W,X,0)*logistic.lik(gamma, W, X, 0) +
-			(p)*normal.lik(beta,tau,sigma2,Y,W,X,delta)*logistic.lik(gamma, W, X, alpha) )
+	loglik = log((1-p)*resp.lin.lik(beta,tau,sigma2,Y,W,X,0)*trt.log.lik(gamma, W, X, 0) +
+			(p)*resp.lin.lik(beta,tau,sigma2,Y,W,X,delta)*trt.log.lik(gamma, W, X, alpha) )
 	return(sum(loglik))
 }
 
-starting <- function(xmat, W){
+lin.lin.llik <- function(b, Y, W, X, alpha, delta, p) {
+	#b = c(gamma, beta, s2, sigma^2, tau)
+	tau <- b[length(b)]
+	sigma2 <- b[length(b)-1]
+	s2 <- b[length(b)-2]
+	gamma <- b[1:ncol(X)]
+	beta <- b[(ncol(X)+1):(length(b)-3)]
+	loglik = log((1-p)*resp.lin.lik(beta,tau,sigma2,Y,W,X,0)*trt.lin.lik(gamma, s2, W, X, 0) +
+			(p)*resp.lin.lik(beta,tau,sigma2,Y,W,X,delta)*trt.lin.lik(gamma, s2, W, X, alpha) )
+	return(sum(loglik))
+}
+
+log.log.llik <- function(b, Y, W, X, alpha, delta, p) {
+	#b = c(gamma, beta, tau)
+	tau <- b[length(b)]
+	gamma <- b[1:ncol(X)]
+	beta <- b[(ncol(X)+1):(length(b)-1)]
+	loglik = log((1-p)*resp.log.lik(beta,tau,Y,W,X,0)*trt.log.lik(gamma, W, X, 0) +
+			(p)*resp.log.lik(beta,tau,Y,W,X,delta)*trt.log.lik(gamma, W, X, alpha) )
+	return(sum(loglik))
+}
+
+log.lin.llik <- function(b, Y, W, X, alpha, delta, p) {
+	#b = c(gamma, beta, s2, tau)
+	tau <- b[length(b)]
+	s2 <- b[length(b)-1]
+	gamma <- b[1:ncol(X)]
+	beta <- b[(ncol(X)+1):(length(b)-2)]
+	loglik = log((1-p)*resp.log.lik(beta,tau,Y,W,X,0)*trt.lin.lik(gamma, s2, W, X, 0) +
+			(p)*resp.log.lik(beta,tau,Y,W,X,delta)*trt.lin.lik(gamma, s2, W, X, alpha) )
+	return(sum(loglik))
+}
+
+###############
+#Generate starting values
+###############
+starting <- function(xmat, W, resp.model, trt.model){
   #generate starting values from models with no unmeas confounders
-  fit.lm <- lm(Y~xmat+W-1)
-  coef.lm <-fit.lm$coef  		#starting values for beta
-  s2 <- summary(fit.lm)$sigma^2	#starting value for sigma^2
-  coef.logit <- glm(W~xmat-1)$coefficients 	#starting values for gamma
-  tau <- coef.lm[length(coef.lm)]	#starting value for tau
-  coef.lm <- coef.lm[-length(coef.lm)]
-  startv <- c(coef.logit,coef.lm,s2,tau) 
+  if(resp.model == "linear") {
+  	fit.lm <- lm(Y~xmat+W-1)
+  	coef.lm <-fit.lm$coef  		
+  	tau <- coef.lm[length(coef.lm)]	
+  	beta <- coef.lm[-length(coef.lm)]
+ 	sigma2 <- summary(fit.lm)$sigma^2	
+  }
+  if(resp.model == "logistic") {
+	logit.coef <- glm(Y~xmat+W-1)$coefficients 
+   	tau <- logit.coef[length(logit.coef)]	
+  	beta <- logit.coef[-length(logit.coef)]
+	sigma2 <- NULL
+  }
+
+  if(trt.model == "logistic") {
+	gamma <- glm(W~xmat-1)$coefficients 
+	s2 <- NULL
+  }
+  if(trt.model == "linear"){
+  	fit.lm <- lm(W~xmat-1)
+  	gamma <-fit.lm$coef  		
+ 	s2 <- summary(fit.lm)$sigma^2	
+  }
+
+  startv <- c(gamma, beta, s2, sigma2, tau) 
+  startv <- startv[!is.null(startv)]
   return(startv)
 }
 
-imbensNBC <- function(Y, W, X, alpha, delta, startvals = NULL) {
+###############
+#Likelihood maximization
+###############
+
+max.llik <- function(Y, W, X, alpha, delta, resp.model, trt.model, startvals = NULL) {
 	#maximize likelihood for given values of alpha, delta
 	if(is.null(startvals))
-		startvals = starting(X, W)
-	else if(length(startvals) != (2*dim(X)[2] + 2))
-		stop(paste("starting values should be a vector of length ", 2*dim(X)[2]+2, sep = ""))
+		startvals = starting(X, W, resp.model, trt.model)
+	else if(length(startvals) != (2*dim(X)[2] + 1 + (resp.model == "linear") + (trt.model == "linear")))
+		stop(paste("starting values should be a vector of length ", 2*dim(X)[2]+1 + (resp.model == "linear") + (trt.model == "linear"), sep = ""))
 	names(startvals) = NULL
-	mleVals = optim(startvals, llik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta) 
-	return(list(tau = mleVals$par[length(startvals)], sigma2 = mleVals$par[length(startvals)-1], gamma = mleVals$par[1:ncol(X)], alpha = alpha, delta = delta, ests = mleVals$par))
+
+	llik.fn <- paste(substr(resp.model,1,3), substr(trt.model,1,3), "llik", sep = ".")
+	mleVals = optim(startvals, llik.fn, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta) 
+#need to return: gamma, beta, tau, sigma2, s2 as needed
+	return(list(tau = mleVals$par[length(startvals)], alpha = alpha, delta = delta, ests = mleVals$par))
 }
+
+#################
+#Housekeeping functions
+#################
 
 parse.formula <- function(form, data) {
 	#extract variables from formula & data
@@ -67,19 +172,28 @@ std.nonbinary <- function(X) {
 	return(X)
 }
 
-R2W <- function(gamma, covmat, alpha) {
-	#calculate partial R2 for treatment regression
-	gamma = matrix(gamma[-1], nrow = 1)
+################
+#Calculate partial R-squared
+################
+
+R2.log <- function(coefs, covmat, sens.param) {
+	#calculate partial R2 for logistic regression
+	gamma = matrix(coefs[-1], nrow = 1)
 	gSg <- gamma%*%covmat%*%t(gamma)
-	aaa <- gSg+alpha^2/4
+	aaa <- gSg+sens.param^2/4
 	return(aaa/(aaa+pi^2/3))
 }
 
+###############
+#Main function call
+###############
 imbensSens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				alpha.range = c(-6,6), 	#range of values of alpha for grid
 				delta.range = c(-6,6), 	#range of values of delta for grid
 				alpha.vals = 100, 	#number of values of alpha for grid
 				delta.vals = 100,		#number of values of delta for grid
+				resp.model = "linear",	#form of model for response: can be one of "linear" and "logistic"
+				trt.model = "logistic",	#form of model for treatment: can be one of "linear" and "logistic"
 				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
 				data = NULL) {
 	#check that data is a data frame
@@ -114,16 +228,29 @@ imbensSens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		
 		
 	#initialize starting values
-	covmat = cov(X)		#sample covariance matrix; needed for partial R2
+	if(resp.model == "logistic")
+		covmat.resp = cov(cbind(X,W))	#sample covariance matrix; needed for partial R2
+	if(trt.model == "logistic")
+		covmat.trt = cov(X)		#sample covariance matrix; needed for partial R2
 	X = cbind(1,X)
-	startvals = starting(X, W)
+	startvals = starting(X, W, resp.model, trt.model)
 
 	#extract quantities needed for se, R^2 calculations
-	timing <-system.time(null.fit <- imbensNBC(Y,W,X,0,0,startvals))
-	r2w.null <- R2W(null.fit$gamma, covmat, 0)
-	lm.null <- lm(Y~W+X-1)
-	se.tau.null <- summary(lm.null)$cov.unscaled[1,1]	#W,W element of t(X)*%*X
-	s2.null <- summary(lm.null)$sigma^2
+	timing <-system.time(null.fit <- max.llik(Y,W,X,0,0,resp.model,trt.model,startvals))
+	if(trt.model == "logistic")
+		r2w.null <- R2.log(null.fit$gamma, covmat.trt, 0)
+	if(resp.model == "logistic")
+		r2y.null <- R2.log((null.fit$beta, null.fit$tau), covmat.resp, 0)
+
+	if(resp.model == "linear") {
+		lm.null <- lm(Y~W+X-1)
+		se.tau.null <- summary(lm.null)$cov.unscaled[1,1]	#W,W element of t(X)*%*X
+		sigma2.null <- summary(lm.null)$sigma^2
+	}
+	if(trt.model == "linear") {
+		lm.null <- lm(W~X-1)
+		s2.null <- summary(lm.null)$sigma^2
+	}
 	
 	#give run time estimate
 	cat("Estimated time to complete grid: ", timing[3]*alpha.vals*delta.vals, " seconds.\n")
@@ -134,16 +261,29 @@ imbensSens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		a = alpha[i]
 		d = delta[j]
 		
-		aaa <- imbensNBC(Y, W, X, a, d, startvals)
+		aaa <- max.llik(Y, W, X, a, d, resp.model, trt.model, startvals)
 		
 		sens.coef[i,j] <- aaa$tau
-		sens.se[i,j] <- sqrt(aaa$sigma2*se.tau.null)
-		R2.resp[i,j] <- round((s2.null-aaa$sigma2)/s2.null,3)
-		R2.trt[i,j] <- round((R2W(aaa$gamma, covmat, a) - r2w.null)/(1-r2w.null),3)
+
+		if(resp.model == "logistic") {
+			R2.resp[i,j] <- round((R2.log(c(aaa$gamma, aaa$tau), covmat.resp, d) - r2y.null)/(1-r2y.null),3)
+		#calculate se of tau for logistic reg.
+		}
+
+		if(resp.model == "linear) {
+			R2.resp[i,j] <- round((sigma2.null-aaa$sigma2)/sigma2.null,3)
+			sens.se[i,j] <- sqrt(aaa$sigma2*se.tau.null)
+		}
+
+		if(trt.model == "logistic")
+			R2.trt[i,j] <- round((R2.log(aaa$gamma, covmat.trt, a) - r2w.null)/(1-r2w.null),3)
+		if(trt.model == "linear) 
+			R2.trt[i,j] <- round((s2.null-aaa$sigma2)/s2.null,3)
+
 		startvals <- aaa$ests
 	}}
 
-	return(list(sens.coef, sens.se, R2.resp, R2.trt, lm.null$coef)) 
+	return(list(sens.coef, sens.se, R2.resp, R2.trt)) 
 }
 
 
