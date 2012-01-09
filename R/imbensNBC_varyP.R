@@ -46,14 +46,14 @@ trt.lin.lik <- function(gamma, s2, w, x, alpha) {
 
 ###############
 #Calculating log-likelihoods
-#name gives response model.treatment model
+#name gives response model.treatment model.confounder model
 #calculate log-likelihood for given values of parameters, alpha, delta
 #Y = outcome
 #W = treatment indicator (1 = treatment, 0 = not)
 #b = vector of parameter values (contents vary by function)
 ################
 
-lin.log.llik <- function(b, Y, W, X, alpha, delta, p) {
+lin.log.binomial.lik <- function(b, Y, W, X, alpha, delta, p) {
 	#b = c(gamma, beta, sigma^2, tau)
 	tau <- b[length(b)]
 	sigma2 <- b[length(b)-1]
@@ -64,7 +64,7 @@ lin.log.llik <- function(b, Y, W, X, alpha, delta, p) {
 	return(sum(loglik))
 }
 
-lin.lin.llik <- function(b, Y, W, X, alpha, delta, p) {
+lin.lin.binomial.lik <- function(b, Y, W, X, alpha, delta, p) {
 	#b = c(gamma, beta, s2, sigma^2, tau)
 	tau <- b[length(b)]
 	sigma2 <- b[length(b)-1]
@@ -76,7 +76,7 @@ lin.lin.llik <- function(b, Y, W, X, alpha, delta, p) {
 	return(sum(loglik))
 }
 
-log.log.llik <- function(b, Y, W, X, alpha, delta, p) {
+log.log.binomial.lik <- function(b, Y, W, X, alpha, delta, p) {
 	#b = c(gamma, beta, tau)
 	tau <- b[length(b)]
 	gamma <- b[1:ncol(X)]
@@ -86,7 +86,7 @@ log.log.llik <- function(b, Y, W, X, alpha, delta, p) {
 	return(sum(loglik))
 }
 
-log.lin.llik <- function(b, Y, W, X, alpha, delta, p) {
+log.lin.binomial.lik <- function(b, Y, W, X, alpha, delta, p) {
 	#b = c(gamma, beta, s2, tau)
 	tau <- b[length(b)]
 	s2 <- b[length(b)-1]
@@ -95,6 +95,74 @@ log.lin.llik <- function(b, Y, W, X, alpha, delta, p) {
 	loglik = log((1-p)*resp.log.lik(beta,tau,Y,W,X,0)*trt.lin.lik(gamma, s2, W, X, 0) +
 			(p)*resp.log.lik(beta,tau,Y,W,X,delta)*trt.lin.lik(gamma, s2, W, X, alpha) )
 	return(sum(loglik))
+}
+
+lin.log.normal.lik <- function(b, Y, W, X, alpha, delta) {
+	#b = c(gamma, beta, sigma2, tau)
+	tau <- b[length(b)]
+	sigma2 <- b[length(b)-1]
+	gamma <- b[1:ncol(X)]
+	beta <- b[(ncol(X)+1):(length(b)-2)]
+	lik <- function(u){
+	 resp.lin.lik(beta,tau,sigma2,Y,W,X,delta*u)*trt.log.lik(gamma, W, X, alpha*u)*dnorm(u) 
+	}
+	v.lik <- function(u){
+		aaa = sapply(u, lik)
+		return(apply(aaa,2,sum))
+	}
+	aaa <- integrate(v.lik, -6, 6)
+	return(aaa$value)
+}
+
+lin.lin.normal.lik <- function(b, Y, W, X, alpha, delta) {
+	#b = c(gamma, beta, s2, sigma^2, tau)
+	tau <- b[length(b)]
+	sigma2 <- b[length(b)-1]
+	s2 <- b[length(b)-2]
+	gamma <- b[1:ncol(X)]
+	beta <- b[(ncol(X)+1):(length(b)-3)]
+	lik <- function(u){
+	 resp.lin.lik(beta,tau,sigma2,Y,W,X,delta)*trt.lin.lik(gamma, s2, W, X, alpha)*dnorm(u) 
+	}
+	v.lik <- function(u){
+		aaa = sapply(u, lik)
+		return(apply(aaa,2,sum))
+	}
+	aaa <- integrate(v.lik, -6, 6)
+	return(aaa$value)
+}
+
+log.log.normal.lik <- function(b, Y, W, X, alpha, delta) {
+	#b = c(gamma, beta, tau)
+	tau <- b[length(b)]
+	gamma <- b[1:ncol(X)]
+	beta <- b[(ncol(X)+1):(length(b)-1)]
+	lik <- function(u){
+	 resp.log.lik(beta,tau,Y,W,X,delta)*trt.log.lik(gamma, W, X, alpha)*dnorm(u) 
+	}
+	v.lik <- function(u){
+		aaa = sapply(u, lik)
+		return(apply(aaa,2,sum))
+	}
+	aaa <- integrate(v.lik, -6, 6)
+	return(aaa$value)
+}
+
+log.lin.normal.lik <- function(b, Y, W, X, alpha, delta) {
+	#b = c(gamma, beta, s2, tau)
+	tau <- b[length(b)]
+	s2 <- b[length(b)-1]
+	gamma <- b[1:ncol(X)]
+	beta <- b[(ncol(X)+1):(length(b)-2)]
+	lik <- function(u){
+	 resp.log.lik(beta,tau,Y,W,X,delta)*trt.lin.lik(gamma, s2, W, X, alpha)*dnorm(u) 
+	}
+	v.lik <- function(u){
+		aaa = sapply(u, lik)
+		return(apply(aaa,2,sum))
+	}
+	aaa <- integrate(v.lik, -6, 6)
+	return(aaa$value)
 }
 
 ###############
@@ -135,7 +203,7 @@ starting <- function(xmat, W, resp.model, trt.model){
 #Likelihood maximization
 ###############
 
-max.llik <- function(Y, W, X, alpha, delta, resp.model, trt.model, startvals = NULL) {
+max.llik <- function(Y, W, X, alpha, delta, resp.model, trt.model, conf.model, p, startvals = NULL) {
 	#maximize likelihood for given values of alpha, delta
 	if(is.null(startvals))
 		startvals = starting(X, W, resp.model, trt.model)
@@ -143,10 +211,55 @@ max.llik <- function(Y, W, X, alpha, delta, resp.model, trt.model, startvals = N
 		stop(paste("starting values should be a vector of length ", 2*dim(X)[2]+1 + (resp.model == "linear") + (trt.model == "linear"), sep = ""))
 	names(startvals) = NULL
 
-	llik.fn <- paste(substr(resp.model,1,3), substr(trt.model,1,3), "llik", sep = ".")
-	mleVals = optim(startvals, llik.fn, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta) 
-#need to return: gamma, beta, tau, sigma2, s2 as needed
-	return(list(tau = mleVals$par[length(startvals)], alpha = alpha, delta = delta, ests = mleVals$par))
+	if(conf.model == "binomial"){
+		if(trt.model == "linear") {
+			if(resp.model == "linear") {
+				mleVals = optim(startvals, fn = lin.lin.binomial.lik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta, p = p) 
+			}
+			if(resp.model == "logistic") {
+				mleVals = optim(startvals, fn = log.lin.binomial.lik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta, p = p) 
+			}
+		}
+		if(trt.model == "logistic") {
+			if(resp.model == "linear") {
+				mleVals = optim(startvals, fn = lin.log.binomial.lik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta, p = p) 
+			}
+			if(resp.model == "logistic") {
+				mleVals = optim(startvals, fn = log.log.binomial.lik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta, p = p) 
+			}
+		}
+	}
+	if(conf.model == "normal"){
+		if(trt.model == "linear") {
+			if(resp.model == "linear") {
+				mleVals = optim(startvals, fn = lin.lin.normal.lik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta) 
+			}
+			if(resp.model == "logistic") {
+				mleVals = optim(startvals, fn = log.lin.normal.lik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta) 
+			}
+		}
+		if(trt.model == "logistic") {
+			if(resp.model == "linear") {
+				mleVals = optim(startvals, fn = lin.log.normal.lik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta) 
+			}
+			if(resp.model == "logistic") {
+				mleVals = optim(startvals, fn = log.log.normal.lik, method = "BFGS", hessian = F, control = list(fnscale = -1,maxit=25000,reltol=1e-17), Y=Y, W=W, X=X, alpha=alpha, delta=delta) 
+			}
+		}
+	}
+	if(trt.model == "linear") {
+		s2 = mleVals$par[2*ncol(X)+1]
+	}else{ s2 = NULL }
+
+	if(resp.model == "linear") {
+		sigma2 = mleVals$par[length(mleVals$par)-1]
+	}else{ sigma2 = NULL }
+	return(list(tau = mleVals$par[length(startvals)], 
+			gamma = mleVals$par[1:ncol(X)], 
+			beta = mleVals$par[(ncol(X)+1):(2*ncol(X))], 
+			trt.s2 = s2,
+			resp.s2 = sigma2,
+			alpha = alpha, delta = delta, ests = mleVals$par))
 }
 
 #################
@@ -194,6 +307,8 @@ imbensSens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				delta.vals = 100,		#number of values of delta for grid
 				resp.model = "linear",	#form of model for response: can be one of "linear" and "logistic"
 				trt.model = "logistic",	#form of model for treatment: can be one of "linear" and "logistic"
+				conf.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
+				p = 0.5,			#Pr(U = 1) for binomial model
 				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
 				data = NULL) {
 	#check that data is a data frame
@@ -236,11 +351,11 @@ imbensSens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	startvals = starting(X, W, resp.model, trt.model)
 
 	#extract quantities needed for se, R^2 calculations
-	timing <-system.time(null.fit <- max.llik(Y,W,X,0,0,resp.model,trt.model,startvals))
+	timing <-system.time(null.fit <- max.llik(Y,W,X,0,0,resp.model,trt.model,conf.model,p,startvals))
 	if(trt.model == "logistic")
 		r2w.null <- R2.log(null.fit$gamma, covmat.trt, 0)
 	if(resp.model == "logistic")
-		r2y.null <- R2.log((null.fit$beta, null.fit$tau), covmat.resp, 0)
+		r2y.null <- R2.log(c(null.fit$beta, null.fit$tau), covmat.resp, 0)
 
 	if(resp.model == "linear") {
 		lm.null <- lm(Y~W+X-1)
@@ -261,7 +376,7 @@ imbensSens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		a = alpha[i]
 		d = delta[j]
 		
-		aaa <- max.llik(Y, W, X, a, d, resp.model, trt.model, startvals)
+		aaa <- max.llik(Y, W, X, a, d, resp.model, trt.model, conf.model, p, startvals)
 		
 		sens.coef[i,j] <- aaa$tau
 
@@ -270,15 +385,15 @@ imbensSens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		#calculate se of tau for logistic reg.
 		}
 
-		if(resp.model == "linear) {
-			R2.resp[i,j] <- round((sigma2.null-aaa$sigma2)/sigma2.null,3)
-			sens.se[i,j] <- sqrt(aaa$sigma2*se.tau.null)
+		if(resp.model == "linear") {
+			R2.resp[i,j] <- round((sigma2.null-aaa$resp.s2)/sigma2.null,3)
+			sens.se[i,j] <- sqrt(aaa$resp.s2*se.tau.null)
 		}
 
 		if(trt.model == "logistic")
 			R2.trt[i,j] <- round((R2.log(aaa$gamma, covmat.trt, a) - r2w.null)/(1-r2w.null),3)
-		if(trt.model == "linear) 
-			R2.trt[i,j] <- round((s2.null-aaa$sigma2)/s2.null,3)
+		if(trt.model == "linear") 
+			R2.trt[i,j] <- round((s2.null-aaa$trt.s2)/s2.null,3)
 
 		startvals <- aaa$ests
 	}}
@@ -288,7 +403,7 @@ imbensSens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 
 library(foreign)
-lalonde<-read.dta("C:/Users/Nicole/Documents/causalSA/data/lalonde data.dta")
+lalonde<-read.dta("C:/Users/Nicole/Documents/causalSA/R_package/trunk/data/lalonde data.dta")
 
 re74per <- with(lalonde,re74/1000)
 re75per <- with(lalonde,re75/1000)
@@ -297,13 +412,16 @@ W <- with(lalonde,t)
 Y <- with(lalonde,re78/1000)
 
 #test grid analysis
-test.run <- imbensSens(Y~W+X, alpha.vals = 10, delta.vals = 10, standardize = F, alpha.range = c(0,5), delta.range = c(0,5))
+test.run <- imbensSens(Y~W+X, alpha.vals = 10, delta.vals = 10, standardize = F, alpha.range = c(0,5), delta.range = c(0,5),
+		trt.model = "linear",
+		resp.model = "linear",
+		conf.model = "binomial")
 test.run <- imbensSens(Y~W+X, alpha.vals = 10, delta.vals = 10, standardize = T, alpha.range = c(-3,3), delta.range = c(-3,3))
 
 #test single fit
-aaa <- imbensNBC(Y, W, cbind(1,X), 0, 0)
+aaa <- max.llik(Y, W, cbind(1,X), 0, 0)
 
 aldelval <- rbind(cbind(0.50279853, 8.5021953), cbind(0.6450885, 6.4783214), cbind(0.9534333, 4.3531752), cbind(1.2617781, 3.333822),cbind(1.7271499, 2.5110906),cbind(2.1572981, 2.0847482),cbind(2.5881854, 1.8135855),cbind(3.042803, 1.6231488))
 
 for(i in 1:8)
-print(imbensNBC(Y,W,cbind(1,X), aldelval[i,1], aldelval[i,2]))
+print(max.llik(Y,W,cbind(1,X), aldelval[i,1], aldelval[i,2]))
