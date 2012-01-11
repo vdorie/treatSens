@@ -1,32 +1,11 @@
 setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
 source("BART_cont.R")
-#################
-#Housekeeping functions
-#################
-
-parse.formula <- function(form, data) {
-	#extract variables from formula & data
-	aaa <- model.frame(form, data = data)
-	trt <- aaa[,2]				#assume treatment is 1st var on RHS
-	covars <- aaa[,-c(1:2)]			#rest of variables on RHS
-	resp <- aaa[,1]				#response from LHS
-	
-	return(list(resp = resp, trt = trt, covars = covars))
-}
-
-std.nonbinary <- function(X) {
-	#returns standardized values of vector not consisting of only 0s and 1s
-	if(length(unique(X))!=2)
-		X = (X - mean(X))/sd(X)
-	else if(sum(unique(X) == c(1,0)) !=2)
-		X = (X - mean(X))/sd(X)
-	return(X)
-}
+source("GLMA_sens.R")
 
 ###############
 #Main function call
 ###############
-GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
+BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				resp.rho.vals = 100, 		#number or vector of values of partial correlation with response for grid
 				trt.rho.vals = 100,		#number or vector of values of partial correlation with treatment for grid
 				resp.rho.range = c(-0.5,0.5), #range of values of partial correlation with response for grid (if given # of values)
@@ -38,6 +17,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
 				data = NULL) {
+	require(BayesTree)
+
 	#check that data is a data frame
 	if(!is.null(data)) {
 		if(class(data) == "matrix") {
@@ -84,11 +65,12 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	}
 		
 	#fit null model & get residuals (and time it)
-	timing <- system.time(null.resp <- glm(Y~X+Z, resp.family))
-	timing <- timing+system.time(null.trt <- glm(Z~X, trt.family))
+	timing <- system.time(null.resp <- bart(x.train = cbind(Z,X), y.train = Y))
+	timing <- timing+system.time(null.trt <- bart(x.train = X, y.train = Z))
 	
-	Y.res <- Y-null.resp$fitted.values
-	Z.res <- Z-null.trt$fitted.values
+	Y.res <- Y-null.resp$yhat.train.mean	#residuals from BART fit - means, or random column? if latter, 
+								#s/b in loop, I think
+	Z.res <- Z-null.trt$yhat.train.mean 	#residuals from trt BART fit
 
 	#give run time estimate
 	cat("Estimated time to complete grid: ", timing[3]*nY*nZ*nsim, " seconds.\n")
@@ -109,9 +91,11 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 			U <- contYZbinaryU(Y.res, Z.res, rY, rZ, p)	
 
 		#fit models with U
-		fit.glm <- glm(Y~X+U+Z, resp.family)
-		fit.trt <- glm(Z~X+U, trt.family)		
-
+		#what should test data be?  Allow options e.g. ATE, ATT, ATC? (Assuming Z binary)
+		fit.resp <- bart(x.train = cbind(Z,X,U), y.train = Y)
+		fit.trt <- bart(x.train = cbind(X,U), y.train = Z)
+		
+########Need to update definitions of outputs, choice of outputs
 		sens.coef[i,j,k] <- fit.glm$coef[n+1]
 		sens.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n+1,n+1] #SE of Z coef
 		delta[i,j,k] <- fit.glm$coef[n]  #estimated coefficient of U in response model
@@ -124,25 +108,3 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
 }
-
-library(foreign)
-lalonde<-read.dta("C:/Users/Nicole/Documents/causalSA/R_package/trunk/data/lalonde data.dta")
-
-re74per <- with(lalonde,re74/1000)
-re75per <- with(lalonde,re75/1000)
-X <- with(lalonde,cbind(married,age,black,hisp,educ,re74per,reo74,re75per,reo75))
-Z <- with(lalonde,t)
-Y <- with(lalonde,re78/1000)
-
-
-#test grid analysis
-test.run <- GLM.sens(Y~Z+X, resp.rho.vals = 100, trt.rho.vals = 100, standardize = F, resp.rho.range = c(-0.5,0.5), trt.rho.range = c(-0.5,0.5),
-		trt.family = binomial,
-		resp.family = gaussian,
-		conf.model = "binomial",
-		nsim = 200)
-
-round(apply(test.run[[5]], c(1,2), mean),3)
-round(apply(test.run[[5]], c(1,2), sd),3)
-round(apply(test.run[[6]], c(1,2), mean),3)
-round(apply(test.run[[6]], c(1,2), sd),3)

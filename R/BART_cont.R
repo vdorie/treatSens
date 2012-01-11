@@ -74,12 +74,12 @@ contYZU <- function(Y, Z, rho_y, rho_z) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZbinaryU <- function(Y, Z, rho_y, rho_z, p) {
+contYZbinaryU <- function(Y, Z, rho_y, rho_z, p, tol = 0.01, maxit = 100) {
 
 	signY = sign(rho_y)
 	signZ = sign(rho_z)
-	rho_y = abs(rho_y)
-	rho_z = abs(rho_z)
+	rho_y = r_y = abs(rho_y)
+	rho_z = r_z = abs(rho_z)
 
 	n <- length(Y)
 	s_Y <- sd(Y)*sqrt((n-1)/n)
@@ -93,7 +93,21 @@ contYZbinaryU <- function(Y, Z, rho_y, rho_z, p) {
 
 	aaa = signY*Y + signZ*Z*delta + rnorm(n, 0, s_e)
 
-	U <- aaa > quantile(aaa, probs = p)
+	U <- aaa > quantile(aaa, probs = 1-p)
+	
+	ry = cor(U,Y)
+	rz = cor(U,Z)
+	iter = 0
+	while(|ry-rho_y| + |rz-rho_z| > tol & iter < maxit) {
+		iter = iter +1
+		pos = sum(U)
+		neg = n-pos
+		switch = c(sample(1:pos,1), sample(1:neg,1))
+		U[U][switch[1]] = FALSE
+		U[!U][switch[2]] = TRUE
+		ry = cor(U,Y)
+		rz = cor(U,Z)
+	}
 
 	return(as.numeric(U))
 }
