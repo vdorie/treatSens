@@ -1,6 +1,6 @@
 setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
 source("BART_cont.R")
-source("GLMA_sens.R")
+source("GLM_sens.R")
 
 ###############
 #Main function call
@@ -10,8 +10,8 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				trt.rho.vals = 100,		#number or vector of values of partial correlation with treatment for grid
 				resp.rho.range = c(-0.5,0.5), #range of values of partial correlation with response for grid (if given # of values)
 				trt.rho.range = c(-0.5,0.5), 	#range of values of partial correlation with treatment for grid (if given # of values)
-				resp.family = gaussian,	#family for GLM of model for response
-				trt.family = gaussian,	#family for GLM of model for treatment
+				est.type = "ATE",			#type of estimand desired: one of ATT, ATC, ATE.  Assumes binary Z with 1 = treatment
+				x.counterfactual = NULL,	#Covariate matrix with counterfactual Z as first column.  Will override est.type if provided
 				conf.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
 				p = 0.5,			#Pr(U = 1) for binomial model
 				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
@@ -65,15 +65,40 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	}
 		
 	#fit null model & get residuals (and time it)
-	timing <- system.time(null.resp <- bart(x.train = cbind(Z,X), y.train = Y))
-	timing <- timing+system.time(null.trt <- bart(x.train = X, y.train = Z))
+	if(!is.null(X)) {
+		timing <- system.time(null.resp <- bart(x.train = cbind(Z,X), y.train = Y))
+		null.trt <- bart(x.train = X, y.train = Z)
+		Z.res <- Z-null.trt$yhat.train.mean 	#residuals from trt BART fit
+
+	}else{
+		timing <- system.time(null.resp <- bart(x.train = Z, y.train = Y))
+		Z.res <- Z-mean(Z) 	#residuals from mean model
+	}
 	
 	Y.res <- Y-null.resp$yhat.train.mean	#residuals from BART fit - means, or random column? if latter, 
 								#s/b in loop, I think
-	Z.res <- Z-null.trt$yhat.train.mean 	#residuals from trt BART fit
 
+	#generate training data for parameter estimate
+	if(!is.null(x.counterfactual)){
+		x.test = x.counterfactual
+	}else{
+		if(est.type == "ATE"){
+			Z.est = 1-Z
+			x.test = cbind(Z.est,X)
+		}
+		elseif(est.type == "ATT"){
+			Z.est = 1-Z[Z==1]
+			x.test = cbind(Z.est, X[Z==1,])
+		}
+		elseif(est.type == "ATC"){
+			Z.est = 1-Z[Z==0]
+			x.test = cbind(Z.est, X[Z==0,])
+		}
+		else
+			stop("Invalid est.type")
+	}
 	#give run time estimate
-	cat("Estimated time to complete grid: ", timing[3]*nY*nZ*nsim, " seconds.\n")
+	cat("Estimated time to complete grid: ", 2*timing[3]*nY*nZ*nsim, " seconds.\n")
 
 	n = length(null.resp$coef)
 
@@ -86,15 +111,19 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		
 		#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
 		if(conf.model == "normal")
-			U <- contYZU(Y.res, Z.res, rY, rZ)
+			U <- try(contYZU(Y.res, Z.res, rY, rZ))
 		if(conf.model == "binomial")
-			U <- contYZbinaryU(Y.res, Z.res, rY, rZ, p)	
+			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ, p))	
 
+	if(!(class(U) == "try-error")){
 		#fit models with U
-		#what should test data be?  Allow options e.g. ATE, ATT, ATC? (Assuming Z binary)
-		fit.resp <- bart(x.train = cbind(Z,X,U), y.train = Y)
-		fit.trt <- bart(x.train = cbind(X,U), y.train = Z)
-		
+		if(!is.null(X)) {
+			fit.resp <- bart(x.train = cbind(Z,X,U), y.train = Y, x.test = x.test)
+			fit.trt <- bart(x.train = cbind(X,U), y.train = Z)
+		}else{
+			fit.resp <- bart(x.train = cbind(Z,U), y.train = Y, x.test = x.test)
+			fit.trt <- bart(x.train = U, y.train = Z)
+		}		
 ########Need to update definitions of outputs, choice of outputs
 		sens.coef[i,j,k] <- fit.glm$coef[n+1]
 		sens.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n+1,n+1] #SE of Z coef
@@ -104,7 +133,7 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		#to return this array we don't need to spend the computing time to fit it
 		resp.cor[i,j,k] <- cor(Y.res,U) #do we want cor(Y,U) or cor(Y.res, U)?
 		trt.cor[i,j,k] <- cor(Z.res,U)
-	}}}
+	}}}}
 
 	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
 }

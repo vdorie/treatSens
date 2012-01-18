@@ -10,6 +10,9 @@ parse.formula <- function(form, data) {
 	trt <- aaa[,2]				#assume treatment is 1st var on RHS
 	covars <- aaa[,-c(1:2)]			#rest of variables on RHS
 	resp <- aaa[,1]				#response from LHS
+
+	if(dim(aaa)[2] == 2)
+		covars = NULL
 	
 	return(list(resp = resp, trt = trt, covars = covars))
 }
@@ -84,9 +87,14 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	}
 		
 	#fit null model & get residuals (and time it)
-	timing <- system.time(null.resp <- glm(Y~X+Z, resp.family))
-	timing <- timing+system.time(null.trt <- glm(Z~X, trt.family))
-	
+	if(!is.null(X)) {
+		timing <- system.time(null.resp <- glm(Y~X+Z, resp.family))
+		timing <- timing+system.time(null.trt <- glm(Z~X, trt.family))
+	}else{
+		timing <- system.time(null.resp <- glm(Y~Z, resp.family))
+		timing <- timing+system.time(null.trt <- glm(Z~1, trt.family))
+	}
+
 	Y.res <- Y-null.resp$fitted.values
 	Z.res <- Z-null.trt$fitted.values
 
@@ -104,14 +112,20 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		
 		#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
 		if(conf.model == "normal")
-			U <- contYZU(Y.res, Z.res, rY, rZ)
+			U <- try(contYZU(Y.res, Z.res, rY, rZ))
 		if(conf.model == "binomial")
-			U <- contYZbinaryU(Y.res, Z.res, rY, rZ, p)	
-
+			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ, p))	
+	if(!(class(U) == "try-error")){
+		#try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
+		#Do we want to return a warning/the error message/our own error message if try fails?
 		#fit models with U
-		fit.glm <- glm(Y~X+U+Z, resp.family)
-		fit.trt <- glm(Z~X+U, trt.family)		
-
+		if(!is.null(X)) {
+			fit.glm <- glm(Y~X+U+Z, resp.family)
+			fit.trt <- glm(Z~X+U, trt.family)		
+		}else{
+			fit.glm <- glm(Y~U+Z, resp.family)
+			fit.trt <- glm(Z~U, trt.family)		
+		}
 		sens.coef[i,j,k] <- fit.glm$coef[n+1]
 		sens.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n+1,n+1] #SE of Z coef
 		delta[i,j,k] <- fit.glm$coef[n]  #estimated coefficient of U in response model
@@ -120,7 +134,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		#to return this array we don't need to spend the computing time to fit it
 		resp.cor[i,j,k] <- cor(Y.res,U) #do we want cor(Y,U) or cor(Y.res, U)?
 		trt.cor[i,j,k] <- cor(Z.res,U)
-	}}}
+	}}}}
 
 	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
 }
@@ -135,12 +149,12 @@ Z <- with(lalonde,t)
 Y <- with(lalonde,re78/1000)
 
 
-#test grid analysis
-test.run <- GLM.sens(Y~Z+X, resp.rho.vals = 100, trt.rho.vals = 100, standardize = F, resp.rho.range = c(-0.5,0.5), trt.rho.range = c(-0.5,0.5),
+test grid analysis
+test.run <- GLM.sens(Y~Z+X, resp.rho.vals = 20, trt.rho.vals = 20, standardize = F, resp.rho.range = c(-0.5,0.5), trt.rho.range = c(-0.5,0.5),
 		trt.family = binomial,
 		resp.family = gaussian,
 		conf.model = "binomial",
-		nsim = 200)
+		nsim = 100)
 
 round(apply(test.run[[5]], c(1,2), mean),3)
 round(apply(test.run[[5]], c(1,2), sd),3)
