@@ -1,5 +1,6 @@
 setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
 source("BART_cont.R")
+source("object_def.R")
 #################
 #Housekeeping functions
 #################
@@ -36,9 +37,9 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				trt.rho.range = c(-0.5,0.5), 	#range of values of partial correlation with treatment for grid (if given # of values)
 				resp.family = gaussian,	#family for GLM of model for response
 				trt.family = gaussian,	#family for GLM of model for treatment
-				conf.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
+				U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
 				p = 0.5,			#Pr(U = 1) for binomial model
-				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
+				standardize = TRUE,	#Logical: should variables be standardized?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
 				data = NULL) {
 	#check that data is a data frame
@@ -77,7 +78,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		rhoZ <- trt.rho.vals
 	}
 	
-	sens.coef <- sens.se <- alpha <- delta <- resp.cor <- trt.cor <- array(NA, dim = c(nY, nZ, nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
+	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.cor <- trt.cor <- array(NA, dim = c(nY, nZ, nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 	
 	#standardize variables
 	if(standardize) {
@@ -111,9 +112,9 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		rZ = rhoZ[j]
 		
 		#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
-		if(conf.model == "normal")
+		if(U.model == "normal")
 			U <- try(contYZU(Y.res, Z.res, rY, rZ))
-		if(conf.model == "binomial")
+		if(U.model == "binomial")
 			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ, p))	
 	if(!(class(U) == "try-error")){
 		#try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
@@ -130,13 +131,16 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		sens.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n+1,n+1] #SE of Z coef
 		delta[i,j,k] <- fit.glm$coef[n]  #estimated coefficient of U in response model
 		alpha[i,j,k] <- fit.trt$coef[n]  #estimated coef of U in trt model
-		#note this is the only use of fitting trt model with U, so if we choose not 
-		#to return this array we don't need to spend the computing time to fit it
-		resp.cor[i,j,k] <- cor(Y.res,U) #do we want cor(Y,U) or cor(Y.res, U)?
+		delta.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n,n] #SE of U coef in response model
+		alpha.se[i,j,k] <- summary(fit.trt)$cov.unscaled[n,n] #SE of U coef in trt model
+		resp.cor[i,j,k] <- cor(Y.res,U) 
 		trt.cor[i,j,k] <- cor(Z.res,U)
 	}}}}
 
 	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
+	#result <- new("sensitivity",tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, se.alpha = alpha.se, se.delta = delta.se, resp.cor = resp.cor, trt.cor = trt.cor)
+	#class(result) <- "sensitivity"
+	#return(result)
 }
 
 library(foreign)
@@ -149,11 +153,11 @@ Z <- with(lalonde,t)
 Y <- with(lalonde,re78/1000)
 
 
-test grid analysis
-test.run <- GLM.sens(Y~Z+X, resp.rho.vals = 20, trt.rho.vals = 20, standardize = F, resp.rho.range = c(-0.5,0.5), trt.rho.range = c(-0.5,0.5),
+#test grid analysis
+test.run.std <- GLM.sens(Y~Z+X, resp.rho.vals = 20, trt.rho.vals = 20, standardize = T, resp.rho.range = c(-0.5,0.5), trt.rho.range = c(-0.5,0.5),
 		trt.family = binomial,
 		resp.family = gaussian,
-		conf.model = "binomial",
+		U.model = "binomial",
 		nsim = 100)
 
 round(apply(test.run[[5]], c(1,2), mean),3)
