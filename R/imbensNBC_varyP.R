@@ -210,7 +210,7 @@ max.llik <- function(Y, W, X, alpha, delta, resp.model, trt.model, conf.model, p
 	else if(length(startvals) != (2*dim(X)[2] + 1 + (resp.model == "linear") + (trt.model == "linear")))
 		stop(paste("starting values should be a vector of length ", 2*dim(X)[2]+1 + (resp.model == "linear") + (trt.model == "linear"), sep = ""))
 	names(startvals) = NULL
-
+###try using "switch" function
 	if(conf.model == "binomial"){
 		if(trt.model == "linear") {
 			if(resp.model == "linear") {

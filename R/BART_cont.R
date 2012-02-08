@@ -68,6 +68,27 @@ contYZU <- function(Y, Z, rho_y, rho_z) {
 }
 
 ###############
+#Normalize a variable X via Box-Cox transorm 
+#X: continuous response variable
+###############
+
+BoxCox <- function(X) {
+
+	lambda <- seq(-5,5, by = 0.1)
+	norm.vec <- sort(rnorm(length(X)))
+	X = X + abs(min(X)) + 1
+
+	lin.cor = vector()
+	for(i in 1:length(lambda)) {
+		X.trans <- (X^lambda[i]-1)/lambda[i]
+		lin.cor[i] <- cor(X.trans[order(X.trans)], norm.vec)
+	}
+	ml = lambda[lin.cor == max(lin.cor, na.rm = T) & !is.na(lin.cor)]
+	return((X^ml-1)/ml)
+}
+
+
+###############
 #Generate U 
 #Y: continuous response variable
 #Z: continuous treatment variable
@@ -78,10 +99,15 @@ contYZbinaryU <- function(Y, Z, rho_y, rho_z, p) {
 
 	signY = sign(rho_y)
 	signZ = sign(rho_z)
-	rho_y = r_y = abs(rho_y)/.7978
-	rho_z = r_z = abs(rho_z)/.8026
+	r_y = abs(rho_y)
+	r_z = abs(rho_z)
+	rho_y = abs(rho_y)/.7978
+	rho_z = abs(rho_z)/.8026
 #Inflation factors to get resulting correlations right.  
 #Indicates that we can't generate correlations above ~0.8
+
+	Y <- BoxCox(Y)
+	Z <- BoxCox(Z)
 
 	n <- length(Y)
 	s_Y <- sd(Y)*sqrt((n-1)/n)
@@ -95,6 +121,16 @@ contYZbinaryU <- function(Y, Z, rho_y, rho_z, p) {
 
 	aaa = signY*Y + signZ*Z*delta + rnorm(n, 0, s_e)
 
+	probs = seq(0.01, 0.99, by = 0.01)
+	diff = vector()
+
+	for( i in 1:length(probs)) {
+		p = probs[i]
+		U <- aaa > quantile(aaa, probs = 1-p)
+		diff[i] = (cor(Y,U)-r_y)^2 + (cor(Z,U)-r_z)^2
+	}
+	
+	p = probs[diff == min(diff, na.rm = T)]
 	U <- aaa > quantile(aaa, probs = 1-p)
 	
 	return(as.numeric(U))
