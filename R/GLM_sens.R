@@ -31,8 +31,17 @@ std.nonbinary <- function(X) {
 #Calculate minimum and maximum possible correlations
 ###############
 
+#calculate the determinant of the covariance matrix
 detCovar <- function(rYU, rZU, rYZ){
 	return(1+2*rYU*rZU*rYZ-rYU^2-rZU^2-rYZ^2)
+}
+
+#find positive rYU for which the determinant of the covariance matrix is 0
+#given rYZ and rZU.  If positive root does not exist, return NA
+rootGivenRZ <- function(rYZ, rZU) {
+	rY = rYZ*rZU + sqrt((1-rYZ^2)*(1-rZU^2))
+	rY[rY < 0] = NA
+	return(rY)
 }
 
 #Note this creates a rectangle with corners as close as possible to (-1,1) and (1,1) 
@@ -43,10 +52,7 @@ minMaxCor <- function(Y,Z,U.model) {
 		rZ <- seq(-1,1, by = 0.001)
 		rY <- rep(NA, length(rZ))
 		for(i in 1:length(rZ)){
-			temp <- try(uniroot(detCovar, interval = c(0,1), rZU = rZ[i], rYZ = rYZ),silent=T)
-			if(class(temp) != "try-error"){
-			if(abs(temp$f.root) < 1e-4)
-				rY[i] = temp$root
+			rY[i] = rootGivenRZ(rYZ,rZ[i])
 			}
 		}
 		temp = sqrt((1-rZ)^2+(1-rY)^2)
@@ -61,6 +67,11 @@ minMaxCor <- function(Y,Z,U.model) {
 	}
 
 	return(cbind(minCor, maxCor))
+}
+
+#return a vector of maximum feasible rYU given a vector of rZU and rYZ
+feasibleCor <- function(rYZ, rZU) {
+	return(rootGivenRZ(rYZ, rZU))
 }
 
 ###############
