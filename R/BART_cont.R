@@ -96,7 +96,6 @@ BoxCox <- function(X) {
 ###############
 
 contYZbinaryU <- function(Y, Z, rho_y, rho_z, p) {
-
 	signY = sign(rho_y)
 	signZ = sign(rho_z)
 	r_y = abs(rho_y)
@@ -106,8 +105,8 @@ contYZbinaryU <- function(Y, Z, rho_y, rho_z, p) {
 #Inflation factors to get resulting correlations right.  
 #Indicates that we can't generate correlations above ~0.8
 
-	Y <- BoxCox(Y)
-	Z <- BoxCox(Z)
+	#Y <- BoxCox(Y)
+	#Z <- BoxCox(Z)
 
 	n <- length(Y)
 	s_Y <- sd(Y)*sqrt((n-1)/n)
@@ -127,7 +126,7 @@ contYZbinaryU <- function(Y, Z, rho_y, rho_z, p) {
 	for( i in 1:length(probs)) {
 		p = probs[i]
 		U <- aaa > quantile(aaa, probs = 1-p)
-		diff[i] = (cor(Y,U)-r_y)^2 + (cor(Z,U)-r_z)^2
+		diff[i] = (cor(Y,U)-rho_y)^2 + (cor(Z,U)-rho_z)^2
 	}
 	
 	p = probs[diff == min(diff, na.rm = T)]
@@ -136,6 +135,33 @@ contYZbinaryU <- function(Y, Z, rho_y, rho_z, p) {
 	return(as.numeric(U))
 }
 
+contYZbinaryU <- function(Y, Z, rho_y, rho_z) {
+
+
+	tauFromCor <- function(rho,range=c(-100,100)) {
+		#find the tau that yields correlation w. binary under scenario setup
+		#need some type of search thru taus:
+    		objective <- function(tau) {
+			tau*dnorm(0)/(sqrt(1+tau^2)*0.5)-rho
+		}
+    		r <- uniroot(objective,range)
+    		r$root
+	}
+
+	rhoFromTau<-function(tau) {
+	    #rho here is the correlation between eta & nu.
+		#given the setup, with both stochastic components std normal, the correl is a simple function of tau.
+		rho <- tau/sqrt(tau^2+1)
+		rho
+	}
+
+	r_y = rhoFromTau(tauFromCor(rho_y))
+	r_z = rhoFromTau(tauFromCor(rho_z))
+
+	latentU = contYZU(Y, Z, r_y, r_z)
+	U = latentU > median(latentU)
+	return(U)
+}
 
 #tau  = seq(-3, 3, by = 0.5)
 #cYZ = cYU = cZU = vector()

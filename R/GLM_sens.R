@@ -31,10 +31,30 @@ std.nonbinary <- function(X) {
 #Calculate minimum and maximum possible correlations
 ###############
 
+detCovar <- function(rYU, rZU, rYZ){
+	return(1+2*rYU*rZU*rYZ-rYU^2-rZU^2-rYZ^2)
+}
+
+#Note this creates a rectangle with corners as close as possible to (-1,1) and (1,1) 
+#some feasible values are excluded as the border between feasible & infeasible is parabolic
 minMaxCor <- function(Y,Z,U.model) {
-	
+	rYZ = cor(Y,Z)
 	if(U.model == "normal") {
-	
+		rZ <- seq(-1,1, by = 0.001)
+		rY <- rep(NA, length(rZ))
+		for(i in 1:length(rZ)){
+			temp <- try(uniroot(detCovar, interval = c(0,1), rZU = rZ[i], rYZ = rYZ),silent=T)
+			if(class(temp) != "try-error"){
+			if(abs(temp$f.root) < 1e-4)
+				rY[i] = temp$root
+			}
+		}
+		temp = sqrt((1-rZ)^2+(1-rY)^2)
+		n = (1:length(temp))[temp == min(temp, na.rm =T) &!is.na(temp) ]
+		temp = sqrt((-1-rZ)^2+(1-rY)^2)
+		m = (1:length(temp))[temp == min(temp, na.rm =T) &!is.na(temp) ]
+		return(cbind(rZ[c(n,m)], rY[c(n,m)]))
+		#need to check consistency with later uses.
 	}
 	else if (U.model == "binomial" {
 

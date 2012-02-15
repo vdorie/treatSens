@@ -86,29 +86,30 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		if(U.model == "normal")
 			U <- try(contYZU(Y.res, Z.res, rY, rZ))
 		if(U.model == "binomial")
-			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ, p))	
+			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ))	
 	if(!(class(U) == "try-error")){
 		#try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
 		#Do we want to return a warning/the error message/our own error message if try fails?
 		#fit models with U
-		if(!is.null(X)) {
-			fit.glm <- glm(Y~X+U+Z, resp.family)
-			fit.trt <- glm(Z~X+U, trt.family)		
-		}else{
-			fit.glm <- glm(Y~U+Z, resp.family)
-			fit.trt <- glm(Z~U, trt.family)		
-		}
-		sens.coef[i,j,k] <- fit.glm$coef[n+1]
-		sens.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n+1,n+1] #SE of Z coef
-		delta[i,j,k] <- fit.glm$coef[n]  #estimated coefficient of U in response model
-		alpha[i,j,k] <- fit.trt$coef[n]  #estimated coef of U in trt model
-		delta.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n,n] #SE of U coef in response model
-		alpha.se[i,j,k] <- summary(fit.trt)$cov.unscaled[n,n] #SE of U coef in trt model
+	#	if(!is.null(X)) {
+	#		fit.glm <- glm(Y~X+U+Z, resp.family)
+	#		fit.trt <- glm(Z~X+U, trt.family)		
+	#	}else{
+	#		fit.glm <- glm(Y~U+Z, resp.family)
+	#		fit.trt <- glm(Z~U, trt.family)		
+	#	}
+	#	sens.coef[i,j,k] <- fit.glm$coef[n+1]
+	#	sens.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n+1,n+1] #SE of Z coef
+	#	delta[i,j,k] <- fit.glm$coef[n]  #estimated coefficient of U in response model
+	#	alpha[i,j,k] <- fit.trt$coef[n]  #estimated coef of U in trt model
+	#	delta.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n,n] #SE of U coef in response model
+	#	alpha.se[i,j,k] <- summary(fit.trt)$cov.unscaled[n,n] #SE of U coef in trt model
 		resp.cor[i,j,k] <- cor(Y.res,U) 
 		trt.cor[i,j,k] <- cor(Z.res,U)
 	}}}}
+	return(list(resp.cor = resp.cor, trt.cor = trt.cor)) 
 
-	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
+#	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
 	#result <- new("sensitivity",tau = sens.coef, se.tau = sens.se, 
 	#			alpha = alpha, delta = delta, 
 	#			se.alpha = alpha.se, se.delta = delta.se, 
@@ -129,13 +130,13 @@ Y <- with(lalonde,re78/1000)
 
 
 #test grid analysis
-test.run.sway <- GLM.sens(Y~Z+X, resp.rho.vals = 100, trt.rho.vals = 100, standardize = T, resp.rho.range = c(-0.5,0.5), trt.rho.range = c(-0.5,0.5),
+test.run <- GLM.sens(Y~Z+X, resp.rho.vals = 20, trt.rho.vals = 20, standardize = T, resp.rho.range = c(-0.5,0.5), trt.rho.range = c(-0.5,0.5),
 		trt.family = binomial,
 		resp.family = gaussian,
-		U.model = "normal",
-		nsim = 50)
+		U.model = "binomial",
+		nsim = 10)
 
-tauS <- apply(test.run[[1]], c(1,2), mean)
+round(apply(test.run[[1]], c(1), mean),3)
 round(apply(test.run[[5]], c(1,2), sd),3)
-round(apply(test.run[[6]], c(1,2), mean),3)
+round(apply(test.run[[2]], c(2), mean),3)
 round(apply(test.run[[6]], c(1,2), sd),3)
