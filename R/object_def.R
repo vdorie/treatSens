@@ -1,8 +1,9 @@
+source("plotSA.R")
 #############
 #Define "sensitivity" object
 #Currently specific to GLM.sens
 #############
-setClass("sensitivity",representation(
+setClass("sensitivity", representation(
 		tau = "array",
 		se.tau = "array",
 		delta = "array",
@@ -14,7 +15,8 @@ setClass("sensitivity",representation(
 		Y = "vector",
 		Z = "vector",
 		X = "matrix",
-		tau0 = "numeric"
+		tau0 = "numeric",
+		Xpartials = "matrix"
 ))
 
 ############
@@ -24,7 +26,7 @@ setClass("sensitivity",representation(
 #commented lines will relabel with average realized s.p.
 ############
 setMethod("summary", signature(object="sensitivity"),
- definition=function(object, ...){
+ definition=function(object){
  	#resp.cor <- object@resp.cor
  	#trt.cor <- object@trt.cor
  	Tau <- object@tau
@@ -37,12 +39,12 @@ setMethod("summary", signature(object="sensitivity"),
 )
 
 ##############
-#print.sensitivity
+#show.sensitivity (should be equivalent to print)
 #prints average values for each cell in grid of:
 #tau, SE of tau, realized sens params, coefficients and their se's
 ##############
-setMethod("print", signature(object="sensitivity"),
-	definition = function(object,...){
+setMethod("show", "sensitivity",
+	definition = function(object){
 		table <- round(apply(object@tau, c(1,2), mean),3)
  		cat("Estimated treatment effects\n")
 		print(table)
@@ -81,9 +83,9 @@ setMethod("print", signature(object="sensitivity"),
 #plot.sensitivity
 #wrapper function - plot function in separate file
 #############
-setMethod("plot", signature(object="sensitivity"),
-	definition = function(object,...){
-		plotSA(object@tau, object@Y, object@Z, object@X,
-			  object@tau0)
+
+setMethod("plot", c("sensitivity", "missing"),
+	definition = function(x,y,...){
+		plotSA(x,...)
 	}
 )
