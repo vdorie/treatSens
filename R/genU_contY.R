@@ -1,4 +1,59 @@
 ###############
+#Calculate minimum and maximum possible correlations
+###############
+
+#find positive rYU for which the determinant of the covariance matrix is 0
+#given rYZ and rZU.  If positive root does not exist, return NA
+rootGivenRZ <- function(rYZ, rZU) {
+	rY = rYZ*rZU + sqrt((1-rYZ^2)*(1-rZU^2))
+	rY[rY < 0] = NA
+	return(rY)
+}
+
+#Note this creates a rectangle with corners as close as possible to (-1,1) and (1,1) 
+#some feasible values are excluded as the border between feasible & infeasible is parabolic
+maxCor <- function(Y,Z) {
+	require(alabama)
+	rYZ = cor(Y,Z)
+
+	detCovar <- function(rU){
+		rYU = rU[1]
+		rZU = rU[2]
+		return(1+2*rYU*rZU*rYZ-rYU^2-rZU^2-rYZ^2)
+	}
+
+
+	upRight <- function(rU) {
+		sqrt((1-rU[2])^2+(1-rU[1])^2)
+	}
+	upLeft <- function(rU) {
+		sqrt((-1-rU[2])^2+(1-rU[1])^2) 
+	}
+	upRgrad <- function(rU) {
+		c(-2*rU[1]*((1-rU[2])^2+(1-rU[1])^2)^(-1/2), -2*rU[2]*((1-rU[2])^2+(1-rU[1])^2)^(-1/2))
+	}
+	upLgrad <- function(rU) {
+		c(-2*rU[1]*((-1-rU[2])^2+(1-rU[1])^2)^(-1/2), -2*rU[2]*((-1-rU[2])^2+(1-rU[1])^2)^(-1/2))
+	}
+	
+	ineqR <- function(rU) {
+		return(c(rU[1], 1-rU[1], rU[2], 1-rU[2]))
+	}
+	ineqL <- function(rU) {
+		return(c(rU[1], 1-rU[1], -rU[2], 1+rU[2]))
+	}
+
+	posMax = auglag(par = c(.5, .5), fn = upRight, gr = upRgrad, heq = detCovar, 
+			hin = ineqR, control.outer = list(trace = F))$par
+	negMax = auglag(par = c(.5, -.5), fn = upLeft, gr = upLgrad, heq = detCovar, 
+			hin = ineqL, control.outer = list(trace = F))$par
+	
+	posMax = sign(posMax)*floor(1000*abs(posMax))/1000
+	negMax = sign(negMax)*floor(1000*abs(negMax))/1000
+	return(rbind(posMax[2:1], negMax[2:1]))
+}
+
+###############
 #Generate U 
 #Y: continuous response variable
 #Z: binary (assumed 0/1) treatment variable
@@ -25,12 +80,10 @@ binaryZcontYU <- function(Y, Z, rho_y, rho_z) {
 	d_u = d_u-d_y
 
 	s_uz = sqrt(s_u^2-sd_Y^2-d_u^2*sd_Z^2-2*d_u*sd_Y*sd_Z*cor(Y,Z))
-	#sqrt(s_u^2-(1-pz)*(mu_0-pz*d_u-mean(Y))^2-(pz)*(mu_1+(1-pz)*d_u-mean(Y))^2)
 
 	U = rep(NA, n)
 	U = signY*Y + signZ*Z*d_u + rnorm(n, -pz*d_u, s_uz)
-	#U[Z==0] = Y[Z==0] + rnorm(n-sum(Z), -pz*d_u, s_uz)
-	#U[Z==1] = Y[Z==1] + rnorm(sum(Z),(1-pz)*d_u, s_uz)
+
 	return(U)
 }
 

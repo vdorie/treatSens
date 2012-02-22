@@ -1,6 +1,9 @@
 setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
-source("BART_cont.R")
-source("GLM_sens.R")
+source("genU_contY.R")
+source("object_def.R")
+source("X_partials.R")
+source("grid_range.R")
+source("housekeeping.R")
 
 ###############
 #Main function call
