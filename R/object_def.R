@@ -27,12 +27,12 @@ setClass("sensitivity", representation(
 ############
 setMethod("summary", signature(object="sensitivity"),
  definition=function(object){
- 	#resp.cor <- object@resp.cor
- 	#trt.cor <- object@trt.cor
+ 	resp.cor <- object@resp.cor
+ 	trt.cor <- object@trt.cor
  	Tau <- object@tau
  	table <- round(apply(Tau, c(1,2), mean),3)
- 	#colnames(table) <- round(apply(resp.cor, 1, mean),2)
- 	#rownames(table) <- round(apply(trt.cor, 2, mean),2)
+ 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
+ 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
 	cat("Estimated treatment effects\n")
 	print(table)
  }

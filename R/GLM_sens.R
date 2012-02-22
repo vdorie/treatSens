@@ -31,11 +31,6 @@ std.nonbinary <- function(X) {
 #Calculate minimum and maximum possible correlations
 ###############
 
-#calculate the determinant of the covariance matrix
-detCovar <- function(rYU, rZU, rYZ){
-	return(1+2*rYU*rZU*rYZ-rYU^2-rZU^2-rYZ^2)
-}
-
 #find positive rYU for which the determinant of the covariance matrix is 0
 #given rYZ and rZU.  If positive root does not exist, return NA
 rootGivenRZ <- function(rYZ, rZU) {
@@ -47,60 +42,133 @@ rootGivenRZ <- function(rYZ, rZU) {
 #Note this creates a rectangle with corners as close as possible to (-1,1) and (1,1) 
 #some feasible values are excluded as the border between feasible & infeasible is parabolic
 maxCor <- function(Y,Z) {
+	require(alabama)
 	rYZ = cor(Y,Z)
 
-	rZ <- seq(-1,1, by = 0.001)
-	rY <- rep(NA, length(rZ))
-	for(i in 1:length(rZ)){
-		rY[i] = rootGivenRZ(rYZ,rZ[i])
+	detCovar <- function(rU){
+		rYU = rU[1]
+		rZU = rU[2]
+		return(1+2*rYU*rZU*rYZ-rYU^2-rZU^2-rYZ^2)
 	}
-	temp = sqrt((1-rZ)^2+(1-rY)^2)
-	n = (1:length(temp))[temp == min(temp, na.rm =T) &!is.na(temp) ]
-	temp = sqrt((-1-rZ)^2+(1-rY)^2)
-	m = (1:length(temp))[temp == min(temp, na.rm =T) &!is.na(temp) ]
-	return(cbind(rZ[c(n,m)], rY[c(n,m)]))
-	#need to check consistency with later uses.
+
+
+	upRight <- function(rU) {
+		sqrt((1-rU[2])^2+(1-rU[1])^2)
+	}
+	upLeft <- function(rU) {
+		sqrt((-1-rU[2])^2+(1-rU[1])^2) 
+	}
+	upRgrad <- function(rU) {
+		c(-2*rU[1]*((1-rU[2])^2+(1-rU[1])^2)^(-1/2), -2*rU[2]*((1-rU[2])^2+(1-rU[1])^2)^(-1/2))
+	}
+	upLgrad <- function(rU) {
+		c(-2*rU[1]*((-1-rU[2])^2+(1-rU[1])^2)^(-1/2), -2*rU[2]*((-1-rU[2])^2+(1-rU[1])^2)^(-1/2))
+	}
+	
+	ineqR <- function(rU) {
+		return(c(rU[1], 1-rU[1], rU[2], 1-rU[2]))
+	}
+	ineqL <- function(rU) {
+		return(c(rU[1], 1-rU[1], -rU[2], 1+rU[2]))
+	}
+
+	posMax = auglag(par = c(.5, .5), fn = upRight, gr = upRgrad, heq = detCovar, 
+			hin = ineqR, control.outer = list(trace = F))$par
+	negMax = auglag(par = c(.5, -.5), fn = upLeft, gr = upLgrad, heq = detCovar, 
+			hin = ineqL, control.outer = list(trace = F))$par
+	
+	posMax = sign(posMax)*floor(1000*abs(posMax))/1000
+	negMax = sign(negMax)*floor(1000*abs(negMax))/1000
+	return(rbind(posMax[2:1], negMax[2:1]))
 }
 
-#return a vector of maximum feasible rYU given a vector of rZU and rYZ
-feasibleCor <- function(rYZ, rZU) {
-	return(rootGivenRZ(rYZ, rZU))
-}
 ##############
 #Divide and conquer to find where 0 is crossed
 ##############
 
-DandCsearch <- function(x1, x2, tau1, tau2,Y, Z, Y.res, Z.res, X, rY, resp.family, trt.family, U.model) {
-	aaa = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, (x1+x2)/2, resp.family, trt.family, U.model)
+DandCsearch <- function(x1, x2, tau1, tau2,fn.call) {
+	#change rhoZU
+	fn.call[8] = (x1+x2)/2
+
+	aaa = eval(fn.call)
 	tauM = aaa$sens.coef
-#cat("tau1 = ", tau1, ", tau2 = ", tau2, "tauM = ", tauM, "\n")
+
 	if(abs(tauM) < aaa$sens.se/2){
 		return(list(rZ = (x1+x2)/2, tau = tauM))
 	}else{
 		if(sign(tau1)==sign(tauM)) 
-			DandCsearch((x1+x2)/2, x2, tauM, tau2, Y, Z, Y.res, Z.res, X, rY, resp.family, trt.family, U.model)
+			DandCsearch((x1+x2)/2, x2, tauM, tau2, fn.call)
 		else
-			DandCsearch((x1+x2)/2, x1, tauM, tau1, Y, Z, Y.res, Z.res, X, rY, resp.family, trt.family, U.model)
+			DandCsearch((x1+x2)/2, x1, tauM, tau1, fn.call)
 	}
 }
+
+###############
+#Find partial cors of Xs
+###############
+
+X.partials <- function(Y, Z, X, resp.family, trt.family) {
+	fname <- ifelse(class(resp.family) == "function", "X.partials.GLM", "X.partials.BART")
+	do.call(fname, list(Y, Z, X, resp.family, trt.family))
+}
+
+X.partials.GLM <- function(Y, Z, X, resp.family, trt.family) {
+	nX <- dim(X)[2]
+	if(is.null(nX))
+		return(NULL)
+	if(nX == 1) {
+		XcorZ = cor(X, Z-mean(Z))
+		fit.resp <- glm(Y~Z, resp.family)
+		Yr <- Y-fit.resp$fitted.values
+		XcorY <- cor(X, Yr)
+	}else{
+		XcorY <- XcorZ <- vector()
+		for(i in 1:nX) {
+			fit.resp <- glm(Y~X[,-i]+Z, resp.family)
+			fit.trt <- glm(Z~X[,-i], trt.family)
+
+			Yr <- Y-fit.resp$fitted.values
+			Zr <- Z-fit.trt$fitted.values
+		
+			XcorY[i] <- cor(X[,i], Yr)
+			XcorZ[i] <- cor(X[,i], Zr)
+		}
+	}
+	return(cbind(XcorZ, XcorY))
+}
+
+X.partials.BART <- function(Y, Z, X, resp.family, trt.family) {
+	nX <- dim(X)[2]
+	if(is.null(nX))
+		return(NULL)
+	if(nX == 1) {
+		XcorZ = cor(X, Z-mean(Z))
+		fit.resp <- bart(y.train = Y, x.train = Z)
+		Yr <- Y-fit.resp$yhat.train.mean
+		XcorY <- cor(X, Yr)
+	}else{
+		XcorY <- XcorZ <- vector()
+		for(i in 1:nX) {
+			fit.resp <- bart(y.train = Y, x.train = cbind(X[,-i],Z))
+			fit.trt <- bart(y.train = Z, x.train = X[,-i])
+
+			Yr <- Y-fit.resp$yhat.train.mean
+			Zr <- Z-fit.trt$yhat.train.mean
+		
+			XcorY[i] <- cor(X[,i], Yr)
+			XcorZ[i] <- cor(X[,i], Zr)
+		}
+	}
+	return(cbind(XcorZ, XcorY))
+}
+
 ###############
 #Find range for grid search
 ###############
 
-grid.search <- function(extreme.cors, Y, Z, X, Y.res, Z.res, resp.family, trt.family, U.model, sgnTau0) {
-
-	nX <- dim(X)[2]
-	XcorY <- XcorZ <- vector()
-	for(i in 1:nX) {
-		fit.resp <- glm(Y~X[,-i]+Z, resp.family)
-		fit.trt <- glm(Z~X[,-i], trt.family)
-
-		Yr <- Y-fit.resp$fitted.values
-		Zr <- Z-fit.trt$fitted.values
-		
-		XcorY[i] <- cor(X[,i], Yr)
-		XcorZ[i] <- cor(X[,i], Zr)
-	}
+grid.search <- function(extreme.cors, Xpart, Y, Z, X, Y.res, Z.res, resp.family, trt.family, U.model, sgnTau0) {
+	fname <- ifelse(class(resp.family) == "function", "fit.GLM.sens", "fit.BART.sens")
+	fn.call <- call(fname, Y, Z, Y.res, Z.res, X, NA, NA, resp.family, trt.family, U.model)
 
 	tau = rep(NA, 3)
 #	calculate new tau for (extreme Y)*(0, midpoint, extreme Z) to see if 0 is crossed (and in which half)
@@ -109,43 +177,45 @@ grid.search <- function(extreme.cors, Y, Z, X, Y.res, Z.res, resp.family, trt.fa
 		rY = extreme.cors[2,2] 
 		rZ = c(0,
 			extreme.cors[2,1]/2, #midpoint
-			extreme.cors[2,1]+.0005) #extreme Z
+			extreme.cors[2,1]) #extreme Z
 
 	}else{
 		rY = extreme.cors[1,2]
 		rZ = c(0,
 			extreme.cors[1,1]/2, #midpoint
-			extreme.cors[1,1]-.0005) #extreme Z
+			extreme.cors[1,1]) #extreme Z
 	}
+	fn.call[7] = rY
 	for(i in 1:3) {
-		aaa = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ[i], resp.family, trt.family, U.model)
+		fn.call[8] = rZ[i]
+		aaa = eval(fn.call)
 		tau[i] =aaa$sens.coef
 	}
-
 
 	if(sign(tau[1]) == sign(tau[3])) {
 		Z.range = c(min(rZ[3], 0), max(rZ[3], 0))
 		Y.range = c(0, rY)
 	}else {
-		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])],Y, Z, Y.res, Z.res, X, rY, resp.family, trt.family, U.model) 
+		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])], fn.call) 
 		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(3*loc0$rZ))
 		Z.range = c(min(Zmax, 0), max(Zmax,0))
-		Y.range = c(0,rootGivenRZ(cor(Y.res,Z.res),Zmax)-0.0005)
+		Y.val = rootGivenRZ(cor(Y.res,Z.res),Zmax)
+		Y.range = c(0,sign(Y.val)*floor(1000*abs(Y.val))/1000)
 		#set 0 to be 1/3 of way across at extreme Y?  Other surface-dependent?
 	}
 
 	#Update limits to include partial correlations for Xs if necessary
-	if(min(XcorY) < Y.range[1])
-		Y.range[1] = min(XcorY)
-	if(min(XcorZ) < Z.range[1])
-		Z.range[1] = min(XcorZ)
-	if(max(XcorY) > Y.range[2])
-		Y.range[2] = max(XcorY)
-	if(max(XcorZ) > Z.range[2])
-		Z.range[2] = max(XcorZ)
+	if(min(Xpart[,2]) < Y.range[1])
+		Y.range[1] = min(Xpart[,2])
+	if(min(Xpart[,1]) < Z.range[1])
+		Z.range[1] = min(Xpart[,1])
+	if(max(Xpart[,2]) > Y.range[2])
+		Y.range[2] = max(Xpart[,2])
+	if(max(Xpart[,1]) > Z.range[2])
+		Z.range[2] = max(Xpart[,1])
 
 
-	return(list(X.partials = cbind(XcorZ, XcorY), ranges = rbind(Y.range, Z.range)))
+	return(ranges = rbind(Y.range, Z.range))
 }
 
 ###############
@@ -200,13 +270,19 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#Estimate extreme correlations
 	extreme.cors = maxCor(Y.res, Z.res)
+	if(U.model == "binomial") {
+ 		extreme.cors = 2*dnorm(0)*extreme.cors
+	}
+
+	cat("Calculating sensitivity parameters of X...\n")
+	Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, Y,Z, X,Y.res, Z.res, resp.family, trt.family, U.model,sgnTau0 = sign(null.resp$coef[n]))
+	grid.range = grid.search(extreme.cors, Xpartials, Y,Z, X,Y.res, Z.res, resp.family, trt.family, U.model,sgnTau0 = sign(null.resp$coef[n]))
 
-	rhoY <- seq(grid.range$ranges[1,1], grid.range$ranges[1,2], length.out = grid.dim[1])
-	rhoZ <- seq(grid.range$ranges[2,1], grid.range$ranges[2,2], length.out = grid.dim[2])
+	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
+	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
 
 	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.cor <- trt.cor <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 
@@ -238,7 +314,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z, X = X,
 				tau0 = null.resp$coef[n],
-				Xpartials = grid.range$X.partials)
+				Xpartials = Xpartials)
 	return(result)
 }
 
@@ -253,7 +329,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rhoYU, rhoZU, resp.family, trt.f
 		if(U.model == "normal")
 			U <- try(contYZU(Y.res, Z.res, rhoYU, rhoZU))
 		if(U.model == "binomial")
-			U <- try(contYZbinaryU(Y.res, Z.res, rhoYU, rhoZU, p=0.5))	
+			U <- try(contYZbinaryU(Y.res, Z.res, rhoYU, rhoZU))	
 	if(!(class(U) == "try-error")){
 		#try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
 		#Do we want to return a warning/the error message/our own error message if try fails?

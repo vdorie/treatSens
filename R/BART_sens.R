@@ -6,14 +6,9 @@ source("GLM_sens.R")
 #Main function call
 ###############
 BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
-				resp.rho.vals = 100, 		#number or vector of values of partial correlation with response for grid
-				trt.rho.vals = 100,		#number or vector of values of partial correlation with treatment for grid
-				resp.rho.range = c(-0.5,0.5), #range of values of partial correlation with response for grid (if given # of values)
-				trt.rho.range = c(-0.5,0.5), 	#range of values of partial correlation with treatment for grid (if given # of values)
-				est.type = "ATE",			#type of estimand desired: one of ATT, ATC, ATE.  Assumes binary Z with 1 = treatment
+				grid.dim = c(20,20),	#final dimensions of output grid				est.type = "ATE",			#type of estimand desired: one of ATT, ATC, ATE.  Assumes binary Z with 1 = treatment
 				x.counterfactual = NULL,	#Covariate matrix with counterfactual Z as first column.  Will override est.type if provided
-				conf.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
-				p = 0.5,			#Pr(U = 1) for binomial model
+				U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
 				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
 				data = NULL) {
@@ -37,24 +32,6 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	Z = form.vars$trt
 	X = form.vars$covars
 	
-	#initialize grids, sensitivity parameter values
-
-	if(length(resp.rho.vals) == 1) {
-		nY <- resp.rho.vals
-		rhoY <- seq(resp.rho.range[1], resp.rho.range[2], length.out = nY)
-	}else{
-		nY <- length(resp.rho.vals)
-		rhoY <- resp.rho.vals
-	}
-	
-	if(length(trt.rho.vals) == 1) {
-		nZ <- trt.rho.vals
-		rhoZ <- seq(trt.rho.range[1], trt.rho.range[2], length.out = nZ)
-	}else{
- 		nZ <- length(trt.rho.vals)
-		rhoZ <- trt.rho.vals
-	}
-	
 	sens.coef <- sens.se <- alpha <- delta <- resp.cor <- trt.cor <- array(NA, dim = c(nY, nZ, nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 	
 	#standardize variables
@@ -64,14 +41,15 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		X = apply(X, 2, std.nonbinary)
 	}
 		
+	cat("Fitting null models...\n")
 	#fit null model & get residuals (and time it)
 	if(!is.null(X)) {
-		timing <- system.time(null.resp <- bart(x.train = cbind(Z,X), y.train = Y))
+		null.resp <- bart(x.train = cbind(Z,X), y.train = Y)
 		null.trt <- bart(x.train = X, y.train = Z)
 		Z.res <- Z-null.trt$yhat.train.mean 	#residuals from trt BART fit
 
 	}else{
-		timing <- system.time(null.resp <- bart(x.train = Z, y.train = Y))
+		null.resp <- bart(x.train = Z, y.train = Y)
 		Z.res <- Z-mean(Z) 	#residuals from mean model
 	}
 	
@@ -97,23 +75,45 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		else
 			stop("Invalid est.type")
 	}
-	#give run time estimate
-	cat("Estimated time to complete grid: ", 2*timing[3]*nY*nZ*nsim, " seconds.\n")
+
+	#Estimate extreme correlations
+	extreme.cors = maxCor(Y.res, Z.res)
+
+	cat("Calculating sensitivity parameters of X...\n")
+	Xpartials <- X.partials(Y, Z, X, "BART", "BART")
+
+	#find ranges for final grid
+	cat("Finding grid range...\n")
+	grid.range = grid.search(extreme.cors, Xpartials, Y,Z, X,Y.res, Z.res, resp.family, trt.family, U.model,sgnTau0 = sign(null.resp$coef[n]))
+
+	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
+	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
 
 	n = length(null.resp$coef)
 
+	cat("Computing final grid...")
 	#fill in grid
-	for(i in 1:nY) {
-	for(j in 1:nZ) {
+	for(i in 1:grid.dim[1]) {
+	for(j in 1:grid.dim[2]) {
 	for(k in 1:nsim){
 		rY = rhoY[i]
 		rZ = rhoZ[j]
 		
-		#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
-		if(conf.model == "normal")
-			U <- try(contYZU(Y.res, Z.res, rY, rZ))
-		if(conf.model == "binomial")
-			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ, p))	
+}}}
+
+	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
+}
+
+#############
+#fit.BART.sens
+#############
+
+fit.BART.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, U.model) {
+	#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
+	if(U.model == "normal")
+		U <- try(contYZU(Y.res, Z.res, rY, rZ))
+	if(U.model == "binomial")
+		U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ))	
 
 	if(!(class(U) == "try-error")){
 		#fit models with U
@@ -133,7 +133,16 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		#to return this array we don't need to spend the computing time to fit it
 		resp.cor[i,j,k] <- cor(Y.res,U) #do we want cor(Y,U) or cor(Y.res, U)?
 		trt.cor[i,j,k] <- cor(Z.res,U)
-	}}}}
-
-	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
+	}else{
+	return(list(
+		sens.coef = NA,
+		sens.se = NA, 	
+		delta = NA, 	
+		alpha = NA,	
+		delta.se = NA, 
+		alpha.se = NA,
+		resp.cor = NA, 
+		trt.cor = NA
+		))
+	}
 }

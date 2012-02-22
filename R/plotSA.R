@@ -40,4 +40,4 @@ plotSA = function(x,...) {
 		lty = 0,add = T,method = "edge",...)
 }
 
-plot(test.run)
+#plot(test.run)
