@@ -42,9 +42,10 @@ DandCsearch <- function(x1, x2, tau1, tau2,fn.call) {
 #sgnTau0: the sign of the estimated treatment effect in the null model
 ###
 
-grid.search <- function(extreme.cors, Xpart, Y, Z, X, Y.res, Z.res, resp.family, trt.family, U.model, sgnTau0) {
-	fname <- ifelse(class(resp.family) == "function", "fit.GLM.sens", "fit.BART.sens")
-	fn.call <- call(fname, Y, Z, Y.res, Z.res, X, NA, NA, resp.family, trt.family, U.model)
+grid.search <- function(extreme.cors, Xpart, Y, Z, X, Y.res, Z.res, sgnTau0, control.fit) {
+	fname <- ifelse(!is.null(control.fit$resp.family), "fit.GLM.sens", "fit.BART.sens")
+	fn.call <- call(fname, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, rY=NA, rZ=NA, 
+		control.fit = control.fit)
 
 	tau = rep(NA, 3)
 #	calculate new tau for (extreme Y)*(0, midpoint, extreme Z) to see if 0 is crossed (and in which half)

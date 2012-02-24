@@ -57,20 +57,21 @@ X.partials.BART <- function(Y, Z, X, resp.family, trt.family) {
 		return(NULL)
 	if(nX == 1) {
 		XcorZ = cor(X, Z-mean(Z))
-		fit.resp <- bart(y.train = Y, x.train = Z)
+		fit.resp <- bart(y.train = Y, x.train = Z, verbose = F)
 		Yr <- Y-fit.resp$yhat.train.mean
 		XcorY <- cor(X, Yr)
 	}else{
 		XcorY <- XcorZ <- vector()
 		for(i in 1:nX) {
-			fit.resp <- bart(y.train = Y, x.train = cbind(X[,-i],Z))
-			fit.trt <- bart(y.train = Z, x.train = X[,-i])
+			fit.resp <- bart(y.train = Y, x.train = cbind(X[,-i],Z), verbose = F)
+			fit.trt <- bart(y.train = Z, x.train = X[,-i], verbose = F)
 
 			Yr <- Y-fit.resp$yhat.train.mean
-			Zr <- Z-fit.trt$yhat.train.mean
+			Zr <- Z-pnorm(apply(fit.trt$yhat.train,2,mean))
 		
 			XcorY[i] <- cor(X[,i], Yr)
 			XcorZ[i] <- cor(X[,i], Zr)
+			cat("Completed ", i, " of ", nX, "variables.\n")
 		}
 	}
 	return(cbind(XcorZ, XcorY))

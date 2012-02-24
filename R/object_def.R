@@ -16,8 +16,13 @@ setClass("sensitivity", representation(
 		Z = "vector",
 		X = "matrix",
 		tau0 = "numeric",
-		Xpartials = "matrix"
-))
+		Xpartials = "matrix"),
+	prototype(
+		delta = NULL,
+		alpha = NULL,
+		se.delta = NULL,
+		se.alpha = NULL)
+)
 
 ############
 #summary.sensitivity

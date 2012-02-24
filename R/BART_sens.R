@@ -9,8 +9,8 @@ source("housekeeping.R")
 #Main function call
 ###############
 BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
-				grid.dim = c(20,20),	#final dimensions of output grid				est.type = "ATE",			#type of estimand desired: one of ATT, ATC, ATE.  Assumes binary Z with 1 = treatment
-				x.counterfactual = NULL,	#Covariate matrix with counterfactual Z as first column.  Will override est.type if provided
+				grid.dim = c(20,20),	#final dimensions of output grid				
+				est.type = "ATE",		#type of estimand desired: one of ATT, ATC, ATE.  Assumes binary Z with 1 = treatment
 				U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
 				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
@@ -35,8 +35,6 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	Z = form.vars$trt
 	X = form.vars$covars
 	
-	sens.coef <- sens.se <- alpha <- delta <- resp.cor <- trt.cor <- array(NA, dim = c(nY, nZ, nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
-	
 	#standardize variables
 	if(standardize) {
 		Y = std.nonbinary(Y)
@@ -44,40 +42,39 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		X = apply(X, 2, std.nonbinary)
 	}
 		
+	#generate training data for parameter estimate
+	if(est.type == "ATE"){
+		Z.est = 1-Z
+		x.test = cbind(Z.est,X)
+		Z.test = rep(TRUE, length(Z))
+	}else if(est.type == "ATT"){
+		Z.est = 1-Z[Z==1]
+		x.test = cbind(Z.est, X[Z==1,])
+		Z.test = (Z==1)
+	}else if(est.type == "ATC"){
+		Z.est = 1-Z[Z==0]
+		x.test = cbind(Z.est, X[Z==0,])
+		Z.test = (Z==0)
+	}else
+		stop("Invalid est.type")
+
 	cat("Fitting null models...\n")
 	#fit null model & get residuals (and time it)
 	if(!is.null(X)) {
-		null.resp <- bart(x.train = cbind(Z,X), y.train = Y)
-		null.trt <- bart(x.train = X, y.train = Z)
-		Z.res <- Z-null.trt$yhat.train.mean 	#residuals from trt BART fit
+		null.resp <- bart(x.train = cbind(Z,X), y.train = Y, x.test = x.test,verbose = F)
+		null.trt <- bart(x.train = X, y.train = Z, verbose = F)
+		Z.res <- Z-pnorm(apply(null.trt$yhat.train,2,mean)) 	#residuals from trt BART fit
 
 	}else{
-		null.resp <- bart(x.train = Z, y.train = Y)
+		null.resp <- bart(x.train = Z, y.train = Y, x.test = x.test, verbose = F)
 		Z.res <- Z-mean(Z) 	#residuals from mean model
 	}
 	
 	Y.res <- Y-null.resp$yhat.train.mean	#residuals from BART fit - means, or random column? if latter, 
 								#s/b in loop, I think
 
-	#generate training data for parameter estimate
-	if(!is.null(x.counterfactual)){
-		x.test = x.counterfactual
-	}else{
-		if(est.type == "ATE"){
-			Z.est = 1-Z
-			x.test = cbind(Z.est,X)
-		}
-		elseif(est.type == "ATT"){
-			Z.est = 1-Z[Z==1]
-			x.test = cbind(Z.est, X[Z==1,])
-		}
-		elseif(est.type == "ATC"){
-			Z.est = 1-Z[Z==0]
-			x.test = cbind(Z.est, X[Z==0,])
-		}
-		else
-			stop("Invalid est.type")
-	}
+
+	tau0 = mean(apply(null.resp$yhat.train[,Z.test]- null.resp$yhat.test, 1, mean))
 
 	#Estimate extreme correlations
 	extreme.cors = maxCor(Y.res, Z.res)
@@ -87,32 +84,58 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, Xpartials, Y,Z, X,Y.res, Z.res, resp.family, trt.family, U.model,sgnTau0 = sign(null.resp$coef[n]))
+	grid.range = grid.search(extreme.cors, Xpartials, Y,Z, X,Y.res, Z.res, sgnTau0 = sign(tau0), control.fit = list(U.model = U.model, x.test = x.test, Z.test=Z.test))
 
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
 
-	n = length(null.resp$coef)
-
+	sens.coef <- sens.se <- resp.cor <- trt.cor <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
+	
 	cat("Computing final grid...")
 	#fill in grid
+	cell = 0
 	for(i in 1:grid.dim[1]) {
 	for(j in 1:grid.dim[2]) {
+		cell = cell +1
 	for(k in 1:nsim){
 		rY = rhoY[i]
 		rZ = rhoZ[j]
-		
-}}}
 
-	return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
+
+		fit.sens = fit.BART.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(U.model = U.model, x.test = x.test, Z.test=Z.test))
+
+		sens.coef[i,j,k] <- fit.sens$sens.coef
+		sens.se[i,j,k] <- fit.sens$sens.se
+		resp.cor[i,j,k] <- fit.sens$resp.cor
+		trt.cor[i,j,k] <- fit.sens$trt.cor
+
+			
+		}
+		cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
+	}}
+
+	result <- new("sensitivity",tau = sens.coef, se.tau = sens.se, 
+				resp.cor = resp.cor, trt.cor = trt.cor,	
+				alpha = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),	
+				delta = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),
+				se.alpha = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),
+				se.delta = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),
+				Y = Y, Z = Z, X = X,
+				tau0 = tau0,
+				Xpartials = Xpartials)
+	return(result)
 }
 
 #############
 #fit.BART.sens
 #############
 
-fit.BART.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, U.model) {
-	#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
+fit.BART.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
+	U.model = control.fit$U.model
+	x.test = control.fit$x.test
+	Z.test = control.fit$Z.test
+
+	#Generate U w/Y.res, Z.res 
 	if(U.model == "normal")
 		U <- try(contYZU(Y.res, Z.res, rY, rZ))
 	if(U.model == "binomial")
@@ -121,29 +144,25 @@ fit.BART.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, U.model) {
 	if(!(class(U) == "try-error")){
 		#fit models with U
 		if(!is.null(X)) {
-			fit.resp <- bart(x.train = cbind(Z,X,U), y.train = Y, x.test = x.test)
-			fit.trt <- bart(x.train = cbind(X,U), y.train = Z)
+			fit.resp <- bart(x.train = cbind(Z,X,U), y.train = Y, x.test = cbind(x.test, U[Z.test]), verbose = F)
+			#fit.trt <- bart(x.train = cbind(X,U), y.train = Z, x.test = cbind(x.test, U[Z.test]), verbose = F)
 		}else{
-			fit.resp <- bart(x.train = cbind(Z,U), y.train = Y, x.test = x.test)
-			fit.trt <- bart(x.train = U, y.train = Z)
-		}		
-########Need to update definitions of outputs, choice of outputs
-		sens.coef[i,j,k] <- fit.glm$coef[n+1]
-		sens.se[i,j,k] <- summary(fit.glm)$cov.unscaled[n+1,n+1] #SE of Z coef
-		delta[i,j,k] <- fit.glm$coef[n]  #estimated coefficient of U in response model
-		alpha[i,j,k] <- fit.trt$coef[n]  #estimated coef of U in trt model
-		#note this is the only use of fitting trt model with U, so if we choose not 
-		#to return this array we don't need to spend the computing time to fit it
-		resp.cor[i,j,k] <- cor(Y.res,U) #do we want cor(Y,U) or cor(Y.res, U)?
-		trt.cor[i,j,k] <- cor(Z.res,U)
+			fit.resp <- bart(x.train = cbind(Z,U), y.train = Y, x.test = cbind(x.test[,-1], U[Z.test]), verbose = F)
+			#fit.trt <- bart(x.train = U, y.train = Z, x.test = U[Z.test], verbose = F)
+		}	
+
+		mndiffs = apply(fit.resp$yhat.train[,Z.test]
+					- fit.resp$yhat.test, 1, mean)	
+	return(list(
+		sens.coef = mean(mndiffs),	#posterior mean
+		sens.se = sd(mndiffs), 	#SE of posterior
+		resp.cor = cor(Y.res,U), 
+		trt.cor = cor(Z.res,U)
+		))
 	}else{
 	return(list(
 		sens.coef = NA,
 		sens.se = NA, 	
-		delta = NA, 	
-		alpha = NA,	
-		delta.se = NA, 
-		alpha.se = NA,
 		resp.cor = NA, 
 		trt.cor = NA
 		))

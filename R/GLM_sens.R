@@ -66,7 +66,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, Xpartials, Y,Z, X,Y.res, Z.res, resp.family, trt.family, U.model,sgnTau0 = sign(null.resp$coef[n]))
+	grid.range = grid.search(extreme.cors, Xpartials, Y,Z, X,Y.res, Z.res,sgnTau0 = sign(null.resp$coef[n]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model))
 
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -81,7 +81,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		rY = rhoY[i]
 		rZ = rhoZ[j]
 		
-		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, resp.family, trt.family, U.model)
+		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model))
 
 		sens.coef[i,j,k] <- fit.sens$sens.coef
 		sens.se[i,j,k] <- fit.sens$sens.se
@@ -94,7 +94,6 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	}}}
 
-	#return(list(tau = sens.coef, se.tau = sens.se, alpha = alpha, delta = delta, resp.cor = resp.cor, trt.cor = trt.cor)) 
 	result <- new("sensitivity",tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
@@ -110,7 +109,10 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 #fit.GLM.sens
 ###########
 
-fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rhoYU, rhoZU, resp.family, trt.family, U.model) {
+fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rhoYU, rhoZU, control.fit) {
+		resp.family = control.fit$resp.family
+		trt.family = control.fit$trt.family
+		U.model = control.fit$U.model
 
 		#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
 		if(U.model == "normal")
