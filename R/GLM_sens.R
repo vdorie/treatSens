@@ -15,6 +15,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				grid.dim = c(20,20),	#final dimensions of output grid
 				standardize = TRUE,	#Logical: should variables be standardized?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
+				zero.loc = 1/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
+				verbose = F,
 				data = NULL) {
 	#check that data is a data frame
 	if(!is.null(data)) {
@@ -66,22 +68,24 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, Xpartials, Y,Z, X,Y.res, Z.res,sgnTau0 = sign(null.resp$coef[n]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model))
+	grid.range = grid.search(extreme.cors, zero.loc, Xpartials, Y,Z, X,Y.res, Z.res,sgnTau0 = sign(null.resp$coef[n]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
 
 	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.cor <- trt.cor <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 
-	cat("Computing final grid...")
+	cat("Computing final grid...\n")
 	#fill in grid
+	cell = 0
 	for(i in 1:grid.dim[1]) {
 	for(j in 1:grid.dim[2]) {
+		cell = cell +1
 	for(k in 1:nsim){
 		rY = rhoY[i]
 		rZ = rhoZ[j]
 		
-		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model))
+		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 		sens.coef[i,j,k] <- fit.sens$sens.coef
 		sens.se[i,j,k] <- fit.sens$sens.se
@@ -92,15 +96,18 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		resp.cor[i,j,k] <- fit.sens$resp.cor
 		trt.cor[i,j,k] <- fit.sens$trt.cor
 
-	}}}
+		}
+		if(verbose) cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
+	}}
 
-	result <- new("sensitivity",tau = sens.coef, se.tau = sens.se, 
+	result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z, X = X,
 				tau0 = null.resp$coef[n],
-				Xpartials = Xpartials)
+				Xpartials = Xpartials,
+				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,n)]))
 	return(result)
 }
 
@@ -113,6 +120,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 		resp.family = control.fit$resp.family
 		trt.family = control.fit$trt.family
 		U.model = control.fit$U.model
+		std = control.fit$standardize
 
 		#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
 		if(U.model == "normal")
@@ -123,6 +131,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 		#try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
 		#Do we want to return a warning/the error message/our own error message if try fails?
 		#fit models with U
+		if(std) U = std.nonbinary(U)
 		if(!is.null(X)) {
 			fit.glm <- glm(Y~X+U+Z, resp.family)
 			fit.trt <- glm(Z~X+U, trt.family)		

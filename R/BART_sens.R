@@ -14,6 +14,8 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
 				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
+				zero.loc = 1/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
+				verbose = T,
 				data = NULL) {
 	require(BayesTree)
 
@@ -79,19 +81,23 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	#Estimate extreme correlations
 	extreme.cors = maxCor(Y.res, Z.res)
 
+	if(U.model == "binomial") {
+ 		extreme.cors = 2*dnorm(0)*extreme.cors
+	}
+
 	cat("Calculating sensitivity parameters of X...\n")
 	Xpartials <- X.partials(Y, Z, X, "BART", "BART")
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, Xpartials, Y,Z, X,Y.res, Z.res, sgnTau0 = sign(tau0), control.fit = list(U.model = U.model, x.test = x.test, Z.test=Z.test))
+	grid.range = grid.search(extreme.cors, zero.loc, Xpartials, Y,Z, X,Y.res, Z.res, sgnTau0 = sign(tau0), control.fit = list(U.model = U.model, x.test = x.test, Z.test=Z.test))
 
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
 
 	sens.coef <- sens.se <- resp.cor <- trt.cor <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 	
-	cat("Computing final grid...")
+	cat("Computing final grid...\n")
 	#fill in grid
 	cell = 0
 	for(i in 1:grid.dim[1]) {
@@ -111,10 +117,10 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 			
 		}
-		cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
+		if(verbose) cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
 	}}
 
-	result <- new("sensitivity",tau = sens.coef, se.tau = sens.se, 
+	result <- new("sensitivity",model.type = "BART", tau = sens.coef, se.tau = sens.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,	
 				alpha = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),	
 				delta = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),
@@ -122,7 +128,8 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				se.delta = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),
 				Y = Y, Z = Z, X = X,
 				tau0 = tau0,
-				Xpartials = Xpartials)
+				Xpartials = Xpartials,
+				Xcoef = matrix(NA, ncol = 1, nrow = 1))
 	return(result)
 }
 

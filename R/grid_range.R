@@ -42,7 +42,7 @@ DandCsearch <- function(x1, x2, tau1, tau2,fn.call) {
 #sgnTau0: the sign of the estimated treatment effect in the null model
 ###
 
-grid.search <- function(extreme.cors, Xpart, Y, Z, X, Y.res, Z.res, sgnTau0, control.fit) {
+grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, sgnTau0, control.fit) {
 	fname <- ifelse(!is.null(control.fit$resp.family), "fit.GLM.sens", "fit.BART.sens")
 	fn.call <- call(fname, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, rY=NA, rZ=NA, 
 		control.fit = control.fit)
@@ -74,11 +74,11 @@ grid.search <- function(extreme.cors, Xpart, Y, Z, X, Y.res, Z.res, sgnTau0, con
 		Y.range = c(0, rY)
 	}else {
 		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])], fn.call) 
-		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(3*loc0$rZ))
+		bin.mult = ifelse(control.fit$U.model == "binomial", 2*dnorm(0), 1)
+		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ)*bin.mult)
 		Z.range = c(min(Zmax, 0), max(Zmax,0))
-		Y.val = rootGivenRZ(cor(Y.res,Z.res),Zmax)
+		Y.val = rootGivenRZ(cor(Y.res,Z.res),Zmax)*bin.mult
 		Y.range = c(0,sign(Y.val)*floor(1000*abs(Y.val))/1000)
-		#set 0 to be 1/3 of way across at extreme Y?  Other surface-dependent?
 	}
 
 	#Update limits to include partial correlations for Xs if necessary

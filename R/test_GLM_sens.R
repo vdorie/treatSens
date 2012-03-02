@@ -22,16 +22,26 @@ Y <- with(lalonde,re78/1000)
 #				nsim = 20,			#number of simulated Us to average over per cell in grid
 #				data = NULL			#data object containing variables, if applicable
 
+ZN = 1-Z
 test.run <- GLM.sens(Y~Z+X, grid.dim = c(20,20), standardize = T,
 		trt.family = binomial,
 		resp.family = gaussian,
-		U.model = "binomial",
-		nsim = 50)
+		U.model = "normal",
+		verbose = T,
+		nsim = 20)
+test.neg  <- GLM.sens(Y~ZN+X, grid.dim = c(20,20), standardize = T,
+		trt.family = binomial,
+		resp.family = gaussian,
+		U.model = "normal",
+		verbose = T,
+		nsim = 20)
+
 
 #Check out processing functions:
 summary(test.run)
 print(test.run)
-plot(test.run)
+plot(test.run.neg)
+slotNames(test.run)
 
 ##########
 #test binary U
