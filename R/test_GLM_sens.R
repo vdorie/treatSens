@@ -1,5 +1,6 @@
 setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
-source("GLM_sens.R")
+#source("GLM_sens.R")
+source("BART_sens.R")
 
 #load LaLonde data (or replace with your own test case!)
 library(foreign)
@@ -35,6 +36,19 @@ test.neg  <- GLM.sens(Y~ZN+X, grid.dim = c(20,20), standardize = T,
 		U.model = "normal",
 		verbose = T,
 		nsim = 20)
+
+#function arguments:	formula, 			#formula: assume treatment is 1st term on rhs
+#				grid.dim = c(20,20),	#final dimensions of output grid				
+#				est.type = "ATE",		#type of estimand desired: one of ATT, ATC, ATE.  Assumes binary Z with 1 = treatment
+#				U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
+#				standardize = TRUE,	#Logical: should values be standardized?  If FALSE, force specification of ranges?
+#				nsim = 20,			#number of simulated Us to average over per cell in grid
+#				data = NULL
+
+test.run <- BART.sens(Y~Z+X, grid.dim = c(20,20), standardize = T,
+		est.type = "ATE",
+		U.model = "binomial",
+		nsim = 50)
 
 
 #Check out processing functions:
