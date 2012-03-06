@@ -43,10 +43,10 @@ maxCor <- function(Y,Z) {
 		return(c(rU[1], 1-rU[1], -rU[2], 1+rU[2]))
 	}
 
-	posMax = auglag(par = c(.5, .5), fn = upRight, gr = upRgrad, heq = detCovar, 
-			hin = ineqR, control.outer = list(trace = F))$par
-	negMax = auglag(par = c(.5, -.5), fn = upLeft, gr = upLgrad, heq = detCovar, 
-			hin = ineqL, control.outer = list(trace = F))$par
+	posMax = invisible(auglag(par = c(.5, .5), fn = upRight, gr = upRgrad, heq = detCovar, 
+			hin = ineqR, control.outer = list(trace = F))$par)
+	negMax = invisible(auglag(par = c(.5, -.5), fn = upLeft, gr = upLgrad, heq = detCovar, 
+			hin = ineqL, control.outer = list(trace = F))$par}
 	
 	posMax = sign(posMax)*floor(1000*abs(posMax))/1000
 	negMax = sign(negMax)*floor(1000*abs(negMax))/1000

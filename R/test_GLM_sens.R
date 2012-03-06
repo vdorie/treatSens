@@ -49,7 +49,7 @@ test.run <- BART.sens(Y~Z+X, grid.dim = c(20,20), standardize = T,
 		est.type = "ATE",
 		U.model = "binomial",
 		nsim = 50)
-
+save(test.run, file = "test.run.BART.RData")
 
 #Check out processing functions:
 summary(test.run)
