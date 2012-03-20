@@ -29,9 +29,10 @@ plotSA = function(x, coef.axes = F,
 		#forcing inclusion can lead to difficult to read plot.
 	}
 
-	taus = t(apply(x@tau, c(1,2), mean))
+	taus = t(apply(x@tau, c(1,2), mean, na.rm = T))
 
 	if(is.null(contour.levels)){
+#need to robustify if selected cell is NA
 		exTau = ifelse(sign(x@tau0)==1, taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]])
 		clevels = round(seq(x@tau0*0.8, exTau*.8, length.out = 8),2)
 	}else{
