@@ -8,15 +8,17 @@ plotSA = function(x, coef.axes = F,
 			lty.zero = 1,
 			insig.col = "blue",
 			lty.insig = 1,
+			data.line = TRUE,
 			X.pch = 19,
 			signif.level = 0.05,
+			labcex = 0.75,
 			...) {
 #note in help: if contours are too rough, up nsim in sens fn
 	if(!coef.axes) {
 		Zcors = apply(x@trt.cor, 2, mean)
 		Ycors = apply(x@resp.cor, 1, mean)
-		xlab = "Treatment correlation"
-	 	ylab = "Response correlation"
+		xlab = "Treatment partial correlation"
+	 	ylab = "Response partial correlation"
 		Xpart = x@Xpartials
 	}else{
 		Zcors = apply(x@alpha, 2, mean)
@@ -46,15 +48,44 @@ plotSA = function(x, coef.axes = F,
 	abline(v = 0)
 
 	contour(Zcors, Ycors, taus, levels = clevels, 
-		add = T,...)
+		add = T, labcex = labcex,...)
 
 	contour(Zcors, Ycors, taus, levels = 0, 
-		add = T, col = zero.col,lty = lty.zero,...)
+		add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
 
-	contour(Zcors, Ycors, taus/apply(x@se.tau, c(1,2), mean), labels = "Insignificant",
+	contour(Zcors, Ycors, taus/apply(x@se.tau, c(1,2), mean), labels = "N.S.",
 		levels = -sign(x@tau0)*qnorm(signif.level/2), add = T, col = insig.col,
-		lty = lty.insig,...)
+		lty = lty.insig, labcex = labcex,...)
+	
+	legend(0.8*max(Zcors), 0, legend = round(x@tau0,2), cex = labcex,
+		yjust = 0.5, x.intersp = 0,
+		bg = ifelse(par("bg")== "transparent", "white", par("bg")), box.lty = 0)
 
+	if(data.line) {
+		proj.pts = apply(Xpart, 1, mean)
+		max.pt = Xpart[proj.pts == max(proj.pts),]
+		zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
+		if(zcor > max.pt[1]){
+		 zpts = c(zcor-1, zcor)
+		}else{
+		 zpts = c(zcor, zcor+1)
+		}
+		ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
+		if(ycor > max.pt[2]){
+		 ypts = c(ycor-1, ycor)
+		}else{
+		 ypts = c(ycor, ycor+1)
+		}
+		clevel = ((Zcors[zcor[2]] - Zcors[zcor[1]])*(Ycors[ycor[2]] - Ycors[ycor[1]]))^(-1)*
+			sum(taus[zpts, ypts]*
+			matrix(c(-(Zcors[zcor[2]] - max.pt[1])*(Ycors[ycor[1]] - max.pt[2]), 
+				(Zcors[zcor[1]] - max.pt[1])*(Ycors[ycor[1]] - max.pt[2]),
+				(Zcors[zcor[2]] - max.pt[1])*(Ycors[ycor[2]] - max.pt[2]),
+				-(Zcors[zcor[1]] - max.pt[1])*(Ycors[ycor[2]] - max.pt[2])), 
+				nrow = 2, byrow = T))
+		contour(Zcors, Ycors, taus, levels = round(clevel,2),
+			add = T, col = "grey",labcex = labcex,...)
+	}
 }
 
 

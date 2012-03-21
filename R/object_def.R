@@ -70,57 +70,115 @@ setMethod("summary", signature(object="sensitivity"),
 #prints average values for each cell in grid of:
 #tau, SE of tau, (realized sens params,) coefficients and their se's
 ##############
-setMethod("show", "sensitivity",
-	definition = function(object) { #, 
-		digits=3 #){
-	 	resp.cor <- object@resp.cor
-	 	trt.cor <- object@trt.cor
+setMethod("print", "sensitivity",
+	definition = function(x, 
+		digits=3 ){
+	 	resp.cor <- x@resp.cor
+	 	trt.cor <- x@trt.cor
 
-		table <- round(apply(object@tau, c(1,2), mean),digits)
+		table <- round(apply(x@tau, c(1,2), mean),digits)
 	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
 	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
  		cat("Estimated treatment effects\n")
 		print(table)
 
-		table <- round(apply(object@se.tau, c(1,2), mean),digits)
+		table <- round(apply(x@se.tau, c(1,2), mean),digits)
 	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
 	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
  		cat("Standard error of estimated treatment effects\n")
 		print(table)
 
-	#	table <- round(apply(object@resp.cor, c(1,2), mean),digits)
+	#	table <- round(apply(x@resp.cor, c(1,2), mean),digits)
  	#	cat("Realized sensitivity parameter for response (Y)\n")
 	#	print(table)
 
-	#	table <- round(apply(object@trt.cor, c(1,2), mean),digits)
+	#	table <- round(apply(x@trt.cor, c(1,2), mean),digits)
  	#	cat("Realized sensitivity parameter for treatment (Z)\n")
 	#	print(table)
 
-		table <- round(apply(object@delta, c(1,2), mean),digits)
+		table <- round(apply(x@delta, c(1,2), mean),digits)
 	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
 	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
  		cat("Estimated delta - coefficient of U in response model\n")
 		print(table)
 
-		table <- round(apply(object@se.delta, c(1,2), mean),digits)
+		table <- round(apply(x@se.delta, c(1,2), mean),digits)
 	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
 	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
  		cat("Standard error of delta\n")
 		print(table)
 
-		table <- round(apply(object@alpha, c(1,2), mean),digits)
+		table <- round(apply(x@alpha, c(1,2), mean),digits)
 	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
 	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
  		cat("Estimated alpha - coefficient of U in treatment model\n")
 		print(table)
 
-		table <- round(apply(object@se.alpha, c(1,2), mean),digits)
+		table <- round(apply(x@se.alpha, c(1,2), mean),digits)
 	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
 	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
  		cat("Standard error of alpha\n")
 		print(table)
 	}
 )
+
+
+#############
+#show.sensitivity
+#displays means of all slots in object with no processing
+#############
+setMethod("show", signature(object = "sensitivity"),
+	definition = function(object){
+	 	resp.cor <- object@resp.cor
+	 	trt.cor <- object@trt.cor
+
+		table <- apply(object@tau, c(1,2), mean)
+	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
+	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+ 		cat("Estimated treatment effects\n")
+		print(table)
+
+		table <- apply(object@se.tau, c(1,2), mean)
+	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
+	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+ 		cat("Standard error of estimated treatment effects\n")
+		print(table)
+
+	#	table <- apply(object@resp.cor, c(1,2), mean)
+ 	#	cat("Realized sensitivity parameter for response (Y)\n")
+	#	print(table)
+
+	#	table <- apply(object@trt.cor, c(1,2), mean)
+ 	#	cat("Realized sensitivity parameter for treatment (Z)\n")
+	#	print(table)
+
+		table <- apply(object@delta, c(1,2), mean)
+	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
+	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+ 		cat("Estimated delta - coefficient of U in response model\n")
+		print(table)
+
+		table <- apply(object@se.delta, c(1,2), mean)
+	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
+	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+ 		cat("Standard error of delta\n")
+		print(table)
+
+		table <- apply(object@alpha, c(1,2), mean)
+	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
+	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+ 		cat("Estimated alpha - coefficient of U in treatment model\n")
+		print(table)
+
+		table <- apply(object@se.alpha, c(1,2), mean)
+	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
+	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+ 		cat("Standard error of alpha\n")
+		print(table)
+	}
+)
+
+
 
 #############
 #plot.sensitivity

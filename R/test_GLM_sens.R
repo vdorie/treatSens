@@ -1,5 +1,5 @@
 setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
-#source("GLM_sens.R")
+source("GLM_sens.R")
 source("BART_sens.R")
 
 #load LaLonde data (or replace with your own test case!)
@@ -54,8 +54,9 @@ save(test.run, file = "test.run.BART.RData")
 #Check out processing functions:
 summary(test.run)
 print(test.run)
-plot(test.run.neg)
+plot(test.run)
 slotNames(test.run)
+test.run
 
 ##########
 #test binary U
