@@ -16,7 +16,7 @@ DandCsearch <- function(x1, x2, tau1, tau2,fn.call) {
 	fn.call[8] = (x1+x2)/2
 
 	aaa = eval(fn.call)
-	tauM = aaa$sens.coef
+	tauM = mean(aaa$sens.coef)
 
 	if(abs(tauM) < aaa$sens.se/2){
 		return(list(rZ = (x1+x2)/2, tau = tauM))
@@ -44,6 +44,8 @@ DandCsearch <- function(x1, x2, tau1, tau2,fn.call) {
 
 grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, sgnTau0, control.fit) {
 	fname <- ifelse(!is.null(control.fit$resp.family), "fit.GLM.sens", "fit.BART.sens")
+	if(fname == "fit.BART.sens")
+		fname <- ifelse(length(control.fit)==3, "fit.BART.sens", "fit.BART.cont")	
 	fn.call <- call(fname, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, rY=NA, rZ=NA, 
 		control.fit = control.fit)
 
@@ -66,7 +68,8 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, sg
 	for(i in 1:3) {
 		fn.call[8] = rZ[i]
 		aaa = eval(fn.call)
-		tau[i] =aaa$sens.coef
+		tau[i] =mean(aaa$sens.coef)	#only need mean for BART with continuous Z, 
+							#but equiv to single value for other cases
 	}
 
 	if(sign(tau[1]) == sign(tau[3])) {

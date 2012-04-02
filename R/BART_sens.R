@@ -122,10 +122,6 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	result <- new("sensitivity",model.type = "BART", tau = sens.coef, se.tau = sens.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,	
-				alpha = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),	
-				delta = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),
-				se.alpha = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),
-				se.delta = array(NA, dim = c(grid.dim[1], grid.dim[2], nsim)),
 				Y = Y, Z = Z, X = X,
 				tau0 = tau0,
 				Xpartials = Xpartials,

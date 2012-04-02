@@ -76,17 +76,49 @@ plotSA = function(x, coef.axes = F,
 		}else{
 		 ypts = c(ycor, ycor+1)
 		}
-		clevel = ((Zcors[zcor[2]] - Zcors[zcor[1]])*(Ycors[ycor[2]] - Ycors[ycor[1]]))^(-1)*
+		clevel = ((Zcors[zpts[2]] - Zcors[zpts[1]])*(Ycors[ypts[2]] - Ycors[ypts[1]]))^(-1)*
 			sum(taus[zpts, ypts]*
-			matrix(c(-(Zcors[zcor[2]] - max.pt[1])*(Ycors[ycor[1]] - max.pt[2]), 
-				(Zcors[zcor[1]] - max.pt[1])*(Ycors[ycor[1]] - max.pt[2]),
-				(Zcors[zcor[2]] - max.pt[1])*(Ycors[ycor[2]] - max.pt[2]),
-				-(Zcors[zcor[1]] - max.pt[1])*(Ycors[ycor[2]] - max.pt[2])), 
+			matrix(c(-(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]), 
+				(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]),
+				(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2]),
+				-(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
 				nrow = 2, byrow = T))
 		contour(Zcors, Ycors, taus, levels = round(clevel,2),
 			add = T, col = "grey",labcex = labcex,...)
 	}
 }
+
+############
+#plotSA.cont
+############
+plotSA.cont = function(x, coef.axes = F,
+			contour.levels = NULL,
+			zero.col = "red",
+			lty.zero = 1,
+			insig.col = "blue",
+			lty.insig = 1,
+			data.line = TRUE,
+			X.pch = 19,
+			signif.level = 0.05,
+			labcex = 0.75,
+			...) {
+#should do this with lattice to reduce whitespace
+	par(mfrow = c(3,3))#dim(x@tau)[c(1,2)])
+	for(i in 1:3){#dim(x@tau)[1]) {
+	for(j in 1:3){#dim(x@tau)[2]) {
+		trt.ests = apply(x@tau[i,j,,], 2, mean)
+		sd.ests = apply(x@se.tau[i,j,,],2,mean)
+		LCI = trt.ests + qnorm(signif.level/2)*sd.ests
+		UCI = trt.ests + qnorm(1-signif.level/2)*sd.ests
+		plot(lowess(trt.ests~x@Z), xlab = "Treatment", ylab = "Trt effect") 
+		lines(lowess(LCI~x@Z), col = "blue")
+		lines(lowess(UCI~x@Z), col = "blue")
+		lines(lowess(x@tau0~x@Z), col = "grey")
+	}}
+}
+
+
+
 
 
 plotSA.smoothed = function(x,...) {

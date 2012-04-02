@@ -20,11 +20,11 @@ setClass("sensitivity", representation(
 		Xpartials = "matrix",
 		Xcoef = "matrix"),
 	prototype(
-		delta = NULL,
-		alpha = NULL,
-		se.delta = NULL,
-		se.alpha = NULL,
-		Xcoef = NULL)
+		delta = array(NA, dim= c(1,1,1)),
+		alpha = array(NA, dim= c(1,1,1)),
+		se.delta = array(NA, dim= c(1,1,1)),
+		se.alpha = array(NA, dim= c(1,1,1)),
+		Xcoef = array(NA, dim= c(1,1,1)))
 )
 
 ############
@@ -187,6 +187,9 @@ setMethod("show", signature(object = "sensitivity"),
 
 setMethod("plot", c("sensitivity", "missing"),
 	definition = function(x,y,...){
-		plotSA(x,...)
+		if(x@model.type == "BART.cont")
+			plotSA.cont(x,...)
+		else
+			plotSA(x,...)
 	}
 )
