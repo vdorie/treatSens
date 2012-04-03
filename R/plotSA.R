@@ -41,6 +41,7 @@ plotSA = function(x, coef.axes = F,
 		clevels = contour.levels
 	} 
 	
+	par(mgp = c(2,.5,0))
 	plot(Xpart, xlim = c(min(Zcors),max(Zcors)), ylim = c(min(Ycors),max(Ycors)),
 		pch = X.pch, xlab = xlab, ylab = ylab,...)
 
@@ -102,19 +103,38 @@ plotSA.cont = function(x, coef.axes = F,
 			signif.level = 0.05,
 			labcex = 0.75,
 			...) {
+require(lattice)
 #should do this with lattice to reduce whitespace
-	par(mfrow = c(3,3))#dim(x@tau)[c(1,2)])
-	for(i in 1:3){#dim(x@tau)[1]) {
-	for(j in 1:3){#dim(x@tau)[2]) {
-		trt.ests = apply(x@tau[i,j,,], 2, mean)
-		sd.ests = apply(x@se.tau[i,j,,],2,mean)
-		LCI = trt.ests + qnorm(signif.level/2)*sd.ests
-		UCI = trt.ests + qnorm(1-signif.level/2)*sd.ests
-		plot(lowess(trt.ests~x@Z), xlab = "Treatment", ylab = "Trt effect") 
-		lines(lowess(LCI~x@Z), col = "blue")
-		lines(lowess(UCI~x@Z), col = "blue")
-		lines(lowess(x@tau0~x@Z), col = "grey")
-	}}
+	par(mgp = c(2,.5,0))
+	par(mfrow = dim(x@tau)[c(1,2)])
+
+	trt.ests <- sd.ests <- LCI <- UCI <- Z <- tau0 <- cell <- NULL
+	ct = 0
+	for(i in 1:dim(x@tau)[1]) {
+	for(j in 1:dim(x@tau)[2]) {
+		ct = ct+1
+		trt.temp = apply(x@tau[i,j,,], 2, mean)
+		sd.temp = apply(x@se.tau[i,j,,],2,mean)
+
+		trt.ests = c(trt.ests, trt.temp)
+		sd.ests = c(sd.ests, sd.temp)
+
+		LCI = c(LCI,trt.temp + qnorm(signif.level/2)*sd.temp)
+		UCI = c(UCI,trt.temp + qnorm(1-signif.level/2)*sd.temp)
+		
+		tau0 = c(tau0, x@tau0)
+		Z = c(Z, x@Z)
+		trt.cor = round(apply(x@trt.cor, 2, mean, na.rm = T),2)
+		resp.cor = round(apply(x@resp.cor, 1, mean, na.rm = T),2)
+		cell = c(cell, rep(paste("(", trt.cor[i], ",", resp.cor[j],")",sep = ""),length(x@Z)))
+	}} 
+		xyplot(trt.ests + LCI + UCI + tau0 ~ Z | cell, xlab = "Treatment", ylab = "Treatment effect", 
+			layout = dim(x@tau)[c(1,2)], ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
+			type = "smooth", col = c("black", "blue", "blue", "grey"),
+			sub = "(partial r^2 treatment, partial r^2 response)", cex.sub = 0.5) 
+		#points(LCI~Z | cell, col = "blue")
+		#points(UCI~Z | cell, col = "blue")
+		#points(x@tau0~Z | cell, col = "grey")
 }
 
 

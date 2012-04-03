@@ -18,7 +18,7 @@ DandCsearch <- function(x1, x2, tau1, tau2,fn.call) {
 	aaa = eval(fn.call)
 	tauM = mean(aaa$sens.coef)
 
-	if(abs(tauM) < aaa$sens.se/2){
+	if(abs(tauM) < mean(aaa$sens.se)/2){
 		return(list(rZ = (x1+x2)/2, tau = tauM))
 	}else{
 		if(sign(tau1)==sign(tauM)) 
