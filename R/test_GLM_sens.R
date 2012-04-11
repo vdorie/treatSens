@@ -24,12 +24,12 @@ Y <- with(lalonde,re78/1000)
 #				data = NULL			#data object containing variables, if applicable
 
 ZN = 1-Z
-test.run <- GLM.sens(Y~Z+X, grid.dim = c(20,20), standardize = T,
+test.norm <- GLM.sens(Y~Z+X, grid.dim = c(50,50), standardize = T,
 		trt.family = binomial,
 		resp.family = gaussian,
 		U.model = "normal",
 		verbose = T,
-		nsim = 20)
+		nsim = 50)
 test.neg  <- GLM.sens(Y~ZN+X, grid.dim = c(20,20), standardize = T,
 		trt.family = binomial,
 		resp.family = gaussian,
@@ -49,7 +49,7 @@ test.run <- BART.sens(Y~Z+X, grid.dim = c(20,20), standardize = T,
 		est.type = "ATE",
 		U.model = "binomial",
 		nsim = 50)
-save(test.run, file = "test.run.BART.RData")
+save(test.bin, test.norm, file = "test.GLM.Ucomparison.RData")
 
 #Check out processing functions:
 summary(test.run)
@@ -57,6 +57,14 @@ print(test.run)
 plot(test.run)
 slotNames(test.run)
 test.run
+
+pdf("U model comparison.pdf", width = 12, height = 6)
+par(mfrow = c(1,2))
+plot(test.norm, main = "Continuous U")
+debug(plotSA)
+plot(test.bin, main = "Binary U")
+
+dev.off()
 
 ##########
 #test binary U

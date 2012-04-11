@@ -15,14 +15,14 @@ plotSA = function(x, coef.axes = F,
 			...) {
 #note in help: if contours are too rough, up nsim in sens fn
 	if(!coef.axes) {
-		Zcors = apply(x@trt.cor, 2, mean)
-		Ycors = apply(x@resp.cor, 1, mean)
+		Zcors = apply(x@trt.cor, 2, mean, na.rm = T)
+		Ycors = apply(x@resp.cor, 1, mean, na.rm = T)
 		xlab = "Treatment partial correlation"
 	 	ylab = "Response partial correlation"
 		Xpart = x@Xpartials
 	}else{
-		Zcors = apply(x@alpha, 2, mean)
-		Ycors = apply(x@delta, 1, mean)
+		Zcors = apply(x@alpha, 2, mean, na.rm = T)
+		Ycors = apply(x@delta, 1, mean, na.rm = T)
 		xlab = "Alpha"
 		ylab = "Delta"
 		Xpart = x@Xcoef
@@ -42,7 +42,7 @@ plotSA = function(x, coef.axes = F,
 	} 
 	
 	par(mgp = c(2,.5,0))
-	plot(Xpart, xlim = c(min(Zcors),max(Zcors)), ylim = c(min(Ycors),max(Ycors)),
+	plot(Xpart, xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)),
 		pch = X.pch, xlab = xlab, ylab = ylab,...)
 
 	abline(h = 0)
