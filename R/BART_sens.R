@@ -77,6 +77,7 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 
 	tau0 = mean(apply((null.resp$yhat.train[,Z.test]- null.resp$yhat.test)*(-1)^(1-Z[Z.test]), 1, mean))
+	se.tau0 = sd(apply((null.resp$yhat.train[,Z.test]- null.resp$yhat.test)*(-1)^(1-Z[Z.test]), 1, mean))
 
 	#Estimate extreme correlations
 	extreme.cors = maxCor(Y.res, Z.res)
@@ -123,7 +124,7 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	result <- new("sensitivity",model.type = "BART", tau = sens.coef, se.tau = sens.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,	
 				Y = Y, Z = Z, X = X,
-				tau0 = tau0,
+				tau0 = tau0, se.tau0 = se.tau0,
 				Xpartials = Xpartials,
 				Xcoef = matrix(NA, ncol = 1, nrow = 1))
 	return(result)

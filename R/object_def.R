@@ -17,6 +17,7 @@ setClass("sensitivity", representation(
 		Z = "vector",
 		X = "matrix",
 		tau0 = "numeric",
+		se.tau0 = "numeric",
 		Xpartials = "matrix",
 		Xcoef = "matrix"),
 	prototype(

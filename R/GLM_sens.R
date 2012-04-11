@@ -105,7 +105,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z, X = X,
-				tau0 = null.resp$coef[n],
+				tau0 = null.resp$coef[n], se.tau0 = summary(null.resp)$cov.unscaled[n,n],
 				Xpartials = Xpartials,
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,n)]))
 	return(result)

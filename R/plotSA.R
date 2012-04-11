@@ -93,20 +93,12 @@ plotSA = function(x, coef.axes = F,
 #plotSA.cont
 ############
 plotSA.cont = function(x, coef.axes = F,
-			contour.levels = NULL,
-			zero.col = "red",
-			lty.zero = 1,
-			insig.col = "blue",
-			lty.insig = 1,
-			data.line = TRUE,
-			X.pch = 19,
 			signif.level = 0.05,
 			labcex = 0.75,
 			...) {
 require(lattice)
 #should do this with lattice to reduce whitespace
 	par(mgp = c(2,.5,0))
-	par(mfrow = dim(x@tau)[c(1,2)])
 
 	trt.ests <- sd.ests <- LCI <- UCI <- Z <- tau0 <- cell <- NULL
 	ct = 0
@@ -132,11 +124,34 @@ require(lattice)
 			layout = dim(x@tau)[c(1,2)], ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
 			type = "smooth", col = c("black", "blue", "blue", "grey"),
 			sub = "(partial r^2 treatment, partial r^2 response)", cex.sub = 0.5) 
-		#points(LCI~Z | cell, col = "blue")
-		#points(UCI~Z | cell, col = "blue")
-		#points(x@tau0~Z | cell, col = "grey")
 }
 
+#############
+#Null plot for continuous treatment in BART
+#############
+
+plot.null = function(x, coef.axes = F,
+			signif.level = 0.05,
+			labcex = 0.75,
+			...) {
+	require(lattice)
+	require(latticeExtra)
+	par(mgp = c(2,.5,0))
+
+	tau0 = x@tau0
+	LCI = tau0 + qnorm(signif.level/2)*x@se.tau0
+	UCI = tau0 + qnorm(1-signif.level/2)*x@se.tau0
+
+	line.plots <- xyplot(tau0 + LCI + UCI ~ x@Z, xlab = "Treatment", ylab = "Treatment effect", 
+		#ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
+		type = "smooth", col = c("black", "blue", "blue"),
+		scales = list(tck = c(1,0))
+		) 
+	hist.plot <- histogram(~ x@Z, freq = F, type = "density", col = "white",
+			ylim = c(0, 4*max(hist(x@Z,plot=F)$density)))
+
+	line.plots + as.layer(hist.plot, y.same = FALSE, axes = NULL, opposite = FALSE)
+}
 
 
 

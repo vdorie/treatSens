@@ -67,6 +67,7 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 	#equivalent to averaging the slope from Z-1 to Z and the slope from Z to Z+1
 	trt.est.mat = (null.resp$yhat.test[,1:length(Z)]- null.resp$yhat.test[,-c(1:length(Z))])/2
 	tau0 = apply(trt.est.mat, 2, mean)
+	se.tau0 = apply(trt.est.mat,2,sd)
 
 	#Estimate extreme correlations
 	extreme.cors = maxCor(Y.res, Z.res)
@@ -114,7 +115,7 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 	result <- new("sensitivity",model.type = "BART.cont", tau = sens.coef, se.tau = sens.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,	
 				Y = Y, Z = Z, X = X,
-				tau0 = tau0,
+				tau0 = tau0, se.tau0 = se.tau0,
 				Xpartials = Xpartials,
 				Xcoef = matrix(NA, ncol = 1, nrow = 1))
 	return(result)
