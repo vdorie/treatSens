@@ -2,7 +2,7 @@ setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
 source("genU_contY.R")
 source("object_def.R")
 source("X_partials.R")
-source("grid_range.R")
+source("grid_range_cont.R")
 source("housekeeping.R")
 
 ###############
@@ -76,12 +76,12 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
  		extreme.cors = 2*dnorm(0)*extreme.cors
 	}
 
-	cat("Calculating sensitivity parameters of X...\n")
-	Xpartials <- X.partials(Y, Z, X, "BART", "BART")
+	#cat("Calculating sensitivity parameters of X...\n")
+	#Xpartials <- X.partials(Y, Z, X, "BART", "BART")
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, zero.loc, Xpartials, Y,Z, X,Y.res, Z.res, sgnTau0 = sign(mean(tau0)), control.fit = list(U.model = U.model, x.test = x.test))
+	grid.range = grid.search.cont(extreme.cors, tau0, Y, Z, X, Y.res, Z.res, control.fit = list(U.model = U.model, x.test = x.test))
 
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -115,9 +115,7 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 	result <- new("sensitivity",model.type = "BART.cont", tau = sens.coef, se.tau = sens.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,	
 				Y = Y, Z = Z, X = X,
-				tau0 = tau0, se.tau0 = se.tau0,
-				Xpartials = Xpartials,
-				Xcoef = matrix(NA, ncol = 1, nrow = 1))
+				tau0 = tau0, se.tau0 = se.tau0)
 	return(result)
 }
 

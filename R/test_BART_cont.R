@@ -14,11 +14,12 @@ Y <- with(lalonde,re78/1000)
 #Generate a continuous treatment from Z
 Z <- (Z+1)*log(Y+1)+rnorm(length(Z),0,5)
 
-test.run <- BART.sens.cont(Y~Z+X, grid.dim = c(3,3), standardize = T,
+test.run <- BART.sens.cont(Y[!is.na(Y)]~Z[!is.na(Y)]+X[!is.na(Y),], grid.dim = c(3,3), standardize = T,
 		U.model = "normal",
 		verbose = T,
-		nsim = 20)
+		nsim = 50)
 
+save(test.run, file = "test.run.BART.RData")
 #Check out processing functions:
 summary(test.run)
 print(test.run)

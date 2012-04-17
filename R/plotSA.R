@@ -95,12 +95,13 @@ plotSA = function(x, coef.axes = F,
 plotSA.cont = function(x, coef.axes = F,
 			signif.level = 0.05,
 			labcex = 0.75,
+			nullCI = FALSE,
 			...) {
 require(lattice)
 #should do this with lattice to reduce whitespace
 	par(mgp = c(2,.5,0))
 
-	trt.ests <- sd.ests <- LCI <- UCI <- Z <- tau0 <- cell <- NULL
+	trt.ests <- sd.ests <- LCI <- UCI <- LCI0 <- UCI0 <- Z <- tau0 <- cell <- NULL
 	ct = 0
 	for(i in 1:dim(x@tau)[1]) {
 	for(j in 1:dim(x@tau)[2]) {
@@ -113,17 +114,41 @@ require(lattice)
 
 		LCI = c(LCI,trt.temp + qnorm(signif.level/2)*sd.temp)
 		UCI = c(UCI,trt.temp + qnorm(1-signif.level/2)*sd.temp)
-		
+
 		tau0 = c(tau0, x@tau0)
+		LCI0 = c(LCI0, loess(x@tau0 + qnorm(signif.level/2)*x@se.tau0~x@Z)$fitted)
+		UCI0 = c(UCI0, loess(x@tau0 + qnorm(1-signif.level/2)*x@se.tau0~x@Z)$fitted)
+
+			
 		Z = c(Z, x@Z)
+
 		trt.cor = round(apply(x@trt.cor, 2, mean, na.rm = T),2)
 		resp.cor = round(apply(x@resp.cor, 1, mean, na.rm = T),2)
 		cell = c(cell, rep(paste("(", trt.cor[i], ",", resp.cor[j],")",sep = ""),length(x@Z)))
 	}} 
-		xyplot(trt.ests + LCI + UCI + tau0 ~ Z | cell, xlab = "Treatment", ylab = "Treatment effect", 
-			layout = dim(x@tau)[c(1,2)], ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
-			type = "smooth", col = c("black", "blue", "blue", "grey"),
-			sub = "(partial r^2 treatment, partial r^2 response)", cex.sub = 0.5) 
+
+	panel.bands <- function(x,y,upper,lower,subscripts,...,font,fontface) {
+		cat("length x", length(x), "\n")
+		cat("length lower", length(lower), "\n")
+		resort <- order(x)
+		upper <- upper[subscripts]
+		lower <- lower[subscripts]
+		panel.polygon(c(x[resort],rev(x[resort])), c(upper[resort], rev(lower[resort])),border = NA,...)
+	}
+
+	xyplot(tau0 + trt.ests + LCI + UCI ~ Z | cell, xlab = "Treatment", ylab = "Treatment effect", 
+		layout = dim(x@tau)[c(1,2)], ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
+		type = "smooth", col = c("grey", "black", "blue", "blue"),
+		sub = "(partial r^2 treatment, partial r^2 response)", cex.sub = 0.5,
+		upper = UCI0, 
+		lower = LCI0,
+		panel = function(x,y,upper,lower,...){
+			resort <- order(x)
+			if(nullCI) {
+				panel.polygon(c(x[resort],rev(x[resort])), c(upper[resort], rev(lower[resort])),border = NA,...)
+			}
+			panel.xyplot(x, y,...)
+		}) 
 }
 
 #############
