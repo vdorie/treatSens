@@ -95,7 +95,7 @@ plotSA = function(x, coef.axes = F,
 plotSA.cont = function(x, coef.axes = F,
 			signif.level = 0.05,
 			labcex = 0.75,
-			nullCI = FALSE,
+			nullCI = TRUE,
 			...) {
 require(lattice)
 #should do this with lattice to reduce whitespace
@@ -138,10 +138,11 @@ require(lattice)
 
 	xyplot(tau0 + trt.ests + LCI + UCI ~ Z | cell, xlab = "Treatment", ylab = "Treatment effect", 
 		layout = dim(x@tau)[c(1,2)], ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
-		type = "smooth", col = c("grey", "black", "blue", "blue"),
+		type = "smooth", col.line = c("white", "black", "blue", "blue"),
 		sub = "(partial r^2 treatment, partial r^2 response)", cex.sub = 0.5,
 		upper = UCI0, 
 		lower = LCI0,
+		col = "gray80",
 		panel = function(x,y,upper,lower,...){
 			resort <- order(x)
 			if(nullCI) {
@@ -170,6 +171,7 @@ plot.null = function(x, coef.axes = F,
 	line.plots <- xyplot(tau0 + LCI + UCI ~ x@Z, xlab = "Treatment", ylab = "Treatment effect", 
 		#ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
 		type = "smooth", col = c("black", "blue", "blue"),
+		span = .75,
 		scales = list(tck = c(1,0))
 		) 
 	hist.plot <- histogram(~ x@Z, freq = F, type = "density", col = "white",
