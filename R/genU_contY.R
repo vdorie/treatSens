@@ -48,8 +48,8 @@ maxCor <- function(Y,Z) {
 	negMax = invisible(auglag(par = c(.5, -.5), fn = upLeft, gr = upLgrad, heq = detCovar, 
 			hin = ineqL, control.outer = list(trace = F))$par)
 	
-	posMax = sign(posMax)*floor(1000*abs(posMax))/1000
-	negMax = sign(negMax)*floor(1000*abs(negMax))/1000
+	posMax = sign(posMax)*floor(100*abs(posMax))/100
+	negMax = sign(negMax)*floor(100*abs(negMax))/100
 	return(rbind(posMax[2:1], negMax[2:1]))
 }
 

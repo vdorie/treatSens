@@ -85,11 +85,11 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, sg
 	#Update limits to include partial correlations for Xs if necessary
 	if(min(Xpart[,2]) < Y.range[1])
 		Y.range[1] = min(Xpart[,2])
-	if(min(Xpart[,1]) < Z.range[1])
+	if(min(Xpart[,1]) < Z.range[1] & Z.range[2] != rZ[3])
 		Z.range[1] = min(Xpart[,1])
-	if(max(Xpart[,2]) > Y.range[2])
+	if(max(Xpart[,2]) > Y.range[2] & Y.range[2] != rY)
 		Y.range[2] = max(Xpart[,2])
-	if(max(Xpart[,1]) > Z.range[2])
+	if(max(Xpart[,1]) > Z.range[2] & Z.range[2] != rZ[3])
 		Z.range[2] = max(Xpart[,1])
 
 
