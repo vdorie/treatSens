@@ -11,14 +11,14 @@ nX = 25
 
 X = matrix(rnorm(nX*nobs), nrow = nobs)
 
-bA = sample(0:4, prob=c(0.5, .2, .15, .1, .05), size = nX, replace = T)
-Y0A = X%*%matrix(bA, ncol = 1)+rnorm(nobs)
-Y1A = X%*%matrix(bA, ncol = 1)+4 + rnorm(nobs)
+bA = sample(0:4, prob=c(0.5, .2, .15, .1, .05), size = nX+1, replace = T)
+Y0A = cbind(1,X)%*%matrix(bA, ncol = 1)+rnorm(nobs)
+Y1A = cbind(1,X)%*%matrix(bA, ncol = 1)+4 + rnorm(nobs)
 
-bB = sample(seq(0,0.4, by = 0.1), prob=c(.6, .1, .1, .1, .1), size=nX, replace = T)
+bB = sample(seq(0,0.4, by = 0.1), prob=c(.6, .1, .1, .1, .1), size=(nX+1), replace = T)
 omega = 4 - sum(-X%*%matrix(bB, ncol = 1) + exp(X+0.5)%*%matrix(bB, ncol =1))/nobs
-Y1B = exp(X+0.5)%*%matrix(bB, ncol = 1)+rnorm(nobs)
-Y0B = X%*%matrix(bB, ncol =1)-omega+rnorm(nobs)
+Y1B = exp(cbind(1,X+0.5))%*%matrix(bB, ncol = 1)+rnorm(nobs)
+Y0B = cbind(1,X)%*%matrix(bB, ncol =1)-omega+rnorm(nobs)
 
 Z = rbinom(nobs, 1, 0.5)
 YA = YB = rep(NA, nobs)
@@ -31,11 +31,11 @@ YB[!Z] = Y0B[!Z]
 #########
 #Do sensitivity analysis
 #########
-L.BART.1 <- BART.sens(YA~Z+X, grid.dim = c(10,10), standardize = F,
+L.BART.1 <- BART.sens(YA~Z+X, grid.dim = c(5,5), standardize = F,
 		est.type = "ATE",
 		U.model = "normal",
 		verbose = T,
-		nsim = 10)
+		nsim = 4)
 save(file = "test.BART.cont.simulated.RData")
 L.GLM.1 <- GLM.sens(YA~Z+X, grid.dim = c(20,20), standardize = F,
 		trt.family = binomial,
