@@ -2,25 +2,29 @@ setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
 source("BART_sens.R")
 source("BART_cont.R")
 source("GLM_sens.R")
+#load(file = "test.BART.cont.simulated.RData")
 
 #########
 #Generate response surfaces a la Jennifer BART paper
 #########
 nobs = 250
-nX = 25
+nX = 15
 
 X = matrix(rnorm(nX*nobs), nrow = nobs)
+Z = rbinom(nobs, 1, 0.5)
 
 bA = sample(0:4, prob=c(0.5, .2, .15, .1, .05), size = nX+1, replace = T)
-Y0A = cbind(1,X)%*%matrix(bA, ncol = 1)+rnorm(nobs)
-Y1A = cbind(1,X)%*%matrix(bA, ncol = 1)+4 + rnorm(nobs)
+yhat = cbind(1,X)%*%matrix(bA, ncol = 1)
+Y0A = rnorm(nobs, yhat, 1)
+Y1A = rnorm(nobs, yhat+4,1)
 
-bB = sample(seq(0,0.4, by = 0.1), prob=c(.6, .1, .1, .1, .1), size=(nX+1), replace = T)
-omega = 4 - sum(-X%*%matrix(bB, ncol = 1) + exp(X+0.5)%*%matrix(bB, ncol =1))/nobs
-Y1B = exp(cbind(1,X+0.5))%*%matrix(bB, ncol = 1)+rnorm(nobs)
-Y0B = cbind(1,X)%*%matrix(bB, ncol =1)-omega+rnorm(nobs)
+bB = sample(seq(0,0.4, by = 0.1), prob=c(.6, .1, .1, .1, .1), size=nX+1, replace = T)
+y1hat = exp(cbind(1,X+0.5))%*%matrix(bB, ncol = 1)
+y0hat = cbind(1,X)%*%matrix(bB, ncol =1)
+omega = mean(y1hat[Z==1] - y0hat[Z==1]) - 4
+Y1B = rnorm(nobs, y1hat, 1)
+Y0B = rnorm(nobs, y0hat,1)
 
-Z = rbinom(nobs, 1, 0.5)
 YA = YB = rep(NA, nobs)
 YA[Z==1] = Y1A[Z==1]
 YA[!Z] = Y0A[!Z]
@@ -31,33 +35,30 @@ YB[!Z] = Y0B[!Z]
 #########
 #Do sensitivity analysis
 #########
-L.BART.1 <- BART.sens(YA~Z+X, grid.dim = c(5,5), standardize = F,
-		est.type = "ATE",
-		U.model = "normal",
-		verbose = T,
-		nsim = 4)
-save(file = "test.BART.cont.simulated.RData")
-L.GLM.1 <- GLM.sens(YA~Z+X, grid.dim = c(20,20), standardize = F,
-		trt.family = binomial,
-		resp.family = gaussian,
-		U.model = "normal",
-		verbose = T,
-		nsim = 20)
-save(file = "test.BART.cont.simulated.RData")
-NL.BART.1 <- BART.sens(YB~Z+X, grid.dim = c(10,10), standardize = F,
+L.BART.5 <- BART.sens(YA~Z+X, grid.dim = c(10,10), standardize = F,
 		est.type = "ATE",
 		U.model = "normal",
 		verbose = T,
 		nsim = 10)
-save(file = "test.BART.cont.simulated.RData")
-NL.GLM.1 <- GLM.sens(YB~Z+X, grid.dim = c(20,20), standardize = F,
+L.GLM.5 <- GLM.sens(YA~Z+X, grid.dim = c(20,20), standardize = F,
 		trt.family = binomial,
 		resp.family = gaussian,
 		U.model = "normal",
 		verbose = T,
-		nsim = 20)
+		nsim = 10)
+NL.BART.5 <- BART.sens(YB~Z+X, grid.dim = c(10,10), standardize = F,
+		est.type = "ATE",
+		U.model = "normal",
+		verbose = T,
+		nsim = 10)
+NL.GLM.5 <- GLM.sens(YB~Z+X, grid.dim = c(20,20), standardize = F,
+		trt.family = binomial,
+		resp.family = gaussian,
+		U.model = "normal",
+		verbose = T,
+		nsim = 10)
 
-save(file = "test.BART.cont.simulated.RData")
+save(list = ls(), file = "test.BART.cont.simulated.RData")
 
 
 #########

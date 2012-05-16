@@ -53,15 +53,18 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 	if(!is.null(X)) {
 		null.resp <- bart(x.train = cbind(Z,X), y.train = Y, x.test = x.test,verbose = F)
 		null.trt <- bart(x.train = X, y.train = Z, verbose = F)
-		Z.res <- Z-pnorm(apply(null.trt$yhat.train,2,mean)) 	#residuals from trt BART fit
+		Z.res <- Z-null.trt$yhat.train.mean 	#residuals from trt BART fit
 
 	}else{
 		null.resp <- bart(x.train = Z, y.train = Y, x.test = x.test, verbose = F)
 		Z.res <- Z-mean(Z) 	#residuals from mean model
 	}
-	
-	Y.res <- Y-null.resp$yhat.train.mean	#residuals from BART fit - means, or random column? if latter, 
+	if(sum(unique(Y) == c(1,0)) + sum(unique(Y) == c(0,1)) !=2){
+		Y.res <- Y-null.resp$yhat.train.mean	#residuals from BART fit - means, or random column? if latter, 
 								#s/b in loop, I think
+	}else{
+		Y.res <- Y-pnorm(apply(null.resp$yhat.train,2,mean))
+	}
 
 ##HOW TO CALCULATE tau0?
 	#equivalent to averaging the slope from Z-1 to Z and the slope from Z to Z+1
@@ -142,8 +145,12 @@ fit.BART.cont <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 			fit.resp <- bart(x.train = cbind(Z,U), y.train = Y, x.test = cbind(x.test, rep(U, length(x.test[,1])/length(U))), verbose = F)
 			#fit.trt <- bart(x.train = U, y.train = Z, x.test = U, verbose = F)
 		}	
+	if(sum(unique(Y) == c(1,0)) + sum(unique(Y) == c(0,1)) !=2){
+		trt.est.mat = (fit.resp$yhat.test[,1:length(Z)]- fit.resp$yhat.test[,-c(1:length(Z))])/2
+	}else{
+		trt.est.mat = (pnorm(fit.resp$yhat.test[,1:length(Z)])- pnorm(fit.resp$yhat.test[,-c(1:length(Z))]))/2
+	}
 
-	trt.est.mat = (fit.resp$yhat.test[,1:length(Z)]- fit.resp$yhat.test[,-c(1:length(Z))])/2
 	tau = apply(trt.est.mat, 2, mean)
 
 	return(list(

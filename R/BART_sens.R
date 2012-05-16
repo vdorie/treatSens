@@ -76,7 +76,7 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 								#s/b in loop, I think
 
 
-	tau0 = mean(apply((null.resp$yhat.train[,Z.test]- null.resp$yhat.test)*(-1)^(1-Z[Z.test]), 1, mean))
+	tau0 = mean(apply((null.resp$yhat.train[,Z.test]- null.resp$yhat.test)*matrix((-1)^(1-Z[Z.test]), nrow = dim(null.resp$yhat.test)[1], ncol = length(Z.test), byrow = T), 1, mean))
 	se.tau0 = sd(apply((null.resp$yhat.train[,Z.test]- null.resp$yhat.test)*(-1)^(1-Z[Z.test]), 1, mean))
 
 	#Estimate extreme correlations
@@ -156,7 +156,7 @@ fit.BART.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 		}	
 
 		mndiffs = apply((fit.resp$yhat.train[,Z.test]
-					- fit.resp$yhat.test)*(-1)^(1-Z[Z.test]), 1, mean)	
+					- fit.resp$yhat.test)*matrix((-1)^(1-Z[Z.test]), nrow = dim(fit.resp$yhat.test)[1], ncol = length(Z.test), byrow = T), 1, mean)	
 	return(list(
 		sens.coef = mean(mndiffs),	#posterior mean
 		sens.se = sd(mndiffs), 	#SE of posterior
