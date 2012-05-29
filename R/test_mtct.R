@@ -12,3 +12,5 @@ test.run <- BART.sens.cont(Y[!(is.na(Y)|is.na(Z))]~Z[!(is.na(Y)|is.na(Z))]+X[!(i
 		U.model = "normal",
 		verbose = T,
 		nsim = 20)
+
+save(test.run, file = "test.run.mtct.RData")

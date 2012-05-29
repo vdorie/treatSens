@@ -46,6 +46,7 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 	#generate training data for parameter estimate
 		Z.est = c(Z+1, Z-1)
 		x.test = cbind(Z.est,rbind(X,X))
+		names(x.test)[1] = "Z"
 			
 
 	cat("Fitting null models...\n")
@@ -59,21 +60,26 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 		null.resp <- bart(x.train = Z, y.train = Y, x.test = x.test, verbose = F)
 		Z.res <- Z-mean(Z) 	#residuals from mean model
 	}
-	if(sum(unique(Y) == c(1,0)) + sum(unique(Y) == c(0,1)) !=2){
+	if(!is.binary(Y)){
 		Y.res <- Y-null.resp$yhat.train.mean	#residuals from BART fit - means, or random column? if latter, 
 								#s/b in loop, I think
 	}else{
 		Y.res <- Y-pnorm(apply(null.resp$yhat.train,2,mean))
 	}
 
-##HOW TO CALCULATE tau0?
 	#equivalent to averaging the slope from Z-1 to Z and the slope from Z to Z+1
-	trt.est.mat = (null.resp$yhat.test[,1:length(Z)]- null.resp$yhat.test[,-c(1:length(Z))])/2
+	if(!is.binary(Y)){
+		trt.est.mat = (null.resp$yhat.test[,1:length(Z)]- null.resp$yhat.test[,-c(1:length(Z))])/2
+	}else{
+		trt.est.mat = pnorm((null.resp$yhat.test[,1:length(Z)]- null.resp$yhat.test[,-c(1:length(Z))])/2)
+	}
 	tau0 = apply(trt.est.mat, 2, mean)
 	se.tau0 = apply(trt.est.mat,2,sd)
 
 	#Estimate extreme correlations
 	extreme.cors = maxCor(Y.res, Z.res)
+#Having trouble with correlations outside range....
+	extreme.cors = extreme.cors*.95
 
 	if(U.model == "binomial") {
  		extreme.cors = 2*dnorm(0)*extreme.cors
@@ -117,7 +123,7 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 ####DO WE NEED A NEW OBJECT TYPE?
 	result <- new("sensitivity",model.type = "BART.cont", tau = sens.coef, se.tau = sens.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,	
-				Y = Y, Z = Z, X = X,
+				Y = Y, Z = Z, X = as.matrix(X),
 				tau0 = tau0, se.tau0 = se.tau0)
 	return(result)
 }
@@ -139,16 +145,16 @@ fit.BART.cont <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 	if(!(class(U) == "try-error")){
 		#fit models with U
 		if(!is.null(X)) {
-			fit.resp <- bart(x.train = cbind(Z,X,U), y.train = Y, x.test = cbind(x.test, rep(U, length(x.test[,1])/length(U))), verbose = F)
+			fit.resp <- bart(x.train = cbind(Z,X,U), y.train = Y, x.test = cbind(x.test, U), verbose = F)
 			#fit.trt <- bart(x.train = cbind(X,U), y.train = Z, x.test = cbind(x.test[,-1], rep(U, length(x.test[,1])/length(U))), verbose = F)
 		}else{
-			fit.resp <- bart(x.train = cbind(Z,U), y.train = Y, x.test = cbind(x.test, rep(U, length(x.test[,1])/length(U))), verbose = F)
+			fit.resp <- bart(x.train = cbind(Z,U), y.train = Y, x.test = cbind(x.test, U), verbose = F)
 			#fit.trt <- bart(x.train = U, y.train = Z, x.test = U, verbose = F)
 		}	
 	if(sum(unique(Y) == c(1,0)) + sum(unique(Y) == c(0,1)) !=2){
 		trt.est.mat = (fit.resp$yhat.test[,1:length(Z)]- fit.resp$yhat.test[,-c(1:length(Z))])/2
 	}else{
-		trt.est.mat = (pnorm(fit.resp$yhat.test[,1:length(Z)])- pnorm(fit.resp$yhat.test[,-c(1:length(Z))]))/2
+		trt.est.mat = pnorm((fit.resp$yhat.test[,1:length(Z)]- fit.resp$yhat.test[,-c(1:length(Z))])/2)
 	}
 
 	tau = apply(trt.est.mat, 2, mean)

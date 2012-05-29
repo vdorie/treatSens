@@ -16,7 +16,7 @@ curve.distance <- function(trt.est, se.est, tau0, Z) {
 	x = seq(min(Z), max(Z), length.out = 1000)
 	y.index = vector()
 	for(i in 1:length(x))
-		y.index[i] = which(abs(x[i]-Z)==min(abs(x[i]-Z)))
+		y.index[i] = sample(which(abs(x[i]-Z)==min(abs(x[i]-Z))),1)
 	
 	mean(abs((l.est[y.index]-l.null[y.index])/l.se[y.index]))
 	#mean(abs((l.est-l.null)/l.se))
@@ -39,7 +39,7 @@ DandCsearchCont <- function(x1, x2, y1, y2, dist1, dist2, tau0, fn.call, tol = 0
 	fn.call[8] = (x1+x2)/2
 
 	aaa = eval(fn.call)
-	dist = curve.distance(aaa$sens.coef, aaa$sens.se, tau0, Z)
+	dist = curve.distance(aaa$sens.coef, aaa$sens.se, tau0, fn.call$Z)
 
 	if(abs(dist - 0.5) < tol){
 		return(list(rZ = (x1+x2)/2, rY = (y1+y2)/2, dist = dist))

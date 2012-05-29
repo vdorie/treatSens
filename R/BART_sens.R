@@ -59,6 +59,7 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		Z.test = (Z==0)
 	}else
 		stop("Invalid est.type")
+	names(x.test)[1] = "Z"
 
 	cat("Fitting null models...\n")
 	#fit null model & get residuals (and time it)
@@ -72,8 +73,12 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		Z.res <- Z-mean(Z) 	#residuals from mean model
 	}
 	
-	Y.res <- Y-null.resp$yhat.train.mean	#residuals from BART fit - means, or random column? if latter, 
+	if(!is.binary(Y)){
+		Y.res <- Y-null.resp$yhat.train.mean	#residuals from BART fit - means, or random column? if latter, 
 								#s/b in loop, I think
+	}else{
+		Y.res <- Y-pnorm(apply(null.resp$yhat.train,2,mean))
+	}
 
 
 	tau0 = mean(apply((null.resp$yhat.train[,Z.test]- null.resp$yhat.test)*matrix((-1)^(1-Z[Z.test]), nrow = dim(null.resp$yhat.test)[1], ncol = length(Z.test), byrow = T), 1, mean))
@@ -155,8 +160,14 @@ fit.BART.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 			#fit.trt <- bart(x.train = U, y.train = Z, x.test = U[Z.test], verbose = F)
 		}	
 
+	if(!is.binary(Y)){
 		mndiffs = apply((fit.resp$yhat.train[,Z.test]
 					- fit.resp$yhat.test)*matrix((-1)^(1-Z[Z.test]), nrow = dim(fit.resp$yhat.test)[1], ncol = length(Z.test), byrow = T), 1, mean)	
+	}else{
+		mndiffs <- pnorm(apply((fit.resp$yhat.train[,Z.test]
+					- fit.resp$yhat.test)*matrix((-1)^(1-Z[Z.test]), nrow = dim(fit.resp$yhat.test)[1], ncol = length(Z.test), byrow = T), 1, mean))
+	}
+
 	return(list(
 		sens.coef = mean(mndiffs),	#posterior mean
 		sens.se = sd(mndiffs), 	#SE of posterior

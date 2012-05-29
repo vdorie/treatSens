@@ -2,7 +2,7 @@ setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
 source("BART_sens.R")
 source("BART_cont.R")
 source("GLM_sens.R")
-#load(file = "test.BART.cont.simulated.RData")
+load(file = "test.BART.cont.fixedXZ.RData")
 
 #########
 #Generate response surfaces a la Jennifer BART paper
@@ -35,30 +35,30 @@ YB[!Z] = Y0B[!Z]
 #########
 #Do sensitivity analysis
 #########
-L.BART.5 <- BART.sens(YA~Z+X, grid.dim = c(10,10), standardize = F,
+L.BART.1 <- BART.sens(YA~Z+X, grid.dim = c(10,10), standardize = F,
 		est.type = "ATE",
 		U.model = "normal",
 		verbose = T,
 		nsim = 10)
-L.GLM.5 <- GLM.sens(YA~Z+X, grid.dim = c(20,20), standardize = F,
+L.GLM.1 <- GLM.sens(YA~Z+X, grid.dim = c(20,20), standardize = F,
 		trt.family = binomial,
 		resp.family = gaussian,
 		U.model = "normal",
 		verbose = T,
 		nsim = 10)
-NL.BART.5 <- BART.sens(YB~Z+X, grid.dim = c(10,10), standardize = F,
+NL.BART.1 <- BART.sens(YB~Z+X, grid.dim = c(10,10), standardize = F,
 		est.type = "ATE",
 		U.model = "normal",
 		verbose = T,
 		nsim = 10)
-NL.GLM.5 <- GLM.sens(YB~Z+X, grid.dim = c(20,20), standardize = F,
+NL.GLM.1 <- GLM.sens(YB~Z+X, grid.dim = c(20,20), standardize = F,
 		trt.family = binomial,
 		resp.family = gaussian,
 		U.model = "normal",
 		verbose = T,
 		nsim = 10)
 
-save(list = ls(), file = "test.BART.cont.simulated.RData")
+save(list = ls(), file = "test.BART.cont.fixedXZ.RData")
 
 
 #########
