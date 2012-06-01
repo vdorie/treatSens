@@ -76,20 +76,20 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, sg
 	}else {
 		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])], fn.call) 
 		bin.mult = ifelse(control.fit$U.model == "binomial", 2*dnorm(0), 1)
-		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ)*bin.mult)
+		Zmax = sign(rZ[3])*max(0.2,min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ)*bin.mult))
 		Z.range = c(min(Zmax, 0), max(Zmax,0))
-		Y.val = rootGivenRZ(cor(Y.res,Z.res),Zmax)*bin.mult
+		Y.val = min(rootGivenRZ(cor(Y.res,Z.res),Zmax)*bin.mult, rY)
 		Y.range = c(0,sign(Y.val)*floor(1000*abs(Y.val))/1000)
 	}
 
 	#Update limits to include partial correlations for Xs if necessary
 	if(min(Xpart[,2]) < Y.range[1])
 		Y.range[1] = min(Xpart[,2])
-	if(min(Xpart[,1]) < Z.range[1] & Z.range[2] != rZ[3])
+	if(min(Xpart[,1]) < Z.range[1] & min(Xpart[,1]) > rZ[3])
 		Z.range[1] = min(Xpart[,1])
-	if(max(Xpart[,2]) > Y.range[2] & Y.range[2] != rY)
+	if(max(Xpart[,2]) > Y.range[2])
 		Y.range[2] = max(Xpart[,2])
-	if(max(Xpart[,1]) > Z.range[2] & Z.range[2] != rZ[3])
+	if(max(Xpart[,1]) > Z.range[2] & max(Xpart[,1]) < rZ[3])
 		Z.range[2] = max(Xpart[,1])
 
 

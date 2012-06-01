@@ -35,6 +35,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	Y = form.vars$resp
 	Z = form.vars$trt
 	X = form.vars$covars
+
+	Z = as.numeric(Z)		#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
 	
 	#standardize variables
 	if(standardize) {
@@ -81,10 +83,13 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	for(i in 1:grid.dim[1]) {
 	for(j in 1:grid.dim[2]) {
 		cell = cell +1
-	for(k in 1:nsim){
 		rY = rhoY[i]
 		rZ = rhoZ[j]
+	#cat("rY:", rY, "rZ:",rZ,"\n")
+
+	for(k in 1:nsim){
 		
+
 		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 		sens.coef[i,j,k] <- fit.sens$sens.coef

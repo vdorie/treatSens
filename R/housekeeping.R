@@ -19,9 +19,11 @@ is.binary <- function(x) {
 
 parse.formula <- function(form, data) {
 	#extract variables from formula & data
-	aaa <- model.frame(form, data = data)
+	aaa <- get_all_vars(form, data = data)
+	bbb <- model.frame(form, data = data)
 	trt <- aaa[,2]				#assume treatment is 1st var on RHS
-	covars <- aaa[,-c(1:2)]			#rest of variables on RHS
+	ndisc <- (dim(bbb)[2] - dim(aaa)[2])+2
+	covars <- model.matrix(bbb)[,-c(1:ndisc)]		#variables on RHS, less the intercept, treatment(possibly multiple columns if factor)
 	resp <- aaa[,1]				#response from LHS
 
 	if(dim(aaa)[2] == 2)

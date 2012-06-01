@@ -36,6 +36,8 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	Y = form.vars$resp
 	Z = form.vars$trt
 	X = form.vars$covars
+
+	Z = as.numeric(Z)		#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
 	
 	#standardize variables
 	if(standardize) {
