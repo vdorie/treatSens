@@ -27,7 +27,7 @@ test.bg <- BART.sens.cont(hyporate~bg+age+gender+bmi+tc1+tc2, grid.dim = c(3,3),
 source("BART_sens.R")
 source("GLM_sens.R")
 test.tc.glm <- GLM.sens(hyporate~thercode+bmi+age+gender+bg, grid.dim = c(20,20), standardize = F,
-		trt.family = binomial,
+		trt.family = poisson,
 		resp.family = poisson,
 		U.model = "normal",
 		verbose = T,
@@ -37,5 +37,5 @@ test.tc <- BART.sens(hyporate~thercode+bmi+age+gender+bg, grid.dim = c(20,20), s
 		U.model = "normal",
 		nsim = 20)
 
-save(test.age, test.bg, #test.tc, test.tc.glm, 
+save(test.age, test.bg, test.tc.glm, test.tc, 
 		file = "test.run.570.RData")
