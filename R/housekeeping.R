@@ -18,16 +18,24 @@ is.binary <- function(x) {
 ###
 
 parse.formula <- function(form, data) {
-	#extract variables from formula & data
-	aaa <- get_all_vars(form, data = data)
-	bbb <- model.frame(form, data = data)
-	trt <- aaa[,2]				#assume treatment is 1st var on RHS
-	ndisc <- (dim(bbb)[2] - dim(aaa)[2])+2
-	covars <- model.matrix(bbb)[,-c(1:ndisc)]		#variables on RHS, less the intercept, treatment(possibly multiple columns if factor)
-	resp <- aaa[,1]				#response from LHS
+    	varnames <- all.vars(form)
+    	inp <- parse(text = paste("list(", paste(varnames, collapse = ","), 
+        ")"))
+	if(missing(data))
+		data = environment(form)
+	env = environment(form)
+    	variables <- eval(inp, data, env)
 
-	if(dim(aaa)[2] == 2)
+	#extract variables from formula & data
+	trt <- variables[[2]]				#assume treatment is 1st var on RHS
+	resp <- variables[[1]]				#response from LHS
+	variables[[2]] <- NULL
+	variables[[1]] <- NULL
+	if(length(variables) > 0) {
+		covars <- matrix(unlist(variables), nrow = length(resp), byrow = F)			#variables on RHS, less the intercept, treatment(possibly multiple columns if factor)
+	}else{
 		covars = NULL
+	}
 	
 	return(list(resp = resp, trt = trt, covars = covars))
 }
