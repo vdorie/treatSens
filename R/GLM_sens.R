@@ -42,7 +42,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	if(standardize) {
 		Y = std.nonbinary(Y)
 		Z = std.nonbinary(Z)
-		X = apply(X, 2, std.nonbinary)
+		if(!is.null(X))
+			X = apply(X, 2, std.nonbinary)
 	}
 		
 	cat("Fitting null models...\n")
@@ -65,8 +66,12 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
  		extreme.cors = 2*dnorm(0)*extreme.cors
 	}
 
-	cat("Calculating sensitivity parameters of X...\n")
-	Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
+	if(!is.null(X)){
+		cat("Calculating sensitivity parameters of X...\n")
+		Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
+	}else{
+		Xpartials <- NULL
+	}
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
@@ -74,6 +79,10 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
+
+	#if 0 in sequences, shift it a bit - U generation will fail at 0 and we know what the value s/b anyway
+	rhoY[rhoY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
+	rhoZ[rhoZ == 0] <- grid.range[2,1]/(grid.dim[2]*3)
 
 	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.cor <- trt.cor <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 
@@ -105,7 +114,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		if(verbose) cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
 	}}
 
-	result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
+	if(!is.null(X)) {
+		result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
@@ -113,6 +123,15 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				tau0 = null.resp$coef[n], se.tau0 = summary(null.resp)$cov.unscaled[n,n],
 				Xpartials = Xpartials,
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,n)]))
+	}else{
+		result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
+				alpha = alpha, delta = delta, 
+				se.alpha = alpha.se, se.delta = delta.se, 
+				resp.cor = resp.cor, trt.cor = trt.cor,		
+				Y = Y, Z = Z,
+				tau0 = null.resp$coef[n], se.tau0 = summary(null.resp)$cov.unscaled[n,n],
+				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,n)]))
+	}
 	return(result)
 }
 
