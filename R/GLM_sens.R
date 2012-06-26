@@ -80,6 +80,24 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
 
+	if(U.model == "binomial") {
+		cat("Checking grid range...")
+		ny = grid.dim[1]
+		nz = grid.dim[2]
+		rY = rhoY[ny]
+		rZ = rhoZ[nz]
+		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+		while(is.na(fit.sens$sens.coef)){
+			ny = ny-1
+			nz = nz-1
+			rY = rhoY[ny]
+			rZ = rhoZ[nz]
+			fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+		}
+		rhoY <- seq(grid.range[1,1], rY, length.out = grid.dim[1])
+		rhoZ <- seq(grid.range[2,1], rZ, length.out = grid.dim[2])
+	}
+
 	#if 0 in sequences, shift it a bit - U generation will fail at 0 and we know what the value s/b anyway
 	rhoY[rhoY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
 	rhoZ[rhoZ == 0] <- grid.range[2,1]/(grid.dim[2]*3)
@@ -89,8 +107,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	cat("Computing final grid...\n")
 	#fill in grid
 	cell = 0
-	for(i in 1:grid.dim[1]) {
-	for(j in 1:grid.dim[2]) {
+	for(i in grid.dim[1]:1) {
+	for(j in grid.dim[2]:1) {
 		cell = cell +1
 		rY = rhoY[i]
 		rZ = rhoZ[j]

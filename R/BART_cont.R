@@ -50,7 +50,7 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 			
 
 	cat("Fitting null models...\n")
-	#fit null model & get residuals (and time it)
+	#fit null model & get residuals
 	if(!is.null(X)) {
 		null.resp <- bart(x.train = cbind(Z,X), y.train = Y, x.test = x.test,verbose = F)
 		null.trt <- bart(x.train = X, y.train = Z, verbose = F)
@@ -78,9 +78,6 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 
 	#Estimate extreme correlations
 	extreme.cors = maxCor(Y.res, Z.res)
-#Having trouble with correlations outside range....
-	extreme.cors = extreme.cors*.95
-
 	if(U.model == "binomial") {
  		extreme.cors = 2*dnorm(0)*extreme.cors
 	}
@@ -120,7 +117,7 @@ BART.sens.cont <- function(formula, 			#formula: assume treatment is 1st term on
 		}
 		if(verbose) cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
 	}}
-####DO WE NEED A NEW OBJECT TYPE?
+
 	result <- new("sensitivity",model.type = "BART.cont", tau = sens.coef, se.tau = sens.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,	
 				Y = Y, Z = Z, X = as.matrix(X),

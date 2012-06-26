@@ -103,6 +103,24 @@ BART.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
 
+	if(U.model == "binomial") {
+		cat("Checking grid range...")
+		ny = grid.dim[1]
+		nz = grid.dim[2]
+		rY = rhoY[ny]
+		rZ = rhoZ[nz]
+		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+		while(is.na(fit.sens$sens.coef)){
+			ny = ny-1
+			nz = nz-1
+			rY = rhoY[ny]
+			rZ = rhoZ[nz]
+			fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+		}
+		rhoY <- seq(grid.range[1,1], rY, length.out = grid.dim[1])
+		rhoZ <- seq(grid.range[2,1], rZ, length.out = grid.dim[2])
+	}
+
 	sens.coef <- sens.se <- resp.cor <- trt.cor <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 	
 	cat("Computing final grid...\n")
