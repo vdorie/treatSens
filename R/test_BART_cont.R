@@ -18,7 +18,7 @@ Z <-  (Y+apply(2*X,1,sum)+rexp(length(Z), 1/10))^2
 test.run <- BART.sens.cont(Y[!is.na(Y)]~Z[!is.na(Y)]+X[!is.na(Y),], grid.dim = c(3,3), standardize = T,
 		U.model = "normal",
 		verbose = T,
-		nsim = 20)
+		nsim = 10)
 
 save(test.run, file = "test.run.BART.RData")
 #Check out processing functions:
