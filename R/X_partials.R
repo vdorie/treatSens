@@ -14,7 +14,11 @@
 ####
 
 X.partials <- function(Y, Z, X, resp.family, trt.family) {
-	fname <- ifelse(class(resp.family) == "function", "X.partials.GLM", "X.partials.BART")
+	if(class(resp.family) == "function"){
+		fname = "X.partials.GLM"
+	}else{
+		fname <- ifelse(length(resp.family) == 1, "X.partials.BART", "X.partials.LMER")
+	}
 	do.call(fname, list(Y, Z, X, resp.family, trt.family))
 }
 
@@ -72,6 +76,36 @@ X.partials.BART <- function(Y, Z, X, resp.family, trt.family) {
 			XcorY[i] <- cor(X[,i], Yr)
 			XcorZ[i] <- cor(X[,i], Zr)
 			cat("Completed ", i, " of ", nX, "variables.\n")
+		}
+	}
+	return(cbind(XcorZ, XcorY))
+}
+
+###
+#Calculate partials for LMER
+###
+
+X.partials.LMER <- function(Y, Z, X, resp.family, trt.family) {
+	g <- resp.family
+	nX <- dim(X)[2]
+	if(is.null(nX))
+		return(NULL)
+	if(nX == 1) {
+		XcorZ = cor(X, Z-mean(Z))
+		fit.resp <- bart(y.train = Y, x.train = Z, verbose = F)
+		Yr <- Y-fit.resp$yhat.train.mean
+		XcorY <- cor(X, Yr)
+	}else{
+		XcorY <- XcorZ <- vector()
+		for(i in 1:nX) {
+			fit.resp <- lmer(Y~X[,-i]+Z+(1|g))
+			fit.trt <- lmer(Z~X[,-i]+(1|g))
+
+			Yr <- fit.resp@resid
+			Zr <- fit.trt@resid
+		
+			XcorY[i] <- cor(X[,i], Yr)
+			XcorZ[i] <- cor(X[,i], Zr)
 		}
 	}
 	return(cbind(XcorZ, XcorY))

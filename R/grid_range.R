@@ -43,7 +43,11 @@ DandCsearch <- function(x1, x2, tau1, tau2,fn.call) {
 ###
 
 grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, sgnTau0, control.fit) {
-	fname <- ifelse(!is.null(control.fit$resp.family), "fit.GLM.sens", "fit.BART.sens")
+	if(!is.null(control.fit$resp.family)){
+		fname <- "fit.GLM.sens"
+	}else{
+		fname <- ifelse(is.null(control.fit$g), "fit.BART.sens", "fit.LMER.sens")
+	}
 	fn.call <- call(fname, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, rY=NA, rZ=NA, 
 		control.fit = control.fit)
 

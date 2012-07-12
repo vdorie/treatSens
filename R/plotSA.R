@@ -61,7 +61,7 @@ plotSA = function(x, coef.axes = F,
 		yjust = 0.5, x.intersp = 0,
 		bg = ifelse(par("bg")== "transparent", "white", par("bg")), box.lty = 0)
 
-	if(data.line & !is.na(Xpart)) {
+	if(data.line & length(Xpart)>1) {
 		proj.pts = apply(Xpart, 1, mean)
 		max.pt = Xpart[proj.pts == max(proj.pts),]
 		zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
@@ -85,9 +85,10 @@ plotSA = function(x, coef.axes = F,
 				nrow = 2, byrow = T))
 		contour(Zcors, Ycors, taus, levels = round(clevel,2),
 			add = T, col = "grey",labcex = labcex,...)
+	}else{
+		if(data.line)
+			warning("Cannot add data line because there are no non-treatment covariates")
 	}
-	if(data.line & is.na(Xpart))
-		warning("Cannot add data line because there are no non-treatment covariates")
 }
 
 ############
