@@ -2,14 +2,6 @@
 #Calculate minimum and maximum possible correlations
 ###############
 
-#find positive rYU for which the determinant of the covariance matrix is 0
-#given rYZ and rZU.  If positive root does not exist, return NA
-rootGivenRZ <- function(rYZ, rZU) {
-	rY = sqrt(1-rZU^2)
-	rY[rY < 0] = NA
-	return(rY)
-}
-
 #Note this creates a rectangle with corners as close as possible to (-1,1) and (1,1) 
 #some feasible values are excluded as the border between feasible & infeasible is parabolic
 maxCor <- function(Y,Z) {
@@ -31,14 +23,13 @@ contYZU <- function(Y, Z, rho_y, rho_z) {
 	rho_y = abs(rho_y)
 	rho_z = abs(rho_z)
 	n <- length(Y)
-	s_Y <- sd(Y)*sqrt((n-1)/n)
-	s_Z <- sd(Z)*sqrt((n-1)/n)
+	s_Y <- sd(Y)
+	s_Z <- sd(Z)
 	 
-	delta = s_Y/s_Z*rho_z/rho_y
-	s_u = s_Y/rho_y
-	s_e = sqrt((s_Y/rho_y)^2*(1-rho_y^2-rho_z^2))
+	delta = rho_z/s_Z
+	gamma = rho_y/s_Y
 
-	U = signY*Y + signZ*Z*delta + rnorm(n, 0, s_e)
+	U = signY*Y*gamma + signZ*Z*delta + rnorm(n, 0, sqrt(1-rho_y^2-rho_z^2))
 	return(U)
 }
 
