@@ -1,3 +1,11 @@
+#find positive rYU for which the determinant of the covariance matrix is 0
+#given rYZ and rZU.  If positive root does not exist, return NA
+rootGivenRZ <- function(rYZ, rZU) {
+	rY = sqrt(1-rZU^2)
+	rY[rY < 0] = NA
+	return(rY)
+}
+
 ###############
 #Calculate minimum and maximum possible correlations
 ###############
