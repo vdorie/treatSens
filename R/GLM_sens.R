@@ -100,7 +100,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#if 0 in sequences, shift it a bit - U generation will fail at 0 and we know what the value s/b anyway
 	rhoY[rhoY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
-	rhoZ[rhoZ == 0] <- grid.range[2,1]/(grid.dim[2]*3)
+	rhoZ[rhoZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
 
 	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.cor <- trt.cor <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 
