@@ -24,7 +24,7 @@ maxCor <- function(Y,Z) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, rho_y, rho_z) {
+contYZU <- function(Y, Z, rho_y, rho_z, correct = NULL) {
 
 	signY = sign(rho_y)
 	signZ = sign(rho_z)
@@ -33,6 +33,11 @@ contYZU <- function(Y, Z, rho_y, rho_z) {
 	n <- length(Y)
 	s_Y <- sd(Y)
 	s_Z <- sd(Z)
+
+	if(!is.null(correct)){
+		s_Y = s_Y*sqrt((n-1)/(n-correct-1))
+		s_Z = s_Z*sqrt((n-1)/(n-correct))
+	}
 	 
 	delta = rho_z/s_Z
 	gamma = rho_y/s_Y
