@@ -166,7 +166,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 
 		#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
 		if(U.model == "normal")
-			U <- try(contYZU(Y.res, Z.res, rY, rZ))
+			U <- try(contYZU(Y.res, Z.res, rY, rZ, correct = dim(X)[2]))
 		if(U.model == "binomial")
 			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ))	
 	if(!(class(U) == "try-error")){
