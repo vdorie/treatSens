@@ -1,4 +1,3 @@
-setwd("C:/Users/Nicole/Documents/causalSA/R_package/trunk/R")
 source("genU_contY.R")
 source("object_def.R")
 source("X_partials.R")
@@ -175,22 +174,22 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 		#fit models with U
 		if(std) U = std.nonbinary(U)
 		if(!is.null(X)) {
-			fit.glm <- glm(Y~X+U+Z, resp.family)
-			fit.trt <- glm(Z~X+U, trt.family)		
+			fit.glm <- glm(Y~Z+U+X, resp.family)
+			fit.trt <- glm(Z~U+X, trt.family)		
 		}else{
-			fit.glm <- glm(Y~U+Z, resp.family)
+			fit.glm <- glm(Y~Z+U, resp.family)
 			fit.trt <- glm(Z~U, trt.family)		
 		}
 		
 		n = length(fit.trt$coef)
 
 	return(list(
-		sens.coef = fit.glm$coef[n+1],
-		sens.se = summary(fit.glm)$cov.unscaled[n+1,n+1], 	#SE of Z coef
-		delta = fit.glm$coef[n] , 					#estimated coefficient of U in response model
-		alpha = fit.trt$coef[n]  ,					#estimated coef of U in trt model
-		delta.se = summary(fit.glm)$cov.unscaled[n,n], 		#SE of U coef in response model
-		alpha.se = summary(fit.trt)$cov.unscaled[n,n], 		#SE of U coef in trt model
+		sens.coef = fit.glm$coef[2],
+		sens.se = summary(fit.glm)$cov.unscaled[2,2], 	#SE of Z coef
+		delta = fit.glm$coef[3] , 					#estimated coefficient of U in response model
+		alpha = fit.trt$coef[2]  ,					#estimated coef of U in trt model
+		delta.se = summary(fit.glm)$cov.unscaled[3,3], 		#SE of U coef in response model
+		alpha.se = summary(fit.trt)$cov.unscaled[2,2], 		#SE of U coef in trt model
 		resp.cor = cor(Y.res,U), 
 		trt.cor = cor(Z.res,U)
 		))
