@@ -48,7 +48,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	cat("Fitting null models...\n")
 	#fit null model & get residuals
 	if(!is.null(X)) {
-		null.resp <- glm(Y~X+Z, resp.family)
+		null.resp <- glm(Y~Z+X, resp.family)
 		null.trt <- glm(Z~X, trt.family)
 	}else{
 		null.resp <- glm(Y~Z, resp.family)
@@ -74,7 +74,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, zero.loc, Xpartials, Y,Z, X,Y.res, Z.res,sgnTau0 = sign(null.resp$coef[n]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+	grid.range = grid.search(extreme.cors, zero.loc, Xpartials, Y,Z, X,Y.res, Z.res,sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -137,17 +137,17 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z, X = X,
-				tau0 = null.resp$coef[n], se.tau0 = summary(null.resp)$cov.unscaled[n,n],
+				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$cov.unscaled[2,2],
 				Xpartials = Xpartials,
-				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,n)]))
+				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
 	}else{
 		result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z,
-				tau0 = null.resp$coef[n], se.tau0 = summary(null.resp)$cov.unscaled[n,n],
-				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,n)]))
+				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$cov.unscaled[2,n],
+				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
 	}
 	return(result)
 }
