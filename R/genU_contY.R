@@ -53,45 +53,18 @@ contYZU <- function(Y, Z, rho_y, rho_z, correct = NULL) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZbinaryU <- function(Y, Z, rho_y, rho_z) {
+contYZbinaryU <- function(y, z, ry, rz, theta, correct) {
+	n = length(y)
+	vz = var(z)*(n-1)/(n-correct-1)
+	vy = var(y)*(n-1)/(n-correct-2)
+	th = log(theta/(1-theta))
+	zt = (z+rz*(theta-0.5))*rz/(vz-theta*(1-theta)*rz^2)
+	const1 = theta*dnorm(z, (1-theta)*rz, sqrt(vz - theta*(1-theta)*rz^2))
+	c1 = const1/(const1 + (1-theta)*dnorm(z, theta*rz, sqrt(vz - theta*(1-theta)*rz^2)))
+	yt = (y+(c1-0.5)*ry)*ry/(vy-c1*(1-c1)*ry^2)
 
-
-	tauFromCor <- function(rho,X,range=c(-100,100)) {
-		#find the tau that yields correlation w. binary under scenario
-		#Variable X is observed - we assume a normal with obs var
-
-		sigma = sd(X, na.rm = T)
-
-		#need some type of search thru taus:
-	    objective <- function(tau) {
-			var.adj <- tau*sigma/sqrt(tau^2*sigma^2+1)
-			var.adj*dnorm(0)/0.5-rho
-		}
-	    r <- uniroot(objective,range)
-	    r$root
-	}
-
-	rhoFromTau<-function(tau, X) {
- 	   #rho here is the correlation between eta & X.
-		sigma = sd(X, na.rm = T)
-	
-		rho <- tau*sigma/sqrt(tau^2*sigma^2+1)
-		rho
-	}
-
-	r_y = rhoFromTau(tauFromCor(rho_y, Y), Y)
-	r_z = rhoFromTau(tauFromCor(rho_z, Z), Z)
-
-	detCovar <- function(rYU, rZU, rYZ){
-		return(1+2*rYU*rZU*rYZ-rYU^2-rZU^2-rYZ^2)
-	}
-
-	if(detCovar(r_y, r_z, cor(Y,Z)) >= 0) {
-		latentU = contYZU(Y, Z, r_y, r_z)
-		U = latentU > median(latentU)
-		return(U)
-	}else{
-		stop("Latent cor outside feasible range")
-	}
+	pdot = 1/(exp(-th-zt-yt)+1)
+	U = rbinom(length(y), 1, pdot)
+	return(U)
 }
 

@@ -11,6 +11,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				resp.family = gaussian,	#family for GLM of model for response
 				trt.family = gaussian,	#family for GLM of model for treatment
 				U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
+				theta = 0.5, 		#Pr(U=1) for binomial model
 				grid.dim = c(20,20),	#final dimensions of output grid
 				standardize = TRUE,	#Logical: should variables be standardized?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
@@ -74,7 +75,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, zero.loc, Xpartials, Y,Z, X,Y.res, Z.res,sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+	grid.range = grid.search(extreme.cors, zero.loc, Xpartials, Y,Z, X,Y.res, Z.res,theta,sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -85,13 +86,13 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		nz = grid.dim[2]
 		rY = rhoY[ny]
 		rZ = rhoZ[nz]
-		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 		while(is.na(fit.sens$sens.coef)){
 			ny = ny-1
 			nz = nz-1
 			rY = rhoY[ny]
 			rZ = rhoZ[nz]
-			fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+			fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 		}
 		rhoY <- seq(grid.range[1,1], rY, length.out = grid.dim[1])
 		rhoZ <- seq(grid.range[2,1], rZ, length.out = grid.dim[2])
@@ -116,7 +117,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	for(k in 1:nsim){
 		
 
-		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 		sens.coef[i,j,k] <- fit.sens$sens.coef
 		sens.se[i,j,k] <- fit.sens$sens.se
@@ -157,7 +158,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 #fit.GLM.sens
 ###########
 
-fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
+fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit) {
 		resp.family = control.fit$resp.family
 		trt.family = control.fit$trt.family
 		U.model = control.fit$U.model
@@ -167,7 +168,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 		if(U.model == "normal")
 			U <- try(contYZU(Y.res, Z.res, rY, rZ, correct = dim(X)[2]))
 		if(U.model == "binomial")
-			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ))	
+			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ, theta, correct = dim(X)[2]))	
 	if(!(class(U) == "try-error")){
 		#try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
 		#Do we want to return a warning/the error message/our own error message if try fails?
