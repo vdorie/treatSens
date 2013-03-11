@@ -138,7 +138,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z, X = X,
-				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$cov.unscaled[2,2],
+				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xpartials = Xpartials,
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
 	}else{
@@ -147,7 +147,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z,
-				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$cov.unscaled[2,n],
+				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
 	}
 	return(result)
@@ -186,11 +186,11 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit) {
 
 	return(list(
 		sens.coef = fit.glm$coef[2],
-		sens.se = summary(fit.glm)$cov.unscaled[2,2], 	#SE of Z coef
+		sens.se = summary(fit.glm)$coefficients[2,2], 	#SE of Z coef
 		delta = fit.glm$coef[3] , 					#estimated coefficient of U in response model
 		alpha = fit.trt$coef[2]  ,					#estimated coef of U in trt model
-		delta.se = summary(fit.glm)$cov.unscaled[3,3], 		#SE of U coef in response model
-		alpha.se = summary(fit.trt)$cov.unscaled[2,2], 		#SE of U coef in trt model
+		delta.se = summary(fit.glm)$coefficients[3,2], 		#SE of U coef in response model
+		alpha.se = summary(fit.trt)$coefficients[2,2], 		#SE of U coef in trt model
 		resp.cor = cor(Y.res,U), 
 		trt.cor = cor(Z.res,U)
 		))
