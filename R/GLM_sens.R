@@ -102,7 +102,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	rhoY[rhoY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
 	rhoZ[rhoZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
 
-	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.cor <- trt.cor <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
+	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.cor <- trt.cor <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
 
 	cat("Computing final grid...\n")
 	#fill in grid
@@ -127,6 +127,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		alpha.se[i,j,k] <- fit.sens$alpha.se
 		resp.cor[i,j,k] <- fit.sens$resp.cor
 		trt.cor[i,j,k] <- fit.sens$trt.cor
+		resp.s2[i,j,k] <- fit.sens$resp.sigma2
+		trt.s2[i,j,k] <- fit.sens$trt.sigma2
 
 		}
 		if(verbose) cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
@@ -137,7 +139,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
-				Y = Y, Z = Z, X = X,
+				Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xpartials = Xpartials,
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
@@ -146,13 +148,12 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
 				resp.cor = resp.cor, trt.cor = trt.cor,		
-				Y = Y, Z = Z,
+				Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
 	}
 	return(result)
 }
-
 
 ############
 #fit.GLM.sens
@@ -192,7 +193,9 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit) {
 		delta.se = summary(fit.glm)$coefficients[3,2], 		#SE of U coef in response model
 		alpha.se = summary(fit.trt)$coefficients[2,2], 		#SE of U coef in trt model
 		resp.cor = cor(Y.res,U), 
-		trt.cor = cor(Z.res,U)
+		trt.cor = cor(Z.res,U),
+		resp.sigma2 = sum(fit.glm$resid^2)/fit.glm$df.residual,
+		trt.sigma2 = sum(fit.trt$resid^2)/fit.trt$df.residual
 		))
 	}else{
 	return(list(
@@ -203,7 +206,9 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit) {
 		delta.se = NA, 
 		alpha.se = NA,
 		resp.cor = NA, 
-		trt.cor = NA
+		trt.cor = NA,
+		resp.sigma2 = NA,
+		trt.sigma2 = NA
 		))
 	}
 }

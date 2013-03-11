@@ -13,6 +13,8 @@ setClass("sensitivity", representation(
 		se.alpha = "array",
 		resp.cor = "array",
 		trt.cor = "array",
+		sig2.resp = "array",
+		sig2.trt = "array",
 		Y = "vector",
 		Z = "vector",
 		X = "matrix",
@@ -25,6 +27,8 @@ setClass("sensitivity", representation(
 		alpha = array(NA, dim= c(1,1,1)),
 		se.delta = array(NA, dim= c(1,1,1)),
 		se.alpha = array(NA, dim= c(1,1,1)),
+		sig2.resp = array(NA, dim= c(1,1,1)),
+		sig2.trt = array(NA, dim= c(1,1,1)),
 		X = matrix(NA, nrow = 1, ncol = 1),
 		Xpartials = matrix(NA, nrow = 1, ncol = 1),
 		Xcoef = array(NA, dim= c(1,1,1)))
