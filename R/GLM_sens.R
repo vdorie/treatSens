@@ -1,6 +1,5 @@
 source("genU_contY.R")
 source("object_def.R")
-source("X_partials.R")
 source("grid_range.R")
 source("housekeeping.R")
 
@@ -15,7 +14,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				grid.dim = c(20,20),	#final dimensions of output grid
 				standardize = TRUE,	#Logical: should variables be standardized?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
-				zero.loc = 1/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
+				zero.loc = 2/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
 				verbose = F,
 				data = NULL) {
 	#check that data is a data frame
@@ -28,7 +27,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 			stop(paste("Data is not a data.frame object"))
 	}
 
-	
+	if(length(grid.dim) != 2) stop("Error: grid dimenstions must a vector of length 2")
+
 	#extract variables from formula
 	form.vars <- parse.formula(formula, data)
 
@@ -57,52 +57,27 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	}
 
 	n = length(null.resp$coef)
+	n.obs = length(Y)
 	Y.res <- Y-null.resp$fitted.values
+	v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
 	Z.res <- Z-null.trt$fitted.values
-
-	#Estimate extreme correlations
-	extreme.cors = maxCor(Y.res, Z.res)
-	if(U.model == "binomial") {
- 		extreme.cors = 2*dnorm(0)*extreme.cors
-	}
-
-	if(!is.null(X)){
-		cat("Calculating sensitivity parameters of X...\n")
-		Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
-	}else{
-		Xpartials <- NULL
-	}
-
+	v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
+	Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
+	
+	if(standardize){ extreme.coef = matrix(c(-sqrt(v_Y), -sqrt(v_Z), sqrt(v_Y), sqrt(v_Z)), nrow = 2) }
+	else{ extreme.coef = matrix(grid.extremes, nrow = 2, ncol = 2, byrow = T) }
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.cors, zero.loc, Xpartials, Y,Z, X,Y.res, Z.res,theta,sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+	grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta,sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
-	rhoY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
-	rhoZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
-
-	if(U.model == "binomial") {
-		cat("Checking grid range...")
-		ny = grid.dim[1]
-		nz = grid.dim[2]
-		rY = rhoY[ny]
-		rZ = rhoZ[nz]
-		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
-		while(is.na(fit.sens$sens.coef)){
-			ny = ny-1
-			nz = nz-1
-			rY = rhoY[ny]
-			rZ = rhoZ[nz]
-			fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
-		}
-		rhoY <- seq(grid.range[1,1], rY, length.out = grid.dim[1])
-		rhoZ <- seq(grid.range[2,1], rZ, length.out = grid.dim[2])
-	}
+	zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
+	zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
 
 	#if 0 in sequences, shift it a bit - U generation will fail at 0 and we know what the value s/b anyway
-	rhoY[rhoY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
-	rhoZ[rhoZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
+	zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
+	zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
 
-	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.cor <- trt.cor <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(rhoY,2),round(rhoZ,2),NULL))
+	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(zetaY,2),round(zetaZ,2),NULL))
 
 	cat("Computing final grid...\n")
 	#fill in grid
@@ -110,14 +85,13 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	for(i in grid.dim[1]:1) {
 	for(j in grid.dim[2]:1) {
 		cell = cell +1
-		rY = rhoY[i]
-		rZ = rhoZ[j]
-	#cat("rY:", rY, "rZ:",rZ,"\n")
+		rY = zetaY[i]
+		rZ = zetaZ[j]
 
 	for(k in 1:nsim){
 		
 
-		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 		sens.coef[i,j,k] <- fit.sens$sens.coef
 		sens.se[i,j,k] <- fit.sens$sens.se
@@ -125,8 +99,6 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		alpha[i,j,k] <- fit.sens$alpha
 		delta.se[i,j,k] <- fit.sens$delta.se
 		alpha.se[i,j,k] <- fit.sens$alpha.se
-		resp.cor[i,j,k] <- fit.sens$resp.cor
-		trt.cor[i,j,k] <- fit.sens$trt.cor
 		resp.s2[i,j,k] <- fit.sens$resp.sigma2
 		trt.s2[i,j,k] <- fit.sens$trt.sigma2
 
@@ -138,16 +110,13 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
-				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-				Xpartials = Xpartials,
-				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
+				Xcoef = Xcoef)
 	}else{
 		result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
-				resp.cor = resp.cor, trt.cor = trt.cor,		
 				Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
@@ -159,17 +128,17 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 #fit.GLM.sens
 ###########
 
-fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit) {
+fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.fit) {
 		resp.family = control.fit$resp.family
 		trt.family = control.fit$trt.family
 		U.model = control.fit$U.model
 		std = control.fit$standardize
 
-		#Generate U w/Y.res, Z.res (need to get contYZbinaryU working...)
+		#Generate U w/Y.res, Z.res 
 		if(U.model == "normal")
-			U <- try(contYZU(Y.res, Z.res, rY, rZ, correct = dim(X)[2]))
+			U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z))
 		if(U.model == "binomial")
-			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ, theta, correct = dim(X)[2]))	
+			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta))	
 	if(!(class(U) == "try-error")){
 		#try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
 		#Do we want to return a warning/the error message/our own error message if try fails?
@@ -192,8 +161,6 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit) {
 		alpha = fit.trt$coef[2]  ,					#estimated coef of U in trt model
 		delta.se = summary(fit.glm)$coefficients[3,2], 		#SE of U coef in response model
 		alpha.se = summary(fit.trt)$coefficients[2,2], 		#SE of U coef in trt model
-		resp.cor = cor(Y.res,U), 
-		trt.cor = cor(Z.res,U),
 		resp.sigma2 = sum(fit.glm$resid^2)/fit.glm$df.residual,
 		trt.sigma2 = sum(fit.trt$resid^2)/fit.trt$df.residual
 		))
@@ -205,8 +172,6 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, theta, control.fit) {
 		alpha = NA,	
 		delta.se = NA, 
 		alpha.se = NA,
-		resp.cor = NA, 
-		trt.cor = NA,
 		resp.sigma2 = NA,
 		trt.sigma2 = NA
 		))

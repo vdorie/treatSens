@@ -2,7 +2,7 @@
 #plotSA - plot results of sensitivity analysis
 #############
 
-plotSA = function(x, coef.axes = F,
+plotSA = function(x, 
 			contour.levels = NULL,
 			zero.col = "red",
 			lty.zero = 1,
@@ -14,23 +14,15 @@ plotSA = function(x, coef.axes = F,
 			labcex = 0.75,
 			...) {
 #note in help: if contours are too rough, up nsim in sens fn
-	if(!coef.axes) {
-		Zcors = apply(x@trt.cor, 2, mean, na.rm = T)
-		Ycors = apply(x@resp.cor, 1, mean, na.rm = T)
-		xlab = "Treatment partial correlation"
-	 	ylab = "Response partial correlation"
-		Xpart = x@Xpartials
-	}else{
-		Zcors = apply(x@alpha, 2, mean, na.rm = T)
-		Ycors = apply(x@delta, 1, mean, na.rm = T)
+		Zcors = as.numeric(dimnames(x@alpha)[[2]])
+		Ycors = as.numeric(dimnames(x@delta)[[1]])
 		xlab = "Alpha"
 		ylab = "Delta"
 		Xpart = x@Xcoef
 		#note that due to correlation among Xs, some may not appear on plot
 		#because observed partial cors don't map directly to coefs in this case
 		#forcing inclusion can lead to difficult to read plot.
-	}
-
+	
 	taus = t(apply(x@tau, c(1,2), mean, na.rm = T))
 
 	if(is.null(contour.levels)){

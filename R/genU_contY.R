@@ -1,22 +1,3 @@
-#find positive rYU for which the determinant of the covariance matrix is 0
-#given rYZ and rZU.  If positive root does not exist, return NA
-rootGivenRZ <- function(rYZ, rZU) {
-	rY = sqrt(1-rZU^2)
-	rY[rY < 0] = NA
-	return(rY)
-}
-
-###############
-#Calculate minimum and maximum possible correlations
-###############
-
-#Note this creates a rectangle with corners as close as possible to (-1,1) and (1,1) 
-#some feasible values are excluded as the border between feasible & infeasible is parabolic
-maxCor <- function(Y,Z) {
-	theo.extr <- matrix(c(rep(2^(-1/2),2), -2^(-1/2), 2^(-1/2)), nrow = 2, byrow = T)
-	return(trunc(100*theo.extr)/100)
-}
-
 ###############
 #Generate U 
 #Y: continuous response variable
@@ -24,25 +5,16 @@ maxCor <- function(Y,Z) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, rho_y, rho_z, correct = NULL) {
+contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z) {
 
-	signY = sign(rho_y)
-	signZ = sign(rho_z)
-	rho_y = abs(rho_y)
-	rho_z = abs(rho_z)
 	n <- length(Y)
-	s_Y <- sd(Y)
-	s_Z <- sd(Z)
+ 
+	delta = zeta_z/v_Z
+	gamma = zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z
 
-	if(!is.null(correct)){
-		s_Y = s_Y*sqrt((n-1)/(n-correct-1))
-		s_Z = s_Z*sqrt((n-1)/(n-correct))
-	}
-	 
-	delta = rho_z/s_Z
-	gamma = rho_y/s_Y
+	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
 
-	U = signY*Y*gamma + signZ*Z*delta + rnorm(n, 0, sqrt(1-rho_y^2-rho_z^2))
+	U = Y*gamma + Z*delta + rnorm(n, 0, sqrt(var.U))
 	return(U)
 }
 
@@ -53,15 +25,13 @@ contYZU <- function(Y, Z, rho_y, rho_z, correct = NULL) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZbinaryU <- function(y, z, ry, rz, theta, correct) {
+contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) {
 	n = length(y)
-	vz = var(z)*(n-1)/(n-correct-1)
-	vy = var(y)*(n-1)/(n-correct-2)
 	th = log(theta/(1-theta))
-	zt = (z+rz*(theta-0.5))*rz/(vz-theta*(1-theta)*rz^2)
-	const1 = theta*dnorm(z, (1-theta)*rz, sqrt(vz - theta*(1-theta)*rz^2))
-	c1 = const1/(const1 + (1-theta)*dnorm(z, theta*rz, sqrt(vz - theta*(1-theta)*rz^2)))
-	yt = (y+(c1-0.5)*ry)*ry/(vy-c1*(1-c1)*ry^2)
+	zt = (z+cz*(theta-0.5))*cz/(vz-theta*(1-theta)*cz^2)
+	const1 = theta*dnorm(z, (1-theta)*cz, sqrt(vz - theta*(1-theta)*cz^2))
+	c1 = const1/(const1 + (1-theta)*dnorm(z, theta*cz, sqrt(vz - theta*(1-theta)*cz^2)))
+	yt = (y+(c1-0.5)*cy)*cy/(vy-c1*(1-c1)*cy^2)
 
 	pdot = 1/(exp(-th-zt-yt)+1)
 	U = rbinom(length(y), 1, pdot)
