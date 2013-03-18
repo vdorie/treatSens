@@ -64,8 +64,8 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
 	Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
 	
-	if(standardize){ extreme.coef = matrix(c(-sqrt(v_Y), -sqrt(v_Z), sqrt(v_Y), sqrt(v_Z)), nrow = 2) }
-	else{ extreme.coef = matrix(grid.extremes, nrow = 2, ncol = 2, byrow = T) }
+	extreme.coef = matrix(c(-sqrt(v_Y), -sqrt(v_Z), sqrt(v_Y), sqrt(v_Z)), nrow = 2) 
+
 	#find ranges for final grid
 	cat("Finding grid range...\n")
 	grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta,sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))

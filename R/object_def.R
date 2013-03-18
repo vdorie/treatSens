@@ -38,11 +38,11 @@ setClass("sensitivity", representation(
 ############
 setMethod("summary", signature(object="sensitivity"),
  definition=function(object, digits = 3, signif.level = 0.05, ...){
- 	resp.coef <- round(apply(object@delta, 1, mean, na.rm = T),2)
- 	trt.coef <- round(apply(object@alpha, 2, mean, na.rm = T),2)
  	Tau <- object@tau
  	table <- round(apply(Tau, c(1,2), mean),digits	)
 	taus = apply(object@tau, c(1,2), mean)
+ 	resp.coef <- as.numeric(dimnames(taus)[[1]])
+ 	trt.coef <- as.numeric(dimnames(taus)[[2]])
  
 	zeroCoords = contourLines(resp.coef, trt.coef, taus, levels = 0)
 	noSigCoords = contourLines(resp.coef, trt.coef, taus/apply(object@se.tau, c(1,2), mean), levels = -sign(object@tau0)*qnorm(signif.level/2))
@@ -61,8 +61,8 @@ setMethod("summary", signature(object="sensitivity"),
 	print(noSigCors)
 	cat("\n\n")
 
-	colnames(table) <- trt.cors
- 	rownames(table) <- resp.cors
+	colnames(table) <- trt.coef
+ 	rownames(table) <- resp.coef
 	cat("Estimated treatment effects\n")
 	print(table)
  }
@@ -76,18 +76,18 @@ setMethod("summary", signature(object="sensitivity"),
 setMethod("print", "sensitivity",
 	definition = function(x, 
 		digits=3 ){
-	 	resp.coef <- x@delta
-	 	trt.coef <- x@alpha
+	 	resp.coef <- as.numeric(dimnames(taus)[[1]])
+	 	trt.coef <- as.numeric(dimnames(taus)[[2]])
 
 		table <- round(apply(x@tau, c(1,2), mean),digits)
-	 	colnames(table) <- round(apply(resp.coef, 1, mean, na.rm = T),2)
-	 	rownames(table) <- round(apply(trt.coef, 2, mean, na.rm = T),2)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
  		cat("Estimated treatment effects\n")
 		print(table)
 
 		table <- round(apply(x@se.tau, c(1,2), mean),digits)
-	 	colnames(table) <- round(apply(resp.coef, 1, mean, na.rm = T),2)
-	 	rownames(table) <- round(apply(trt.coef, 2, mean, na.rm = T),2)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
  		cat("Standard error of estimated treatment effects\n")
 		print(table)
 
@@ -98,8 +98,8 @@ setMethod("print", "sensitivity",
 #		print(table)
 
 		table <- round(apply(x@se.delta, c(1,2), mean),digits)
-	 	colnames(table) <- round(apply(resp.coef, 1, mean, na.rm = T),2)
-	 	rownames(table) <- round(apply(trt.coef, 2, mean, na.rm = T),2)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
 		cat("Standard error of delta\n")
 		print(table)
 
@@ -110,8 +110,8 @@ setMethod("print", "sensitivity",
 #		print(table)
 
 		table <- round(apply(x@se.alpha, c(1,2), mean),digits)
-	 	colnames(table) <- round(apply(resp.coef, 1, mean, na.rm = T),2)
-	 	rownames(table) <- round(apply(trt.coef, 2, mean, na.rm = T),2)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
  		cat("Standard error of alpha\n")
 		print(table)
 	}
@@ -124,18 +124,18 @@ setMethod("print", "sensitivity",
 #############
 setMethod("show", signature(object = "sensitivity"),
 	definition = function(object){
-	 	resp.cor <- object@delta
-	 	trt.cor <- object@alpha
+	 	resp.coef <- as.numeric(dimnames(taus)[[1]])
+	 	trt.coef <- as.numeric(dimnames(taus)[[2]])
 
 		table <- apply(object@tau, c(1,2), mean)
-	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
-	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
  		cat("Estimated treatment effects\n")
 		print(table)
 
 		table <- apply(object@se.tau, c(1,2), mean)
-	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
-	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
  		cat("Standard error of estimated treatment effects\n")
 		print(table)
 
@@ -146,8 +146,8 @@ setMethod("show", signature(object = "sensitivity"),
 #		print(table)
 
 		table <- apply(object@se.delta, c(1,2), mean)
-	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
-	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
  		cat("Standard error of delta\n")
 		print(table)
 
@@ -158,8 +158,8 @@ setMethod("show", signature(object = "sensitivity"),
 #		print(table)
 
 		table <- apply(object@se.alpha, c(1,2), mean)
-	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
-	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
  		cat("Standard error of alpha\n")
 		print(table)
 	}

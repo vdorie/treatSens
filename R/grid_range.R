@@ -67,7 +67,7 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	}else{
 		rY = c(0,
 			extreme.cors[1,2]/2, #midpoint
-			extreme.cors[1,2]) #extreme Z
+			extreme.cors[1,2]) #extreme Y
 
 		rZ = c(0,
 			extreme.cors[2,2]/2, #midpoint
