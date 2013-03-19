@@ -94,14 +94,22 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 
 	#Update limits to include partial correlations for Xs if necessary
 	if(!is.null(Xpart)){
-		if(min(Xpart[,2]) < Y.range[1])
-			Y.range[1] = min(Xpart[,2])
-		if(min(Xpart[,1]) < Z.range[1] & min(Xpart[,1]) > rZ[3])
-			Z.range[1] = min(Xpart[,1])
-		if(max(Xpart[,2]) > Y.range[2])
-			Y.range[2] = max(Xpart[,2])
-		if(max(Xpart[,1]) > Z.range[2] & max(Xpart[,1]) < rZ[3])
-			Z.range[2] = max(Xpart[,1])
+		if(min(Xpart[,2], na.rm = T) < Y.range[1]){
+			Y.range[1] = min(Xpart[,2], na.rm = T)
+			if(Y.range[1] < -Ymax/3) Y.range[1] = -Ymax/3
+		}
+		if(min(Xpart[,1], na.rm = T) < Z.range[1] & sign(rZ[3])==1){
+			Z.range[1] = min(Xpart[,1], na.rm = T)
+			if(Z.range[1] < -Zmax/3) Z.range[1] = -Zmax/3
+		}
+		if(max(Xpart[,2], na.rm = T) > Y.range[2])
+			Y.range[2] = max(Xpart[,2], na.rm = T)
+		if(max(Xpart[,1], na.rm = T) > Z.range[2] & sign(rZ[3]==-1)){
+			Z.range[2] = max(Xpart[,1], na.rm = T)
+			if(Z.range[2] > -Zmax/3) Z.range[2] = -Zmax/3
+		}
+		#arbitrarily restrict to going 1/3 distance into opposite territory 
+		#to prevent getting full grid for range
 	}
 
 	return(ranges = rbind(Y.range, Z.range))

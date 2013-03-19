@@ -19,6 +19,7 @@ plotSA = function(x,
 		xlab = "Alpha"
 		ylab = "Delta"
 		Xpart = x@Xcoef
+		Xpart = Xpart[!is.na(Xpart[,1]) & !is.na(Xpart[,2]),]
 		#note that due to correlation among Xs, some may not appear on plot
 		#because observed partial cors don't map directly to coefs in this case
 		#forcing inclusion can lead to difficult to read plot.
@@ -55,15 +56,15 @@ plotSA = function(x,
 
 	if(data.line & length(Xpart)>1) {
 		proj.pts = apply(Xpart, 1, mean)
-		max.pt = Xpart[proj.pts == max(proj.pts),]
+		max.pt = Xpart[proj.pts == max(proj.pts[sign(Xpart[,1])==sign(x@tau0)]),]
 		zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
-		if(zcor > max.pt[1]){
+		if(Zcors[zcor] > max.pt[1] & zcor > 1){
 		 zpts = c(zcor-1, zcor)
 		}else{
 		 zpts = c(zcor, zcor+1)
 		}
 		ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
-		if(ycor > max.pt[2]){
+		if(Ycors[ycor] > max.pt[2] & ycor > 1){
 		 ypts = c(ycor-1, ycor)
 		}else{
 		 ypts = c(ycor, ycor+1)
