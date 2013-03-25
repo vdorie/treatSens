@@ -14,7 +14,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				grid.dim = c(20,20),	#final dimensions of output grid
 				standardize = TRUE,	#Logical: should variables be standardized?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
-				zero.loc = 2/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
+				zero.loc = 1/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
 				verbose = F,
 				data = NULL) {
 	#check that data is a data frame
@@ -65,6 +65,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
 	
 	extreme.coef = matrix(c(-sqrt(v_Y), -sqrt(v_Z), sqrt(v_Y), sqrt(v_Z)), nrow = 2) 
+	if(U.model == "binomial") extreme.coef = matrix(c(-2*sqrt(v_Y), -sqrt(v_Z/(theta*(1-theta))), 2*sqrt(v_Y), sqrt(v_Z/(theta*(1-theta)))), nrow = 2) 
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")

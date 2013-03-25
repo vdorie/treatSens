@@ -59,7 +59,7 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	if(sgnTau0 == -1) {
 		rY = c(0,
 			extreme.cors[1,2]/2, #midpoint
-			extreme.cors[1,2]) #extreme Y
+			extreme.cors[1,2]*.9) #extreme Y
 		rZ = c(0,
 			extreme.cors[2,1]/2, #midpoint
 			extreme.cors[2,1]*.95) #extreme Z
@@ -67,7 +67,7 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	}else{
 		rY = c(0,
 			extreme.cors[1,2]/2, #midpoint
-			extreme.cors[1,2]) #extreme Y
+			extreme.cors[1,2]*.9) #extreme Y
 
 		rZ = c(0,
 			extreme.cors[2,2]/2, #midpoint
@@ -84,11 +84,14 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	if(sign(tau[1]) == sign(tau[3])) {
 		Z.range = c(min(rZ[3], 0), max(rZ[3], 0))
 		Y.range = c(0, rY[3])
+		Ymax = rY[3]
+		Zmax = rZ[3]
 	}else {
 		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], rY[2], rY[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])], fn.call) 
 		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ))
 		Z.range = c(min(Zmax, 0), max(Zmax,0))
 		Ymax = min(rY[3],sqrt(v_Y)/(1-Zmax^2/v_Z))
+		if(U.model == "binomial") Ymax = rY[3]
 		Y.range = c(0, Ymax)
 	}
 
