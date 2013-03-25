@@ -91,7 +91,7 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ))
 		Z.range = c(min(Zmax, 0), max(Zmax,0))
 		Ymax = min(rY[3],sqrt(v_Y)/(1-Zmax^2/v_Z))
-		if(U.model == "binomial") Ymax = rY[3]
+		if(fn.call[11][3] == "binomial") Ymax = rY[3]
 		Y.range = c(0, Ymax)
 	}
 
