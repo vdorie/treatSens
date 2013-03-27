@@ -5,7 +5,7 @@
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z) {
+contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 
 	n <- length(Y)
  
@@ -14,7 +14,10 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z) {
 
 	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
 
-	U = Y*gamma + Z*delta + rnorm(n, 0, sqrt(var.U))
+	eps.u = rnorm(n, 0, sqrt(var.U))
+	eps.u = lm(eps.u ~ Y + Z + X)$resid
+
+	U = Y*gamma + Z*delta + eps.u
 	return(U)
 }
 
