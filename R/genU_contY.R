@@ -16,6 +16,7 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 
 	eps.u = rnorm(n, 0, sqrt(var.U))
 	eps.u = lm(eps.u ~ Y + Z + X)$resid
+	eps.u = eps.u * sqrt(var.U)/sd(eps.u)
 
 	U = Y*gamma + Z*delta + eps.u
 	return(U)

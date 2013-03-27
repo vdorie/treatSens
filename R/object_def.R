@@ -76,8 +76,8 @@ setMethod("summary", signature(object="sensitivity"),
 setMethod("print", "sensitivity",
 	definition = function(x, 
 		digits=3 ){
-	 	resp.coef <- as.numeric(dimnames(taus)[[1]])
-	 	trt.coef <- as.numeric(dimnames(taus)[[2]])
+	 	resp.coef <- as.numeric(dimnames(x@tau)[[1]])
+	 	trt.coef <- as.numeric(dimnames(x@tau)[[2]])
 
 		table <- round(apply(x@tau, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
@@ -91,11 +91,11 @@ setMethod("print", "sensitivity",
  		cat("Standard error of estimated treatment effects\n")
 		print(table)
 
-#		table <- round(apply(x@delta, c(1,2), mean),digits)
-#	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
-#	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
-# 		cat("Estimated delta - coefficient of U in response model\n")
-#		print(table)
+		table <- round(apply(x@delta, c(1,2), mean),digits)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
+ 		cat("Estimated delta - coefficient of U in response model\n")
+		print(table)
 
 		table <- round(apply(x@se.delta, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
@@ -103,11 +103,11 @@ setMethod("print", "sensitivity",
 		cat("Standard error of delta\n")
 		print(table)
 
-#		table <- round(apply(x@alpha, c(1,2), mean),digits)
-#	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
-#	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
-#		cat("Estimated alpha - coefficient of U in treatment model\n")
-#		print(table)
+		table <- round(apply(x@alpha, c(1,2), mean),digits)
+	 	colnames(table) <- resp.coef
+	 	rownames(table) <- trt.coef
+		cat("Estimated alpha - coefficient of U in treatment model\n")
+		print(table)
 
 		table <- round(apply(x@se.alpha, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
@@ -124,8 +124,8 @@ setMethod("print", "sensitivity",
 #############
 setMethod("show", signature(object = "sensitivity"),
 	definition = function(object){
-	 	resp.coef <- as.numeric(dimnames(taus)[[1]])
-	 	trt.coef <- as.numeric(dimnames(taus)[[2]])
+	 	resp.coef <- as.numeric(dimnames(object@tau)[[1]])
+	 	trt.coef <- as.numeric(dimnames(object@tau)[[2]])
 
 		table <- apply(object@tau, c(1,2), mean)
 	 	colnames(table) <- resp.coef
