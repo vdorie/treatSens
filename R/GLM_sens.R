@@ -78,7 +78,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
 	zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
 
-	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(zetaY,2),round(zetaZ,2),NULL))
+	sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
 
 	cat("Computing final grid...\n")
 	#fill in grid
