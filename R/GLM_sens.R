@@ -59,9 +59,9 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	n = length(null.resp$coef)
 	n.obs = length(Y)
 	Y.res <- Y-null.resp$fitted.values
-	v_Y <- var(Y.res)#*(n.obs-1)/(n.obs-dim(X)[2]-2)
+	v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
 	Z.res <- Z-null.trt$fitted.values
-	v_Z <- var(Z.res)#*(n.obs-1)/(n.obs-dim(X)[2]-1)
+	v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
 	Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
 	
 	extreme.coef = matrix(c(-sqrt(v_Y), -sqrt(v_Z), sqrt(v_Y), sqrt(v_Z)), nrow = 2) 
