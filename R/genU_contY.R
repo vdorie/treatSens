@@ -29,12 +29,12 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) {
+contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta, bx) {
 	n = length(y)
 	th = log(theta/(1-theta))
 	zt = (z+cz*(theta-0.5))*cz/(vz-theta*(1-theta)*cz^2)
-	const1 = theta*dnorm(z, (1-theta)*cz, sqrt(vz - theta*(1-theta)*cz^2))
-	c1 = const1/(const1 + (1-theta)*dnorm(z, theta*cz, sqrt(vz - theta*(1-theta)*cz^2)))
+	const1 = theta*dnorm(bx+cz, (1-theta)*cz, sqrt(vz - theta*(1-theta)*cz^2))
+	c1 = const1/(const1 + (1-theta)*dnorm(bx, theta*cz, sqrt(vz - theta*(1-theta)*cz^2)))
 	yt = (y+(c1-0.5)*cy)*cy/(vy-c1*(1-c1)*cy^2)
 
 	pdot = 1/(exp(-th-zt-yt)+1)

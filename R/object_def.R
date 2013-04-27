@@ -3,32 +3,32 @@ source("plotSA.R")
 #Define "sensitivity" object
 #Currently specific to GLM.sens
 #############
-setClass("sensitivity", representation(
-		model.type = "character",
-		tau = "array",
-		se.tau = "array",
-		delta = "array",
-		alpha = "array",
-		se.delta = "array",
-		se.alpha = "array",
-		sig2.resp = "array",
-		sig2.trt = "array",
-		Y = "vector",
-		Z = "vector",
-		X = "matrix",
-		tau0 = "numeric",
-		se.tau0 = "numeric",
-		Xcoef = "matrix"),
-	prototype(
-		delta = array(NA, dim= c(1,1,1)),
-		alpha = array(NA, dim= c(1,1,1)),
-		se.delta = array(NA, dim= c(1,1,1)),
-		se.alpha = array(NA, dim= c(1,1,1)),
-		sig2.resp = array(NA, dim= c(1,1,1)),
-		sig2.trt = array(NA, dim= c(1,1,1)),
-		X = matrix(NA, nrow = 1, ncol = 1),
-		Xcoef = array(NA, dim= c(1,1,1)))
-)
+#setClass("sensitivity", representation(
+#		model.type = "character",
+#		tau = "array",
+#		se.tau = "array",
+#		delta = "array",
+#		alpha = "array",
+#		se.delta = "array",
+#		se.alpha = "array",
+#		sig2.resp = "array",
+#		sig2.trt = "array",
+#		Y = "vector",
+#		Z = "vector",
+#		X = "matrix",
+#		tau0 = "numeric",
+#		se.tau0 = "numeric",
+#		Xcoef = "matrix"),
+#	prototype(
+#		delta = array(NA, dim= c(1,1,1)),
+#		alpha = array(NA, dim= c(1,1,1)),
+#		se.delta = array(NA, dim= c(1,1,1)),
+#		se.alpha = array(NA, dim= c(1,1,1)),
+#		sig2.resp = array(NA, dim= c(1,1,1)),
+#		sig2.trt = array(NA, dim= c(1,1,1)),
+#		X = matrix(NA, nrow = 1, ncol = 1),
+#		Xcoef = array(NA, dim= c(1,1,1)))
+#)
 
 ############
 #summary.sensitivity
@@ -36,16 +36,17 @@ setClass("sensitivity", representation(
 #Default to dimensions labeled with target sensitivity parameters
 #commented lines will relabel with average realized s.p.
 ############
-setMethod("summary", signature(object="sensitivity"),
- definition=function(object, digits = 3, signif.level = 0.05, ...){
- 	Tau <- object@tau
+#setMethod("summary", signature(object="sensitivity"),
+# definition=function(object, digits = 3, signif.level = 0.05, ...){
+summary.sensitivity <- function(object, digits = 3, signif.level = 0.05, ...){
+ 	Tau <- object$tau
  	table <- round(apply(Tau, c(1,2), mean),digits	)
-	taus = apply(object@tau, c(1,2), mean)
+	taus <- apply(object$tau, c(1,2), mean)
  	resp.coef <- as.numeric(dimnames(taus)[[1]])
  	trt.coef <- as.numeric(dimnames(taus)[[2]])
  
 	zeroCoords = contourLines(resp.coef, trt.coef, taus, levels = 0)
-	noSigCoords = contourLines(resp.coef, trt.coef, taus/apply(object@se.tau, c(1,2), mean), levels = -sign(object@tau0)*qnorm(signif.level/2))
+	noSigCoords = contourLines(resp.coef, trt.coef, taus/apply(object$se.tau, c(1,2), mean), levels = -sign(object$tau0)*qnorm(signif.level/2))
 	
 	zeroCors = round(cbind(zeroCoords[[1]]$y, zeroCoords[[1]]$x),digits)
 	noSigCors = round(cbind(noSigCoords[[1]]$y, noSigCoords[[1]]$x),digits)
@@ -66,104 +67,105 @@ setMethod("summary", signature(object="sensitivity"),
 	cat("Estimated treatment effects\n")
 	print(table)
  }
-)
+#)
 
 ##############
 #print.sensitivity 
 #prints average values for each cell in grid of:
 #tau, SE of tau, (realized sens params,) coefficients and their se's
 ##############
-setMethod("print", "sensitivity",
-	definition = function(x, 
-		digits=3 ){
-	 	resp.coef <- as.numeric(dimnames(x@tau)[[1]])
-	 	trt.coef <- as.numeric(dimnames(x@tau)[[2]])
+#setMethod("print", "sensitivity",
+#	definition = function(x, 
+print.sensitivity = function(x, digits=3 ){
+	 	resp.coef <- as.numeric(dimnames(x$tau)[[1]])
+	 	trt.coef <- as.numeric(dimnames(x$tau)[[2]])
 
-		table <- round(apply(x@tau, c(1,2), mean),digits)
+		table <- round(apply(x$tau, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
  		cat("Estimated treatment effects\n")
 		print(table)
 
-		table <- round(apply(x@se.tau, c(1,2), mean),digits)
+		table <- round(apply(x$se.tau, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
  		cat("Standard error of estimated treatment effects\n")
 		print(table)
 
-		table <- round(apply(x@delta, c(1,2), mean),digits)
+		table <- round(apply(x$delta, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
  		cat("Estimated delta - coefficient of U in response model\n")
 		print(table)
 
-		table <- round(apply(x@se.delta, c(1,2), mean),digits)
+		table <- round(apply(x$se.delta, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
 		cat("Standard error of delta\n")
 		print(table)
 
-		table <- round(apply(x@alpha, c(1,2), mean),digits)
+		table <- round(apply(x$alpha, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
 		cat("Estimated alpha - coefficient of U in treatment model\n")
 		print(table)
 
-		table <- round(apply(x@se.alpha, c(1,2), mean),digits)
+		table <- round(apply(x$se.alpha, c(1,2), mean),digits)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
  		cat("Standard error of alpha\n")
 		print(table)
 	}
-)
+#)
 
 
 #############
 #show.sensitivity
 #displays means of all slots in object with no processing
 #############
-setMethod("show", signature(object = "sensitivity"),
-	definition = function(object){
-	 	resp.coef <- as.numeric(dimnames(object@tau)[[1]])
-	 	trt.coef <- as.numeric(dimnames(object@tau)[[2]])
+#setMethod("show", signature(object = "sensitivity"),
+#	definition = function(object){
+show.sensitivity = function(object){
+	 	resp.coef <- as.numeric(dimnames(object$tau)[[1]])
+	 	trt.coef <- as.numeric(dimnames(object$tau)[[2]])
 
-		table <- apply(object@tau, c(1,2), mean)
+		table <- apply(object$tau, c(1,2), mean)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
  		cat("Estimated treatment effects\n")
 		print(table)
 
-		table <- apply(object@se.tau, c(1,2), mean)
+		table <- apply(object$se.tau, c(1,2), mean)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
  		cat("Standard error of estimated treatment effects\n")
 		print(table)
 
-#		table <- apply(object@delta, c(1,2), mean)
+#		table <- apply(object$delta, c(1,2), mean)
 #	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
 #	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
 # 		cat("Estimated delta - coefficient of U in response model\n")
 #		print(table)
 
-		table <- apply(object@se.delta, c(1,2), mean)
+		table <- apply(object$se.delta, c(1,2), mean)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
  		cat("Standard error of delta\n")
 		print(table)
 
-#		table <- apply(object@alpha, c(1,2), mean)
+#		table <- apply(object$alpha, c(1,2), mean)
 #	 	colnames(table) <- round(apply(resp.cor, 1, mean, na.rm = T),2)
 #	 	rownames(table) <- round(apply(trt.cor, 2, mean, na.rm = T),2)
 # 		cat("Estimated alpha - coefficient of U in treatment model\n")
 #		print(table)
 
-		table <- apply(object@se.alpha, c(1,2), mean)
+		table <- apply(object$se.alpha, c(1,2), mean)
 	 	colnames(table) <- resp.coef
 	 	rownames(table) <- trt.coef
  		cat("Standard error of alpha\n")
 		print(table)
 	}
-)
+#)
 
 
 
@@ -172,11 +174,12 @@ setMethod("show", signature(object = "sensitivity"),
 #wrapper function - plot function in separate file
 #############
 
-setMethod("plot", c("sensitivity", "missing"),
-	definition = function(x,y,...){
-		if(x@model.type == "BART.cont")
+#setMethod("plot", c("sensitivity", "missing"),
+#	definition = function(x,y,...){
+plot.sensitivity = function(x,y,...){
+		if(x$model.type == "BART.cont")
 			plotSA.cont(x,...)
 		else
 			plotSA(x,...)
 	}
-)
+#)

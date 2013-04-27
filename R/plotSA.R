@@ -14,21 +14,21 @@ plotSA = function(x,
 			labcex = 0.75,
 			...) {
 #note in help: if contours are too rough, up nsim in sens fn
-		Zcors = as.numeric(dimnames(x@alpha)[[2]])
-		Ycors = as.numeric(dimnames(x@delta)[[1]])
+		Zcors = as.numeric(dimnames(x$alpha)[[2]])
+		Ycors = as.numeric(dimnames(x$delta)[[1]])
 		xlab = "Alpha"
 		ylab = "Delta"
-		Xpart = x@Xcoef
+		Xpart = x$Xcoef
 		Xpart = Xpart[!is.na(Xpart[,1]) & !is.na(Xpart[,2]),]
 		#note that due to correlation among Xs, some may not appear on plot
 		#because observed partial cors don't map directly to coefs in this case
 		#forcing inclusion can lead to difficult to read plot.
 	
-	taus = t(apply(x@tau, c(1,2), mean, na.rm = T))
+	taus = t(apply(x$tau, c(1,2), mean, na.rm = T))
 
 	if(is.null(contour.levels)){
-		exTau = ifelse(sign(x@tau0)==1, taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]])
-		clevels = round(seq(x@tau0*0.8, exTau*.8, length.out = 8),2)
+		exTau = ifelse(sign(x$tau0)==1, taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]])
+		clevels = round(seq(x$tau0*0.8, exTau*.8, length.out = 8),2)
 	}else{
 		clevels = contour.levels
 	} 
@@ -46,17 +46,17 @@ plotSA = function(x,
 	contour(Zcors, Ycors, taus, levels = 0, 
 		add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
 
-	contour(Zcors, Ycors, taus/apply(x@se.tau, c(1,2), mean), labels = "N.S.",
-		levels = -sign(x@tau0)*qnorm(signif.level/2), add = T, col = insig.col,
+	contour(Zcors, Ycors, taus/apply(x$se.tau, c(1,2), mean), labels = "N.S.",
+		levels = -sign(x$tau0)*qnorm(signif.level/2), add = T, col = insig.col,
 		lty = lty.insig, labcex = labcex,...)
 	
-	legend(0.8*max(Zcors), 0, legend = round(x@tau0,2), cex = labcex,
+	legend(0.8*max(Zcors), 0, legend = round(x$tau0,2), cex = labcex,
 		yjust = 0.5, x.intersp = 0,
 		bg = ifelse(par("bg")== "transparent", "white", par("bg")), box.lty = 0)
 
 	if(data.line & length(Xpart)>1) {
 		proj.pts = apply(Xpart, 1, mean)
-		max.pt = Xpart[proj.pts == max(proj.pts[sign(Xpart[,1])==sign(x@tau0)]),]
+		max.pt = Xpart[proj.pts == max(proj.pts[sign(Xpart[,1])==sign(x$tau0)]),]
 		zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
 		if(Zcors[zcor] > max.pt[1] & zcor > 1){
 		 zpts = c(zcor-1, zcor)
@@ -96,11 +96,11 @@ require(lattice)
 
 	trt.ests <- sd.ests <- LCI <- UCI <- LCI0 <- UCI0 <- Z <- tau0 <- cell <- NULL
 	ct = 0
-	for(i in 1:dim(x@tau)[1]) {
-	for(j in 1:dim(x@tau)[2]) {
+	for(i in 1:dim(x$tau)[1]) {
+	for(j in 1:dim(x$tau)[2]) {
 		ct = ct+1
-		trt.temp = apply(x@tau[i,j,,], 2, mean)
-		sd.temp = apply(x@se.tau[i,j,,],2,mean)
+		trt.temp = apply(x$tau[i,j,,], 2, mean)
+		sd.temp = apply(x$se.tau[i,j,,],2,mean)
 
 		trt.ests = c(trt.ests, trt.temp)
 		sd.ests = c(sd.ests, sd.temp)
@@ -108,16 +108,16 @@ require(lattice)
 		LCI = c(LCI,trt.temp + qnorm(signif.level/2)*sd.temp)
 		UCI = c(UCI,trt.temp + qnorm(1-signif.level/2)*sd.temp)
 
-		tau0 = c(tau0, x@tau0)
-		LCI0 = c(LCI0, loess(x@tau0 + qnorm(signif.level/2)*x@se.tau0~x@Z)$fitted)
-		UCI0 = c(UCI0, loess(x@tau0 + qnorm(1-signif.level/2)*x@se.tau0~x@Z)$fitted)
+		tau0 = c(tau0, x$tau0)
+		LCI0 = c(LCI0, loess(x$tau0 + qnorm(signif.level/2)*x$se.tau0~x$Z)$fitted)
+		UCI0 = c(UCI0, loess(x$tau0 + qnorm(1-signif.level/2)*x$se.tau0~x$Z)$fitted)
 
 			
-		Z = c(Z, x@Z)
+		Z = c(Z, x$Z)
 
-		trt.cor = round(apply(x@trt.cor, 2, mean, na.rm = T),2)
-		resp.cor = round(apply(x@resp.cor, 1, mean, na.rm = T),2)
-		cell = c(cell, rep(paste("(", trt.cor[i], ",", resp.cor[j],")",sep = ""),length(x@Z)))
+		trt.cor = round(apply(x$trt.cor, 2, mean, na.rm = T),2)
+		resp.cor = round(apply(x$resp.cor, 1, mean, na.rm = T),2)
+		cell = c(cell, rep(paste("(", trt.cor[i], ",", resp.cor[j],")",sep = ""),length(x$Z)))
 	}} 
 
 	panel.bands <- function(x,y,upper,lower,subscripts,...,font,fontface) {
@@ -130,7 +130,7 @@ require(lattice)
 	}
 
 	xyplot(tau0 + trt.ests + LCI + UCI ~ Z | cell, xlab = "Treatment", ylab = "Treatment effect", 
-		layout = dim(x@tau)[c(1,2)], ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
+		layout = dim(x$tau)[c(1,2)], ylim = c(.95*min(c(LCI, x$tau0)), 1.05*max(c(UCI, x$tau0))),
 		type = "smooth", col.line = c("white", "black", "blue", "blue"),
 		sub = "(partial r^2 treatment, partial r^2 response)", cex.sub = 0.5,
 		upper = UCI0, 
@@ -156,18 +156,18 @@ plot.null = function(x, coef.axes = F,
 	require(lattice)
 	require(latticeExtra)
 
-	tau0 = x@tau0
-	LCI = tau0 + qnorm(signif.level/2)*x@se.tau0
-	UCI = tau0 + qnorm(1-signif.level/2)*x@se.tau0
+	tau0 = x$tau0
+	LCI = tau0 + qnorm(signif.level/2)*x$se.tau0
+	UCI = tau0 + qnorm(1-signif.level/2)*x$se.tau0
 
-	line.plots <- xyplot(tau0 + LCI + UCI ~ x@Z, xlab = "Treatment", ylab = "Treatment effect", 
-		#ylim = c(.95*min(c(LCI, x@tau0)), 1.05*max(c(UCI, x@tau0))),
+	line.plots <- xyplot(tau0 + LCI + UCI ~ x$Z, xlab = "Treatment", ylab = "Treatment effect", 
+		#ylim = c(.95*min(c(LCI, x$tau0)), 1.05*max(c(UCI, x$tau0))),
 		type = "smooth", col = c("black", "blue", "blue"),
 		span = .75,
 		scales = list(tck = c(1,0))
 		) 
-	hist.plot <- histogram(~ x@Z, freq = F, type = "density", col = "white",
-			ylim = c(0, 4*max(hist(x@Z,plot=F)$density)))
+	hist.plot <- histogram(~ x$Z, freq = F, type = "density", col = "white",
+			ylim = c(0, 4*max(hist(x$Z,plot=F)$density)))
 
 	line.plots + as.layer(hist.plot, y.same = FALSE, axes = NULL, opposite = FALSE)
 }

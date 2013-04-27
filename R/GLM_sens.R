@@ -69,7 +69,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta,sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+	grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta, null.resp$fitted, sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 	zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -92,7 +92,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	for(k in 1:nsim){
 		
 
-		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+		fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, BzX = null.resp$fitted, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
 
 		sens.coef[i,j,k] <- fit.sens$sens.coef
 		sens.se[i,j,k] <- fit.sens$sens.se
@@ -108,19 +108,21 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	}}
 
 	if(!is.null(X)) {
-		result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
+		result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
 				Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xcoef = Xcoef)
+		class(result) <- "sensitivity"
 	}else{
-		result <- new("sensitivity",model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
+		result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
 				Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
+		class(result) <- "sensitivity"
 	}
 	return(result)
 }
@@ -129,7 +131,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 #fit.GLM.sens
 ###########
 
-fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.fit) {
+fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, control.fit) {
 		resp.family = control.fit$resp.family
 		trt.family = control.fit$trt.family
 		U.model = control.fit$U.model
@@ -139,7 +141,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
 		if(U.model == "normal")
 			U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z, X))
 		if(U.model == "binomial")
-			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta))	
+			U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX))	
 	if(!(class(U) == "try-error")){
 		#try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
 		#Do we want to return a warning/the error message/our own error message if try fails?
