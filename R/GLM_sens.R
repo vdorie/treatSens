@@ -14,8 +14,9 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				grid.dim = c(20,20),	#final dimensions of output grid
 				standardize = TRUE,	#Logical: should variables be standardized?
 				nsim = 20,			#number of simulated Us to average over per cell in grid
-				zero.loc = 1/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
+				zero.loc = 1/3,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
 				verbose = F,
+				buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
 				data = NULL) {
 	#check that data is a data frame
 	if(!is.null(data)) {
@@ -28,6 +29,12 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	}
 
 	if(length(grid.dim) != 2) stop("Error: grid dimenstions must a vector of length 2")
+
+	if(class(trt.family) == "character" && trt.family == "normal") trt.family = gaussian
+	if(class(resp.family) == "character" && resp.family == "normal") resp.family = gaussian
+
+	if(!(U.model %in% c("binomial", "normal")))
+		stop("Invalid specification for distribution of U")
 
 	#extract variables from formula
 	form.vars <- parse.formula(formula, data)
@@ -64,12 +71,16 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
 	Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
 	
-	extreme.coef = matrix(c(-sqrt(v_Y), -sqrt(v_Z), sqrt(v_Y), sqrt(v_Z)), nrow = 2) 
-	if(U.model == "binomial") extreme.coef = matrix(c(-2*sqrt(v_Y), -sqrt(v_Z/(theta*(1-theta))), 2*sqrt(v_Y), sqrt(v_Z/(theta*(1-theta)))), nrow = 2) 
+	extreme.coef = matrix(c(-sqrt((v_Y-buffer)/(1-buffer)), -sqrt(v_Z-buffer), sqrt((v_Y-buffer)/(1-buffer)), sqrt(v_Z-buffer)), nrow = 2) 
+	if(U.model == "binomial") extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
 
+	if(zero.loc == "full"){
+		grid.range = extreme.coef
+	}else{ 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
 	grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta, null.resp$fitted, sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize))
+	}
 
 	zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])

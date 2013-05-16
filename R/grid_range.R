@@ -59,7 +59,7 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	if(sgnTau0 == -1) {
 		rY = c(0,
 			extreme.cors[1,2]/2, #midpoint
-			extreme.cors[1,2]*.9) #extreme Y
+			extreme.cors[1,2]*.95) #extreme Y
 		rZ = c(0,
 			extreme.cors[2,1]/2, #midpoint
 			extreme.cors[2,1]*.95) #extreme Z
@@ -67,7 +67,7 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	}else{
 		rY = c(0,
 			extreme.cors[1,2]/2, #midpoint
-			extreme.cors[1,2]*.9) #extreme Y
+			extreme.cors[1,2]*.95) #extreme Y
 
 		rZ = c(0,
 			extreme.cors[2,2]/2, #midpoint
@@ -82,38 +82,81 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	}
 
 	if(sign(tau[1]) == sign(tau[3])) {
-		Z.range = c(min(rZ[3], 0), max(rZ[3], 0))
-		Y.range = c(0, rY[3])
+	#	Z.range = c(min(rZ[3], 0), max(rZ[3], 0))
+	#	Y.range = c(0, rY[3])
 		Ymax = rY[3]
 		Zmax = rZ[3]
 	}else {
 		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], rY[2], rY[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])], fn.call) 
 		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ))
-		Z.range = c(min(Zmax, 0), max(Zmax,0))
+	#	Z.range = c(min(Zmax, 0), max(Zmax,0))
 		Ymax = min(rY[3],sqrt(v_Y)/(1-Zmax^2/v_Z))
 		if(control.fit[3] == "binomial") Ymax = rY[3]
-		Y.range = c(0, Ymax)
+	#	Y.range = c(0, Ymax)
 	}
 
-	#Update limits to include partial correlations for Xs if necessary
-	if(!is.null(Xpart)){
-		if(min(Xpart[,2], na.rm = T) < Y.range[1]){
-			Y.range[1] = min(Xpart[,2], na.rm = T)
-			if(Y.range[1] < -Ymax/3) Y.range[1] = -Ymax/3
-		}
-		if(min(Xpart[,1], na.rm = T) < Z.range[1] & sign(rZ[3])==1){
-			Z.range[1] = min(Xpart[,1], na.rm = T)
-			if(Z.range[1] < -Zmax/3) Z.range[1] = -Zmax/3
-		}
-		if(max(Xpart[,2], na.rm = T) > Y.range[2])
-			Y.range[2] = max(Xpart[,2], na.rm = T)
-		if(max(Xpart[,1], na.rm = T) > Z.range[2] & sign(rZ[3]==-1)){
-			Z.range[2] = max(Xpart[,1], na.rm = T)
-			if(Z.range[2] > -Zmax/3) Z.range[2] = -Zmax/3
-		}
-		#arbitrarily restrict to going 1/3 distance into opposite territory 
-		#to prevent getting full grid for range
+######Do it again for opposite side
+	if(sgnTau0 == 1) {
+		rY = c(0,
+			extreme.cors[1,2]/2, #midpoint
+			extreme.cors[1,2]*.95) #extreme Y
+		rZ = c(0,
+			extreme.cors[2,1]/2, #midpoint
+			extreme.cors[2,1]*.95) #extreme Z
+
+	}else{
+		rY = c(0,
+			extreme.cors[1,2]/2, #midpoint
+			extreme.cors[1,2]*.95) #extreme Y
+
+		rZ = c(0,
+			extreme.cors[2,2]/2, #midpoint
+			extreme.cors[2,2]*.95) #extreme Z
 	}
+	for(i in 1:3) {
+		fn.call[7] = rY[i]
+		fn.call[8] = rZ[i]
+		aaa = eval(fn.call)
+		tau[i] =aaa$sens.coef
+					
+	}
+
+	if(sign(tau[1]) == sign(tau[3])) {
+	#	Z.range = c(min(rZ[1], 0), max(rZ[1], 0))
+	#	Y.range = c(0, rY[1])
+		Ymin = rY[3]
+		Zmin = rZ[3]
+	}else {
+		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], rY[2], rY[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])], fn.call) 
+		Zmin = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ))
+	#	Z.range = c(min(Zmax, 0), max(Zmax,0))
+		Ymin = max(rY[3],sqrt(v_Y)/(1-Zmin^2/v_Z))
+		if(control.fit[3] == "binomial") Ymax = rY[3]
+	#	Y.range = c(0, Ymax)
+	}
+
+	Z.range = c(min(Zmin, Zmax), max(Zmin, Zmax))
+	Y.range = c(0, min(Ymin, Ymax))
+
+	#Update limits to include partial correlations for Xs if necessary
+	#if(!is.null(Xpart)){
+	#	if(min(Xpart[,2], na.rm = T) < Y.range[1]){
+	#		Y.range[1] = min(Xpart[,2], na.rm = T)
+	#		if(Y.range[1] < -Ymax/3) Y.range[1] = -Ymax/3
+	#	}
+	#	if(min(Xpart[,1], na.rm = T) < Z.range[1] & sign(rZ[3])==1){
+	#		Z.range[1] = min(Xpart[,1], na.rm = T)
+	#		if(Z.range[1] < -Zmax/3) Z.range[1] = -Zmax/3
+	#	}
+	#	if(max(Xpart[,2], na.rm = T) > Y.range[2])
+	#		Y.range[2] = max(Xpart[,2], na.rm = T)
+	#	if(max(Xpart[,1], na.rm = T) > Z.range[2] & sign(rZ[3]==-1)){
+	#		Z.range[2] = max(Xpart[,1], na.rm = T)
+	#		if(Z.range[2] > -Zmax/3) Z.range[2] = -Zmax/3
+	#	}
+	#	#arbitrarily restrict to going 1/3 distance into opposite territory 
+	#	#to prevent getting full grid for range
+	#}
 
 	return(ranges = rbind(Y.range, Z.range))
 }

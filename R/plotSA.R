@@ -27,8 +27,8 @@ plotSA = function(x,
 	taus = t(apply(x$tau, c(1,2), mean, na.rm = T))
 
 	if(is.null(contour.levels)){
-		exTau = ifelse(sign(x$tau0)==1, taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]])
-		clevels = round(seq(x$tau0*0.8, exTau*.8, length.out = 8),2)
+		exTau = c(taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]])
+		clevels = round(seq(exTau[2]*.8, exTau[1]*.8, length.out = 14), 2) #round(seq(x$tau0*0.8, exTau*.8, length.out = 8),2)
 	}else{
 		clevels = contour.levels
 	} 
@@ -46,7 +46,7 @@ plotSA = function(x,
 	contour(Zcors, Ycors, taus, levels = 0, 
 		add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
 
-	contour(Zcors, Ycors, taus/apply(x$se.tau, c(1,2), mean), labels = "N.S.",
+	contour(Zcors, Ycors, taus/t(apply(x$se.tau, c(1,2), mean)), labels = "N.S.",
 		levels = -sign(x$tau0)*qnorm(signif.level/2), add = T, col = insig.col,
 		lty = lty.insig, labcex = labcex,...)
 	
