@@ -84,7 +84,7 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 
 		sens.coef[i,j] <- null.resp$coef[2]-rY*rZ/v_Z
-		sens.se[i,j] <- v_Y*solve(t(cbind(Z,X)) %*% cbind(Z,X))[1,1]
+		sens.se[i,j] <- sqrt((v_Y*solve(t(cbind(Z,X)) %*% cbind(Z,X))[1,1])
 		delta[i,j] <- rY
 		alpha[i,j] <- rZ
 		delta.se[i,j] <- NA
