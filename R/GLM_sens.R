@@ -18,24 +18,82 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				verbose = F,
 				buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
 				data = NULL) {
-	#check that data is a data frame
-	if(!is.null(data)) {
-		if(class(data) == "matrix") {
-			data = data.frame(data)
-			cat("Warning: coerced matrix to data frame")
-		}
-		else if(class(data) != "data.frame")
-			stop(paste("Data is not a data.frame object"))
-	}
+  
+  #check that data is a data frame
+  if(!is.null(data)) {
+    if(identical(class(data),"matrix")) {
+      if(verbose) cat("Warning: coerced matrix to data frame", "\n")
+      data = data.frame(data)
+    }
+    else if(!identical(class(data),"data.frame")) {
+      stop(paste("Data is not a data.frame object"))
+    }    
+  }
+  
+  #change the name of link function in a way consistent with glm()
+  if(identical(class(trt.family),"character")) {
+    if(identical(trt.family,"gaussian")||identical(trt.family,"normal")) {
+      if(verbose) cat("Gaussian family with identity link function is assumed in the treatment model.", "\n")
+      trt.family = gaussian
+    }
+    if(identical(trt.family,"binomial")||trt.family,"binary")||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
+      if(verbose) cat("Binomial family with logistic link function is assumed in the treatment model.", "\n")
+      trt.family = binomial
+    }
+  }
+  
+  if(!identical(class(trt.family),"function")) {
+    stop(paste("trt.family is not correctly specified."))
+  }
+  
+  if(identical(class(resp.family),"character")) {
+    if(identical(resp.family,"normal")) {
+      if(verbose) cat("Gaussian family with identity link function is assumed in the response model.", "\n")        
+      resp.family = gaussian
+    }
+    if(identical(resp.family,"binary")||identical(resp.family,"logit")||identical(resp.family,"logistic")) {
+      if(verbose) cat("Binomial family with logistic link function is assumed in the response model.", "\n")
+      resp.family = binomial
+    }
+  }  
+  
+  if(!identical(class(resp.family),"function")) {
+    stop(paste("resp.family is not correctly specified."))
+  }
+  
+  
+  #change the name of U.model in a way consistent with the program.
+  if(identical(class(U.model),"function")) {
+    if(identical(U.model,gaussian)) {
+      if(verbose) cat("Normally distributed continous U is assumed.", "\n")    
+      U.model = "normal"
+    }
+    if(identical(U.model,binomial)) {
+      if(verbose) cat("Binary U with binomial distribution is assumed.", "\n")    
+      U.model = "binomial"
+    }
+  }
+  
+  if(identical(class(U.model),"character")) {
+    if(identical(U.model,"gaussian")||identical(U.model,"continuous")) {
+      if(verbose) cat("Normally distributed continous U is assumed.", "\n")
+      U.model = "normal"
+    }
+    if(identical(U.model,"binary")) {
+      if(verbose) cat("Binary U with binomial distribution is assumed.", "\n")
+      U.model = "binomial"
+    }
+  }
+  
+  if(!identical(U.model,"normal") && !identical(U.model,"binomial")) {
+    stop(paste("U.model is not correctly specified."))        
+  }
 
-	if(length(grid.dim) != 2) stop("Error: grid dimenstions must a vector of length 2")
-
-	if(class(trt.family) == "character" && trt.family == "normal") trt.family = gaussian
-	if(class(resp.family) == "character" && resp.family == "normal") resp.family = gaussian
-
-	if(!(U.model %in% c("binomial", "normal")))
-		stop("Invalid specification for distribution of U")
-
+  #check whether the dimentions of grid are at least 2.
+  if(length(grid.dim) != 2) {
+    stop("Error: grid dimenstions must a vector of length 2")    
+  }
+ 
 	#extract variables from formula
 	form.vars <- parse.formula(formula, data)
 
