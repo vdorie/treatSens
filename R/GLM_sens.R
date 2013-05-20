@@ -36,7 +36,7 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
       if(verbose) cat("Gaussian family with identity link function is assumed in the treatment model.", "\n")
       trt.family = gaussian
     }
-    if(identical(trt.family,"binomial")||trt.family,"binary")||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
+    if(identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
       if(verbose) cat("Binomial family with logistic link function is assumed in the treatment model.", "\n")
       trt.family = binomial
     }
