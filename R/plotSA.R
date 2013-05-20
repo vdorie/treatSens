@@ -13,75 +13,77 @@ plotSA = function(x,
 			signif.level = 0.05,
 			labcex = 0.75,
 			...) {
-#note in help: if contours are too rough, up nsim in sens fn
-		Zcors = as.numeric(dimnames(x$alpha)[[2]])
-		Ycors = as.numeric(dimnames(x$delta)[[1]])
-		xlab = "Alpha"
-		ylab = "Delta"
-		Xpart = x$Xcoef
-		Xpart = Xpart[!is.na(Xpart[,1]) & !is.na(Xpart[,2]),]
-		#note that due to correlation among Xs, some may not appear on plot
-		#because observed partial cors don't map directly to coefs in this case
-		#forcing inclusion can lead to difficult to read plot.
-	
-	taus = t(apply(x$tau, c(1,2), mean, na.rm = T))
-
-	if(is.null(contour.levels)){
-		exTau = c(taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]])
-		clevels = round(seq(exTau[2]*.8, exTau[1]*.8, length.out = 14), 2) #round(seq(x$tau0*0.8, exTau*.8, length.out = 8),2)
-	}else{
-		clevels = contour.levels
-	} 
-	
-	par(mgp = c(2,.5,0))
-	plot(Xpart, xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)),
-		pch = X.pch, xlab = xlab, ylab = ylab,...)
-
-	abline(h = 0)
-	abline(v = 0)
-
-	contour(Zcors, Ycors, taus, levels = clevels, 
-		add = T, labcex = labcex,...)
-
-	contour(Zcors, Ycors, taus, levels = 0, 
-		add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
-
-	contour(Zcors, Ycors, taus/t(apply(x$se.tau, c(1,2), mean)), labels = "N.S.",
-		levels = -sign(x$tau0)*qnorm(signif.level/2), add = T, col = insig.col,
-		lty = lty.insig, labcex = labcex,...)
-	
-	legend(0.8*max(Zcors), 0, legend = round(x$tau0,2), cex = labcex,
-		yjust = 0.5, x.intersp = 0,
-		bg = ifelse(par("bg")== "transparent", "white", par("bg")), box.lty = 0)
-
-	if(data.line & length(Xpart)>1) {
-		proj.pts = apply(Xpart, 1, mean)
-		max.pt = Xpart[proj.pts == max(proj.pts[sign(Xpart[,1])==sign(x$tau0)]),]
-		zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
-		if(Zcors[zcor] > max.pt[1] & zcor > 1){
-		 zpts = c(zcor-1, zcor)
-		}else{
-		 zpts = c(zcor, zcor+1)
-		}
-		ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
-		if(Ycors[ycor] > max.pt[2] & ycor > 1){
-		 ypts = c(ycor-1, ycor)
-		}else{
-		 ypts = c(ycor, ycor+1)
-		}
-		clevel = ((Zcors[zpts[2]] - Zcors[zpts[1]])*(Ycors[ypts[2]] - Ycors[ypts[1]]))^(-1)*
-			sum(taus[zpts, ypts]*
-			matrix(c(-(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]), 
-				(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]),
-				(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2]),
-				-(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
-				nrow = 2, byrow = T))
-		contour(Zcors, Ycors, taus, levels = round(clevel,2),
-			add = T, col = "grey",labcex = labcex,...)
-	}else{
-		if(data.line)
-			warning("Cannot add data line because there are no non-treatment covariates")
-	}
+  #note in help: if contours are too rough, up nsim in sens fn
+  Zcors = as.numeric(dimnames(x$alpha)[[2]])
+  Ycors = as.numeric(dimnames(x$delta)[[1]])
+  xlab = "Alpha"
+  ylab = "Delta"
+  Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),]
+  Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
+  Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
+  #note that due to correlation among Xs, some may not appear on plot
+  #because observed partial cors don't map directly to coefs in this case
+  #forcing inclusion can lead to difficult to read plot.
+  
+  taus = t(apply(x$tau, c(1,2), mean, na.rm = T))
+  
+  if(is.null(contour.levels)){
+    exTau = c(taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]]) #MH: extreme values of tau at right end
+    clevels = round(seq(exTau[2]*.8, exTau[1]*.8, length.out = 14), 2) #MH: vals at which contours are drawn. round(seq(x$tau0*0.8, exTau*.8, length.out = 8),2)
+  }else{
+    clevels = contour.levels
+  } 
+  
+  par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
+  plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)),
+       pch = X.pch, xlab = xlab, ylab = ylab,...)
+  mtext("Note: Coefficients of Xs multiplied by -1 are displayed in red.", side=3)
+  
+  abline(h = 0)
+  abline(v = 0)
+  
+  contour(Zcors, Ycors, taus, levels = clevels, 
+          add = T, labcex = labcex,...)
+  
+  contour(Zcors, Ycors, taus, levels = 0, 
+          add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
+  
+  contour(Zcors, Ycors, taus/t(apply(x$se.tau, c(1,2), mean)), labels = "N.S.",
+          levels = -sign(x$tau0)*qnorm(signif.level/2), add = T, col = insig.col,
+          lty = lty.insig, labcex = labcex,...)
+  
+  legend(0.8*max(Zcors), 0, legend = round(x$tau0,2), cex = labcex,
+         yjust = 0.5, x.intersp = 0,
+         bg = ifelse(par("bg")== "transparent", "white", par("bg")), box.lty = 0)
+  
+  if(data.line & length(Xpart)>1) {
+    proj.pts = apply(Xpart, 1, mean)
+    max.pt = Xpart[proj.pts == max(proj.pts[sign(Xpart[,1])==sign(x$tau0)]),]
+    zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
+    if(Zcors[zcor] > max.pt[1] & zcor > 1){
+      zpts = c(zcor-1, zcor)
+    }else{
+      zpts = c(zcor, zcor+1)
+    }
+    ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
+    if(Ycors[ycor] > max.pt[2] & ycor > 1){
+      ypts = c(ycor-1, ycor)
+    }else{
+      ypts = c(ycor, ycor+1)
+    }
+    clevel = ((Zcors[zpts[2]] - Zcors[zpts[1]])*(Ycors[ypts[2]] - Ycors[ypts[1]]))^(-1)*
+      sum(taus[zpts, ypts]*
+            matrix(c(-(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]), 
+                     (Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]),
+                     (Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2]),
+                     -(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
+                   nrow = 2, byrow = T))
+    contour(Zcors, Ycors, taus, levels = round(clevel,2),
+            add = T, col = "grey",labcex = labcex,...)
+  }else{
+    if(data.line)
+      warning("Cannot add data line because there are no non-treatment covariates")
+  }
 }
 
 ############

@@ -177,12 +177,20 @@ GLM.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	}}
 
 	if(!is.null(X)) {
+    #MH: Codes to multiply X by -1 to limit plot to 1 & 2 quadrants.
+	  Xcoef.flg =  matrix(ifelse(Xcoef[,2]>=0,1,-1))
+	  Xcoef.flg.multiplier = matrix(rep(Xcoef.flg, each=dim(X)[[1]]),dim(X)[[1]],dim(X)[[2]])
+	  X.positive = X*Xcoef.flg.multiplier
+	  null.resp.plot <- glm(Y~Z+X.positive, resp.family)
+	  null.trt.plot <- glm(Z~X.positive, trt.family)
+	  Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
+    
 		result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
 				Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-				Xcoef = Xcoef)
+				Xcoef = Xcoef, Xcoef.plot = Xcoef.plot)
 		class(result) <- "sensitivity"
 	}else{
 		result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
