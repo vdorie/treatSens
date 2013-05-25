@@ -9,7 +9,7 @@ plotSA = function(x,
 			insig.col = "blue",
 			lty.insig = 1,
 			data.line = TRUE,
-			X.pch = 19,
+			X.pch = NULL,
 			signif.level = 0.05,
 			labcex = 0.75,
 			...) {
@@ -23,7 +23,10 @@ plotSA = function(x,
   Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
   #note that due to correlation among Xs, some may not appear on plot
   #because observed partial cors don't map directly to coefs in this case
-  #forcing inclusion can lead to difficult to read plot.
+  #forcing inclusion can lead to difficult to read plot.  
+  if(is.null(X.pch)){
+    X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
+  }
   
   taus = t(apply(x$tau, c(1,2), mean, na.rm = T))
   
@@ -34,10 +37,13 @@ plotSA = function(x,
     clevels = contour.levels
   } 
   
+  if (any(Xpart[,2]<0)) {
+    cat("Note: Predictors with negative coefficients for the response surface have been transformed through multiplication by -1 and are displayed as inverted triangles.", "\n")    
+  }
+
   par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
   plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)),
        pch = X.pch, xlab = xlab, ylab = ylab,...)
-  mtext("Note: Coefficients of Xs multiplied by -1 are displayed in red.", side=3)
   
   abline(h = 0)
   abline(v = 0)

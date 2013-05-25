@@ -17,7 +17,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
                      zero.loc = 1/3,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
                      verbose = F,
                      buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
-                     weights = NULL,
+                     weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
                      data = NULL) {
   
   #check that data is a data frame
@@ -94,7 +94,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   if(length(grid.dim) != 2) {
     stop("Error: grid dimenstions must a vector of length 2")    
   }
-  
+
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
   
@@ -112,22 +112,63 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
       X = apply(X, 2, std.nonbinary)
   }
   
-  cat("Fitting null models...\n")
-  #fit null model & get residuals
+  n.obs = length(Y)
+  
+  #fit null model for treatment model & get residuals
   if(!is.null(X)) {
-    null.resp <- glm(Y~Z+X, family=resp.family, weights=weights)
     null.trt <- glm(Z~X, trt.family)
   }else{
-    null.resp <- glm(Y~Z, resp.family)
     null.trt <- glm(Z~1, trt.family)
+  }
+  Z.res <- Z-null.trt$fitted.values
+  v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
+  
+  ###############################
+  #NEW CODE FOR WEIGHTS
+  ###############################
+  #create weights if the user specifies either ATE, ATT, or ATC.
+
+  nt = sum(Z==1)
+  nc = sum(Z==0)
+  
+  if (!is.null(weights) && identical(class(weights),"character")) {
+    if (identical(trt.family,gaussian) && (any(null.trt$fitted<0) || any(null.trt$fitted>1))) {
+      stop(paste("Weights estimated with gaussian family are out of bound."))}
+    
+    if (!any(weights==c("ATE","ATT","ATC"))) {
+      stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
+    
+    if (identical(weights,"ATE")) {
+      weights <- 1/null.trt$fitted
+      weights[Z==0] <-1/(1-null.trt$fitted[Z==0])
+      weights = weights*n.obs/sum(weights) #normalizing weight
+      cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect.","\n")}
+    
+    if (identical(weights,"ATT")) {
+      weights <- null.trt$fitted/(1-null.trt$fitted)
+      weights[Z==1] <-1
+      weights[Z==0] = weights[Z==0]*(nc/sum(weights[Z==0])) #normalizing weight
+      cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the treated.","\n")}
+    
+    if (identical(weights,"ATC")) {
+      weights <- (1-null.trt$fitted)/null.trt$fitted
+      weights[Z==0] <- 1
+      weights[Z==1] = weights[Z==1]*(nt/sum(weights[Z==1])) #normalizing weight
+      cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")}
+  }
+
+  cat("Fitting null models...\n")
+  #fit null model for the outcome & get residuals
+  #the following codes must be placed after codes for weights 
+  if(!is.null(X)) {
+    null.resp <- glm(Y~Z+X, family=resp.family, weights=weights)
+  }else{
+    null.resp <- glm(Y~Z, resp.family)
   }
   
   n = length(null.resp$coef)
-  n.obs = length(Y)
   Y.res <- Y-null.resp$fitted.values
   v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
-  Z.res <- Z-null.trt$fitted.values
-  v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
   Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
   
   extreme.coef = matrix(c(-sqrt((v_Y-buffer)/(1-buffer)), -sqrt(v_Z-buffer), sqrt((v_Y-buffer)/(1-buffer)), sqrt(v_Z-buffer)), nrow = 2) 
@@ -138,10 +179,11 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   }else{ 
     #find ranges for final grid
     cat("Finding grid range...\n")
+undebug(grid.search)
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta, null.resp$fitted, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
   }
-  
+undebug(grid.search)  
   zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
   zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
   
@@ -180,9 +222,8 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   
   if(!is.null(X)) {
     #MH: Codes to multiply X by -1 to limit plot to 1 & 2 quadrants.
-    Xcoef.flg =  matrix(ifelse(Xcoef[,2]>=0,1,-1))
-    Xcoef.flg.multiplier = matrix(rep(Xcoef.flg, each=dim(X)[[1]]),dim(X)[[1]],dim(X)[[2]])
-    X.positive = X*Xcoef.flg.multiplier
+    Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
+    X.positive = t(t(X)*Xcoef.flg)
     null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
     null.trt.plot <- glm(Z~X.positive, family=trt.family)
     Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
