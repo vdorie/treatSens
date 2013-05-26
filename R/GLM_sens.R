@@ -132,8 +132,8 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   nc = sum(Z==0)
   
   if (!is.null(weights) && identical(class(weights),"character")) {
-    if (identical(trt.family,gaussian) && (any(null.trt$fitted<0) || any(null.trt$fitted>1))) {
-      stop(paste("Weights estimated with gaussian family are out of bound."))}
+    if (!identical(trt.family,binomial)) {
+      stop(paste("trt.family must be binomial when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
     
     if (!any(weights==c("ATE","ATT","ATC"))) {
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
