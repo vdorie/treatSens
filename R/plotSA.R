@@ -42,8 +42,17 @@ plotSA = function(x,
   }
 
   par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
-  plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)),
+  
+  #MH: define max, min of plots
+  xplot.min = ifelse(min(Zcors, na.rm = T)<min(Xpart.plot[,1]),min(Zcors, na.rm = T),min(Xpart.plot[,1]))
+  xplot.max = ifelse(max(Zcors, na.rm = T)>max(Xpart.plot[,1]),max(Zcors, na.rm = T),max(Xpart.plot[,1]))
+  yplot.max = ifelse(max(Ycors, na.rm = T)>max(Xpart.plot[,2]),max(Ycors, na.rm = T),max(Xpart.plot[,2]))  
+  plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(xplot.min,xplot.max), ylim = c(0,yplot.max),
        pch = X.pch, xlab = xlab, ylab = ylab,...)
+  
+  #old codes
+  #plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)),
+  #     pch = X.pch, xlab = xlab, ylab = ylab,...)
   
   abline(h = 0)
   abline(v = 0)
@@ -66,13 +75,13 @@ plotSA = function(x,
     proj.pts = apply(Xpart, 1, mean)
     max.pt = Xpart[proj.pts == max(proj.pts[sign(Xpart[,1])==sign(x$tau0)]),]
     zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
-    if(Zcors[zcor] > max.pt[1] & zcor > 1){
+    if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ #MH: ||(zcor==length(Zcors)) is added to avoid error
       zpts = c(zcor-1, zcor)
     }else{
       zpts = c(zcor, zcor+1)
     }
     ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
-    if(Ycors[ycor] > max.pt[2] & ycor > 1){
+    if((Ycors[ycor] > max.pt[2] & ycor > 1)||(ycor==length(Ycors))){ #MH: ||(ycor==length(Ycors)) is added to avoid error
       ypts = c(ycor-1, ycor)
     }else{
       ypts = c(ycor, ycor+1)

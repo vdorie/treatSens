@@ -12,7 +12,7 @@
 #fn.call: sensitivity analysis function call (will call one of fit_GLM_sens or fit_BART_sens)
 ###
 
-DandCsearch <- function(x1, x2, y1, y2, tau1, tau2,fn.call) {
+DandCsearch <- function(x1, x2, y1, y2, tau1, tau2, fn.call) {
 	#change coefficients in function call
 	fn.call[7] = (y1+y2)/2
 	fn.call[8] = (x1+x2)/2
@@ -44,7 +44,7 @@ DandCsearch <- function(x1, x2, y1, y2, tau1, tau2,fn.call) {
 #sgnTau0: the sign of the estimated treatment effect in the null model
 ###
 
-grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, BzX, sgnTau0, control.fit) {
+grid.search <- function(extreme.cors, zero.loc, Xpart, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, BzX, sgnTau0, control.fit) {
 	if(!is.null(control.fit$resp.family)){
 		fname <- "fit.GLM.sens"
 	}else{
@@ -77,8 +77,7 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 		fn.call[7] = rY[i]
 		fn.call[8] = rZ[i]
 		aaa = eval(fn.call)
-		tau[i] =aaa$sens.coef
-					
+		tau[i] =aaa$sens.coef	
 	}
 
 	if(sign(tau[1]) == sign(tau[3])) {
@@ -89,7 +88,14 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	}else {
 		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], rY[2], rY[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])], fn.call) 
 		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ))
-	#	Z.range = c(min(Zmax, 0), max(Zmax,0))
+    
+		#MH: update Zmax so that it include all plots.
+    if ((sgnTau0 == 1) && (all(Xcoef.plot[,1])<extreme.cors[2,2]*.95)) {
+      Zmax = ifelse(Zmax>max(Xcoef.plot[,1]),Zmax,max(Xcoef.plot[,1]))}
+		if ((sgnTau0 == -1) && (all(Xcoef.plot[,1])>extreme.cors[2,1]*.95)) {
+		  Zmax = ifelse(Zmax<max(Xcoef.plot[,1]),Zmax,max(Xcoef.plot[,1]))}
+    
+    #	Z.range = c(min(Zmax, 0), max(Zmax,0))
 		Ymax = min(rY[3],sqrt(v_Y)/(1-Zmax^2/v_Z))
 		if(control.fit[3] == "binomial") Ymax = rY[3]
 	#	Y.range = c(0, Ymax)
@@ -129,7 +135,14 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Y, Z, X, Y.res, Z.res, v_
 	}else {
 		loc0 <- DandCsearch(rZ[2], rZ[sign(tau)!=sign(tau[2])], rY[2], rY[sign(tau)!=sign(tau[2])], tau[2], tau[sign(tau)!=sign(tau[2])], fn.call) 
 		Zmin = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ))
-	#	Z.range = c(min(Zmax, 0), max(Zmax,0))
+
+		#MH: update Zmin so that it include all plots.
+    if ((sgnTau0 == 1) && (all(Xcoef.plot[,1])>extreme.cors[2,1]*.95)) {
+		  Zmin = ifelse(Zmin<min(Xcoef.plot[,1]),Zmin,min(Xcoef.plot[,1]))}
+		if ((sgnTau0 == -1) && (all(Xcoef.plot[,1])<extreme.cors[2,2]*.95)) {
+		  Zmin = ifelse(Zmin>min(Xcoef.plot[,1]),Zmin,min(Xcoef.plot[,1]))}
+    
+		#	Z.range = c(min(Zmax, 0), max(Zmax,0))
 		Ymin = max(rY[3],sqrt(v_Y)/(1-Zmin^2/v_Z))
 		if(control.fit[3] == "binomial") Ymax = rY[3]
 	#	Y.range = c(0, Ymax)

@@ -132,11 +132,12 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   nc = sum(Z==0)
   
   if (!is.null(weights) && identical(class(weights),"character")) {
-    if (!identical(trt.family,binomial)) {
-      stop(paste("trt.family must be binomial when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
     
     if (!any(weights==c("ATE","ATT","ATC"))) {
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
+
+    if (!identical(trt.family,binomial)) {
+      stop(paste("trt.family must be binomial when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
     
     if (identical(weights,"ATE")) {
       weights <- 1/null.trt$fitted
@@ -179,11 +180,20 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   }else{ 
     #find ranges for final grid
     cat("Finding grid range...\n")
-undebug(grid.search)
-    grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta, null.resp$fitted, sgnTau0 = sign(null.resp$coef[2]), 
+    
+    #MH: Codes to multiply X by -1 to limit plot to 1 & 2 quadrants.
+    Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
+    X.positive = t(t(X)*Xcoef.flg)
+    null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
+    null.trt.plot <- glm(Z~X.positive, family=trt.family)
+    Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
+    
+#debug(grid.search)
+    grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, Y.res, Z.res,v_Y, v_Z, theta, null.resp$fitted, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
   }
-undebug(grid.search)  
+  
+#undebug(grid.search)
   zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
   zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
   
@@ -221,13 +231,6 @@ undebug(grid.search)
     }}
   
   if(!is.null(X)) {
-    #MH: Codes to multiply X by -1 to limit plot to 1 & 2 quadrants.
-    Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
-    X.positive = t(t(X)*Xcoef.flg)
-    null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
-    null.trt.plot <- glm(Z~X.positive, family=trt.family)
-    Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
-    
     result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
                    alpha = alpha, delta = delta, 
                    se.alpha = alpha.se, se.delta = delta.se, 
@@ -270,10 +273,10 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, con
     if(std) U = std.nonbinary(U)
     if(!is.null(X)) {
       fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)
-      fit.trt <- glm(Z~U+X, trt.family)		
+      fit.trt <- glm(Z~U+X, family=trt.family)		
     }else{
-      fit.glm <- glm(Y~Z+U, resp.family)
-      fit.trt <- glm(Z~U, trt.family)		
+      fit.glm <- glm(Y~Z+U, family=resp.family)
+      fit.trt <- glm(Z~U, family=trt.family)		
     }
     
     n = length(fit.trt$coef)
@@ -281,10 +284,10 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, con
     return(list(
       sens.coef = fit.glm$coef[2],
       sens.se = summary(fit.glm)$coefficients[2,2], 	#SE of Z coef
-      delta = fit.glm$coef[3] , 					#estimated coefficient of U in response model
-      alpha = fit.trt$coef[2]  ,					#estimated coef of U in trt model
-      delta.se = summary(fit.glm)$coefficients[3,2], 		#SE of U coef in response model
-      alpha.se = summary(fit.trt)$coefficients[2,2], 		#SE of U coef in trt model
+      delta = fit.glm$coef[3], 					              #estimated coefficient of U in response model
+      alpha = fit.trt$coef[2],				    	          #estimated coef of U in trt model
+      delta.se = summary(fit.glm)$coefficients[3,2], 	#SE of U coef in response model
+      alpha.se = summary(fit.trt)$coefficients[2,2], 	#SE of U coef in trt model
       resp.sigma2 = sum(fit.glm$resid^2)/fit.glm$df.residual,
       trt.sigma2 = sum(fit.trt$resid^2)/fit.trt$df.residual
     ))
