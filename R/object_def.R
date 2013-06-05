@@ -177,9 +177,13 @@ show.sensitivity = function(object){
 #setMethod("plot", c("sensitivity", "missing"),
 #	definition = function(x,y,...){
 plot.sensitivity = function(x,y,...){
-		if(x$model.type == "BART.cont")
-			plotSA.cont(x,...)
-		else
-			plotSA(x,...)
+		if(x$model.type == "BART.cont") {
+		  plotSA.cont(x,...)
+		}	else {
+#undebug(plotSA)
+		  plotSA(x,...)
+#undebug(plotSA)
+		}
+
 	}
 #)

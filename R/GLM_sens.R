@@ -2,6 +2,7 @@ source("genU_contY.R")
 source("object_def.R")
 source("grid_range.R")
 source("housekeeping.R")
+source("warnings.R")
 
 ###############
 #Main function call
@@ -20,81 +21,25 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
                      weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
                      data = NULL) {
   
-  #check that data is a data frame
-  if(!is.null(data)) {
-    if(identical(class(data),"matrix")) {
-      if(verbose) cat("Warning: coerced matrix to data frame", "\n")
-      data = data.frame(data)
-    }
-    else if(!identical(class(data),"data.frame")) {
-      stop(paste("Data is not a data.frame object"))
-    }    
-  }
+  #Check data, options, and etc. conform to the format.
+  out.warnings <- warnings(formula, resp.family, trt.family, U.model,	theta, grid.dim, 
+           standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
   
-  #change the name of link function in a way consistent with glm()
-  if(identical(class(trt.family),"character")) {
-    if(identical(trt.family,"gaussian")||identical(trt.family,"normal")) {
-      if(verbose) cat("Gaussian family with identity link function is assumed in the treatment model.", "\n")
-      trt.family = gaussian
-    }
-    if(identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
-      if(verbose) cat("Binomial family with logistic link function is assumed in the treatment model.", "\n")
-      trt.family = binomial
-    }
-  }
-  
-  if(!identical(class(trt.family),"function")) {
-    stop(paste("trt.family is not correctly specified."))
-  }
-  
-  if(identical(class(resp.family),"character")) {
-    if(identical(resp.family,"normal")) {
-      if(verbose) cat("Gaussian family with identity link function is assumed in the response model.", "\n")        
-      resp.family = gaussian
-    }
-    if(identical(resp.family,"binary")||identical(resp.family,"logit")||identical(resp.family,"logistic")) {
-      if(verbose) cat("Binomial family with logistic link function is assumed in the response model.", "\n")
-      resp.family = binomial
-    }
-  }  
-  
-  if(!identical(class(resp.family),"function")) {
-    stop(paste("resp.family is not correctly specified."))
-  }
+  formula=out.warnings$formula
+  resp.family=out.warnings$resp.family
+  trt.family=out.warnings$trt.family
+  U.model=out.warnings$U.model
+  theta=out.warnings$theta
+  grid.dim=out.warnings$grid.dim
+  standardize=out.warnings$standardize
+  nsim=out.warnings$nsim
+  zero.loc=out.warnings$zero.loc
+  verbose=out.warnings$verbose
+  buffer=out.warnings$buffer
+  weights=out.warnings$weights
+  data=out.warnings$data
   
   
-  #change the name of U.model in a way consistent with the program.
-  if(identical(class(U.model),"function")) {
-    if(identical(U.model,gaussian)) {
-      if(verbose) cat("Normally distributed continous U is assumed.", "\n")    
-      U.model = "normal"
-    }
-    if(identical(U.model,binomial)) {
-      if(verbose) cat("Binary U with binomial distribution is assumed.", "\n")    
-      U.model = "binomial"
-    }
-  }
-  
-  if(identical(class(U.model),"character")) {
-    if(identical(U.model,"gaussian")||identical(U.model,"continuous")) {
-      if(verbose) cat("Normally distributed continous U is assumed.", "\n")
-      U.model = "normal"
-    }
-    if(identical(U.model,"binary")) {
-      if(verbose) cat("Binary U with binomial distribution is assumed.", "\n")
-      U.model = "binomial"
-    }
-  }
-  
-  if(!identical(U.model,"normal") && !identical(U.model,"binomial")) {
-    stop(paste("U.model is not correctly specified."))        
-  }
-  
-  #check whether the dimentions of grid are at least 2.
-  if(length(grid.dim) != 2) {
-    stop("Error: grid dimenstions must a vector of length 2")    
-  }
-
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
   
@@ -110,6 +55,9 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
     Z = std.nonbinary(Z)
     if(!is.null(X))
       X = apply(X, 2, std.nonbinary)
+  } else { #MH: following two lines are added to avoid error in contYZU
+    Y = as.numeric(Y)
+    Z = as.numeric(Z)
   }
   
   n.obs = length(Y)
@@ -172,6 +120,12 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
   Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
   
+  # change buffer = 0 when v_Y or v_Z is small.
+  if ((v_Y-buffer<=0)||(v_Z-buffer<=0)||(v_Z/(theta*(1-theta))-buffer<=0)) {
+    buffer = 0
+    warning("Buffer is set to 0 because some of residual variances are too small.")
+  }
+  
   extreme.coef = matrix(c(-sqrt((v_Y-buffer)/(1-buffer)), -sqrt(v_Z-buffer), sqrt((v_Y-buffer)/(1-buffer)), sqrt(v_Z-buffer)), nrow = 2) 
   if(U.model == "binomial") extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
   
@@ -192,7 +146,6 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, Y.res, Z.res,v_Y, v_Z, theta, null.resp$fitted, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
   }
-  
 #undebug(grid.search)
   zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
   zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -263,7 +216,9 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, con
   
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal")
+#debug(contYZU)
     U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z, X))
+#undebug(contYZU)
   if(U.model == "binomial")
     U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX))	
   if(!(class(U) == "try-error")){
