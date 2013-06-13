@@ -19,9 +19,13 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
                      verbose = F,
                      buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
                      weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
+                     seed = 1234,     #default seed is 1234.
                      data = NULL) {
   
-  #Check data, options, and etc. conform to the format.
+  # set seed
+  set.seed(seed)
+  
+  #Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warnings(formula, resp.family, trt.family, U.model,	theta, grid.dim, 
            standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
   
@@ -64,7 +68,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   
   #fit null model for treatment model & get residuals
   if(!is.null(X)) {
-    null.trt <- glm(Z~X, trt.family)
+    null.trt <- glm(Z~X, family=trt.family)
   }else{
     null.trt <- glm(Z~1, trt.family)
   }
@@ -129,20 +133,23 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   extreme.coef = matrix(c(-sqrt((v_Y-buffer)/(1-buffer)), -sqrt(v_Z-buffer), sqrt((v_Y-buffer)/(1-buffer)), sqrt(v_Z-buffer)), nrow = 2) 
   if(U.model == "binomial") extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
   
+  #MH: Codes to multiply X by -1 to limit plot to 1 & 2 quadrants.
+  Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
+  X.positive = t(t(X)*Xcoef.flg)
+  null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
+  null.trt.plot <- glm(Z~X.positive, family=trt.family)
+  Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
+  
   if(zero.loc == "full"){
     grid.range = extreme.coef
-  }else{ 
+    #extreme.coef2 = extreme.coef
+    #extreme.coef2[1,1] = 0
+    #grid.range = extreme.coef2    
+  }else{
     #find ranges for final grid
     cat("Finding grid range...\n")
     
-    #MH: Codes to multiply X by -1 to limit plot to 1 & 2 quadrants.
-    Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
-    X.positive = t(t(X)*Xcoef.flg)
-    null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
-    null.trt.plot <- glm(Z~X.positive, family=trt.family)
-    Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
-    
-#debug(grid.search)
+    #debug(grid.search)
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, Y.res, Z.res,v_Y, v_Z, theta, null.resp$fitted, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
   }
@@ -215,12 +222,16 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, con
   weights = control.fit$weights
   
   #Generate U w/Y.res, Z.res 
-  if(U.model == "normal")
+  if(U.model == "normal"){
 #debug(contYZU)
     U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z, X))
 #undebug(contYZU)
-  if(U.model == "binomial")
-    U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX))	
+  }
+  
+  if(U.model == "binomial"){
+    U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX))
+  }
+  
   if(!(class(U) == "try-error")){
     #try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
     #Do we want to return a warning/the error message/our own error message if try fails?

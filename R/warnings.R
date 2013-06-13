@@ -89,7 +89,7 @@ warnings <- function(formula,     	#formula: assume treatment is 1st term on rhs
   }
   
   #check whether the dimentions of grid are at least 2.
-  if(length(grid.dim) != 2) {
+  if(!is.null(grid.dim) && (length(grid.dim) != 2)) {
     stop(paste("Error: grid dimenstions must a vector of length 2"))
   }
   

@@ -10,7 +10,7 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 	n <- length(Y)
  
 	delta = zeta_z/v_Z
-	gamma = zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z
+	gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) #MH: as.numeric added to avoid non-conformable error
 
 	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
 
@@ -29,7 +29,7 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta, bx) {
+contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta, bx) { #Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX
 	n = length(y)
 	th = log(theta/(1-theta))
 	zt = (z+cz*(theta-0.5))*cz/(vz-theta*(1-theta)*cz^2)

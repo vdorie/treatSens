@@ -2,33 +2,46 @@ source("genU_contY.R")
 source("object_def.R")
 source("grid_range.R")
 source("housekeeping.R")
+source("warnings.R")
 source("GLM_sens.R")
 
 ###############
 #Main function call
 ###############
-point.GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
-                     resp.family = gaussian,	#family for GLM of model for response
-                     trt.family = gaussian,	#family for GLM of model for treatment
-                     U.model = "normal",	#form of model for confounder: can be one of "binomial" and "normal"
-                     zetaY = NA,    #sensitivity parameter
-                     zetaZ = NA,    #sensitivity parameter
-                     theta = 0.5, 		#Pr(U=1) for binomial model
-                     standardize = TRUE,	#Logical: should variables be standardized?
-                     nsim = 20,			#number of simulated Us to average over per cell in grid
-                     verbose = F,
-                     weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.                      
-                     data = NULL) {
+point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
+                           resp.family = gaussian,	#family for GLM of model for response
+                           trt.family = gaussian,	#family for GLM of model for treatment
+                           U.model = "normal",	#form of model for confounder: can be one of "binomial" and "normal"
+                           zetaY = NA,    #sensitivity parameter
+                           zetaZ = NA,    #sensitivity parameter
+                           theta = 0.5, 		#Pr(U=1) for binomial model
+                           standardize = TRUE,	#Logical: should variables be standardized?
+                           nsim = 20,			#number of simulated Us to average over per cell in grid
+                           verbose = F,
+                           weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.                      
+                           seed = 1234,     #default seed is 1234.
+                           data = NULL) {
   
-  #check that data is a data frame
-  if(!is.null(data)) {
-    if(class(data) == "matrix") {
-      data = data.frame(data)
-      cat("Warning: coerced matrix to data frame")
-    }
-    else if(class(data) != "data.frame")
-      stop(paste("Data is not a data.frame object"))
-  }
+  #Check whether data, options, and etc. conform to the format in "warnings.R"
+  grid.dim = NULL
+  zero.loc = NULL
+  buffer = NULL
+  out.warnings <- warnings(formula, resp.family, trt.family, U.model,  theta, grid.dim, 
+                           standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
+  
+  formula=out.warnings$formula
+  resp.family=out.warnings$resp.family
+  trt.family=out.warnings$trt.family
+  U.model=out.warnings$U.model
+  theta=out.warnings$theta
+  grid.dim=out.warnings$grid.dim
+  standardize=out.warnings$standardize
+  nsim=out.warnings$nsim
+  zero.loc=out.warnings$zero.loc
+  verbose=out.warnings$verbose
+  buffer=out.warnings$buffer
+  weights=out.warnings$weights
+  data=out.warnings$data
   
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
@@ -116,9 +129,12 @@ point.GLM.sens <- function(formula,   		#formula: assume treatment is 1st term o
   dimnames(results)[[2]] = c("sens.coef","sens.se","delta","alpha","delta.se","alpha.se","resp.sigma2","trt.sigma2")
   
   for(i in 1:nsim){
-    #running GLM_sens on single point
-    out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
+    set.seed(i) #set seed
     
+    #running GLM_sens on single point
+#debug(fit.GLM.sens)
+    out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
+#undebug(fit.GLM.sens) 
     #record the output to the results.
     results[i,1] <- out.fit.GLM.sens$sens.coef
     results[i,2] <- out.fit.GLM.sens$sens.se
