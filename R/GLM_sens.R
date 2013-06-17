@@ -141,16 +141,16 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   
   if(zero.loc == "full"){
-    grid.range = extreme.coef
-    #extreme.coef2 = extreme.coef
-    #extreme.coef2[1,1] = 0
-    #grid.range = extreme.coef2    
+    grid.range.full = extreme.coef
+    grid.range.full[1,1] = 0
+    grid.range = grid.range.full
   }else{
     #find ranges for final grid
     cat("Finding grid range...\n")
     
     #debug(grid.search)
-    grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, Y.res, Z.res,v_Y, v_Z, theta, null.resp$fitted, sgnTau0 = sign(null.resp$coef[2]), 
+    grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, Y.res, Z.res,v_Y, v_Z, theta, 
+                             null.resp$fitted, null.trt$linear.predictors, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
   }
 #undebug(grid.search)
@@ -174,7 +174,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
       
       for(k in 1:nsim){
 
-        fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, BzX = null.resp$fitted,
+        fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, BzX = null.resp$fitted, BX = null.trt$linear.predictors,
                                 control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, standardize=standardize, weights=weights))
         
         sens.coef[i,j,k] <- fit.sens$sens.coef
@@ -214,18 +214,24 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
 #fit.GLM.sens
 ###########
 
-fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, control.fit) {
+fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, BX, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
   U.model = control.fit$U.model
   std = control.fit$standardize
   weights = control.fit$weights
   
+  #MH:transform zeta_z
+  require(arm, quietly)  #load arm for invlogit function
+  if(identical(trt.family, binomial)) {
+    rZ = invlogit(rZ + BX) - invlogit(BX) 
+  }
+  
   #Generate U w/Y.res, Z.res 
-  if(U.model == "normal"){
-#debug(contYZU)
-    U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z, X))
-#undebug(contYZU)
+  if(U.model == "normal"){  
+    #debug(contYZU)
+    U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z, X))      
+    #undebug(contYZU)
   }
   
   if(U.model == "binomial"){
