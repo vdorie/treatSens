@@ -30,7 +30,8 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 ###############
 
 contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta, bx) { #Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX
-	n = length(y)
+  bx = bx + cz*cy/vz*z
+  n = length(y)
 	th = log(theta/(1-theta))
 	zt = (z+cz*(theta-0.5))*cz/(vz-theta*(1-theta)*cz^2)
 	const1 = theta*dnorm(bx+cz, (1-theta)*cz, sqrt(vz - theta*(1-theta)*cz^2))
