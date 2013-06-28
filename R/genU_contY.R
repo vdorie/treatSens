@@ -29,17 +29,60 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta, bx) { #Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX
-  bx = bx + cz*cy/vz*z
-  n = length(y)
-	th = log(theta/(1-theta))
-	zt = (z+cz*(theta-0.5))*cz/(vz-theta*(1-theta)*cz^2)
-	const1 = theta*dnorm(bx+cz, (1-theta)*cz, sqrt(vz - theta*(1-theta)*cz^2))
-	c1 = const1/(const1 + (1-theta)*dnorm(bx, theta*cz, sqrt(vz - theta*(1-theta)*cz^2)))
-	yt = (y+(c1-0.5)*cy)*cy/(vy-c1*(1-c1)*cy^2)
-
-	pdot = 1/(exp(-th-zt-yt)+1)
+contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { #Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX
+ 	n = length(y)
+	c1 = theta*dnorm(z+rz*theta-rz, 0, sqrt(vz-theta*(1-theta)*rz^2))/(theta*dnorm(z+rz*theta-rz, 0, sqrt(vz-theta*(1-theta)*rz^2)) + 
+				(1-theta)*dnorm(z+rz*theta, 0, sqrt(vz-theta*(1-theta)*rz^2)))
+	norms = function(u){
+		theta^u*(1-theta)^(1-u)*dnorm(z+rz*theta-rz*u, 0, sqrt(vz-theta*(1-theta)*rz^2))*
+			dnorm(y+c1*ry-ry*u+z*theta*(1-theta)*ry*rz/vz, 0, 
+				sqrt((vy-ry*sqrt(theta*(1-theta))*(1-rz^2/(vz-theta*(1-theta)*rz^2)))))
+	} 
+	pdot = norms(1)/(norms(1)+norms(0))
 	U = rbinom(length(y), 1, pdot)
 	return(U)
 }
 
+###############
+#Generate U 
+#Y: continuous response variable
+#Z: binary treatment variable
+#rho_y, rho_z: desired correlations between U and Y or Z
+###############
+
+contYbinaryZU <- function(y, z, x, cy, cz, theta) { 
+  n = length(y)
+  nx = dim(X)[2]
+  null.resp = lm(y~z+x)
+  null.trt = glm(z~x, family = binomial(link = 'probit'))
+  v_Y = var(null.resp$resid)*(n-1)/(n-nx-2)
+  v_Z = var(null.trt$resid)*(n-1)/(n-nx-1)
+
+  p = 0.5
+
+  for(j in 1:50) {
+    U = rbinom(n,1,p)
+    
+    U.fit = lm(y~z+x+U)
+    y.coef = U.fit$coef
+    y.coef[length(y.coef)]  = cy
+    z.coef = glm(z~x+U, family=binomial(link="probit"))$coef
+    z.coef[length(z.coef)] = cz
+    v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
+  
+    pyzu = dnorm(y-cbind(1,z,x,1)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
+      (1-pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1)))^(1-z)*
+      pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1))^z*theta
+  
+    pyz = dnorm(y-cbind(1,z,x,0)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
+      (1-pnorm(cbind(1,x,0)%*%matrix(z.coef, ncol = 1)))^(1-z)*
+      pnorm(cbind(1,x,0)%*%matrix(z.coef, ncol = 1))^z*(1-theta) +
+      dnorm(y-cbind(1,z,x,1)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
+      (1-pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1)))^(1-z)*
+      pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1))^z*theta
+  
+    p = pyzu/pyz
+  }
+  U = rbinom(n,1,p)
+  return(U)
+}

@@ -174,7 +174,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
       
       for(k in 1:nsim){
 
-        fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, BzX = null.resp$fitted, BX = null.trt$linear.predictors,
+        fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, BX = null.trt$linear.predictors,
                                 control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, standardize=standardize, weights=weights))
         
         sens.coef[i,j,k] <- fit.sens$sens.coef
@@ -214,7 +214,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
 #fit.GLM.sens
 ###########
 
-fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, BX, control.fit) {
+fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BX, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
   U.model = control.fit$U.model
@@ -234,10 +234,14 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BzX, BX,
     #undebug(contYZU)
   }
   
-  if(U.model == "binomial"){
-    U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX))
+  if(U.model == "binomial" & !is.binary(Z)){
+    U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta))
   }
   
+  if(U.model == "binomial" & is.binary(Z)){
+    U <- try(contYbinaryZU(Y, Z, X, rY, rZ, theta))
+  }
+
   if(!(class(U) == "try-error")){
     #try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
     #Do we want to return a warning/the error message/our own error message if try fails?

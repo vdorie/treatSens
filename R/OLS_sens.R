@@ -10,6 +10,7 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				grid.dim = c(100,100),	#final dimensions of output grid
 				standardize = TRUE,	#Logical: should variables be standardized?
 				zero.loc = 1/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
+        weights = NULL,   #observation weights for weighted estimators
 				data = NULL) {
 	#check that data is a data frame
 	if(!is.null(data)) {
@@ -32,7 +33,14 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	Z = as.numeric(Z)		#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
 	
-	#standardize variables
+	
+	if(is.null(weights)){
+	  wt = rep(1, length(Y))
+	}else{
+	  wt = weights
+	}
+  
+  #standardize variables
 	if(standardize) {
 		Y = std.nonbinary(Y)
 		Z = std.nonbinary(Z)
@@ -43,19 +51,19 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	cat("Fitting null models...\n")
 	#fit null model & get residuals
 	if(!is.null(X)) {
-		null.resp <- lm(Y~Z+X)
-		null.trt <- lm(Z~X)
+		null.resp <- lm(Y~Z+X, weights = wt)
+		null.trt <- lm(Z~X, weights = wt)
 	}else{
-		null.resp <- lm(Y~Z)
-		null.trt <- lm(Z~1)
+		null.resp <- lm(Y~Z, weights = wt)
+		null.trt <- lm(Z~1, weights = wt)
 	}
 
 	n = length(null.resp$coef)
-	n.obs = length(Y)
+	n.obs = sum(wt)
 	Y.res <- Y-null.resp$fitted.values
-	v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
+	v_Y <- sum(wt*Y.res^2)/n.obs*(n.obs-1)/(n.obs-dim(X)[2]-2)
 	Z.res <- Z-null.trt$fitted.values
-	v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
+	v_Z <- sum(wt*Z.res^2)/n.obs*(n.obs-1)/(n.obs-dim(X)[2]-1)
 	Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
 	
 	extreme.coef = matrix(c(-sqrt(v_Y), -sqrt(v_Z), sqrt(v_Y), sqrt(v_Z)), nrow = 2) 
@@ -84,7 +92,7 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 
 		sens.coef[i,j] <- null.resp$coef[2]-rY*rZ/v_Z
-	  	sens.se = sqrt((v_Y-rY*(1-rZ^2/v_Z))/(n.obs*(v_Z-rZ)))
+	  sens.se[i,j] = sqrt((v_Y-rY*1 - sens.coef[i,j]*sum(wt)*rZ)/(n.obs*(v_Z-sum(wt)*rZ))) #assume Var(U) = 1
 		delta[i,j] <- rY
 		alpha[i,j] <- rZ
 		delta.se[i,j] <- NA
