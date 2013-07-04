@@ -92,8 +92,8 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 
 		sens.coef[i,j] <- null.resp$coef[2]-rY*rZ/v_Z
-	  sens.se[i,j] = sqrt((v_Y-rY*1 - sens.coef[i,j]*sum(wt)*rZ)/(n.obs*(v_Z-sum(wt)*rZ))) #assume Var(U) = 1
-		delta[i,j] <- rY
+	  sens.se[i,j] = sqrt((v_Y-rY^2*1 - rY^2*rZ/v_Z*rZ)/(n.obs*(v_Z-rZ^2))) #assume Var(U) = 1
+    delta[i,j] <- rY
 		alpha[i,j] <- rZ
 		delta.se[i,j] <- NA
 		alpha.se[i,j] <- NA
