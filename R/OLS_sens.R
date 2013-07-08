@@ -32,13 +32,45 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	X = form.vars$covars
 
 	Z = as.numeric(Z)		#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
-	
-	
+  
+	#codes for weights
 	if(is.null(weights)){
 	  wt = rep(1, length(Y))
 	}else{
-	  wt = weights
-	}
+	  nt = sum(Z==1)
+	  nc = sum(Z==0)
+	  if (identical(class(weights),"character")) {
+	    
+	    if (!any(weights==c("ATE","ATT","ATC"))) {
+	      stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
+	    
+	    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
+	      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
+	    
+	    if (identical(trt.family,gaussian) && ((null.trt$fitted<=0) || (null.trt$fitted>=1))) {
+	      stop(paste("The predicted probability of treatment assignment exceeds the bound of (0,1)."))}
+	    
+	    if (identical(weights,"ATE")) {
+	      wt <- 1/null.trt$fitted
+	      wt[Z==0] <-1/(1-null.trt$fitted[Z==0])
+	      wt = weights*n.obs/sum(weights) #normalizing weight
+	      cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect.","\n")}
+	    
+	    if (identical(weights,"ATT")) {
+	      wt <- null.trt$fitted/(1-null.trt$fitted)
+	      wt[Z==1] <-1
+	      wt[Z==0] = weights[Z==0]*(nc/sum(weights[Z==0])) #normalizing weight
+	      cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the treated.","\n")}
+	    
+	    if (identical(weights,"ATC")) {
+	      wt <- (1-null.trt$fitted)/null.trt$fitted
+	      wt[Z==0] <- 1
+	      wt[Z==1] = weights[Z==1]*(nt/sum(weights[Z==1])) #normalizing weight
+	      cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")}
+	  }else{
+	    wt = weights      
+	  }
+	}  
   
   #standardize variables
 	if(standardize) {
@@ -90,17 +122,21 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		rY = zetaY[i]
 		rZ = zetaZ[j]
 
-
+		#if (identical(U.model,"binomial")) {
+		#  sig.u=.25
+		#}else{
+		#  sig.u=1
+		#}
+		sig.u=1
+		
 		sens.coef[i,j] <- null.resp$coef[2]-rY*rZ/v_Z
-	  sens.se[i,j] = sqrt((v_Y-rY^2*1 - rY^2*rZ/v_Z*rZ)/(n.obs*(v_Z-rZ^2))) #assume Var(U) = 1
-    delta[i,j] <- rY
+		sens.se = sqrt((v_Y-rY^2*sig.u + rY^2*rZ/v_Z*rZ)/(n.obs*(v_Z-rZ^2*sig.u)))   #MH: second sign changed to +, sqrt((v_Y-beta.u*(1-(cov.zu)^2/v_Z))/(n*(v_Z-cov.zu)))
+		delta[i,j] <- rY
 		alpha[i,j] <- rZ
 		delta.se[i,j] <- NA
 		alpha.se[i,j] <- NA
 		resp.s2[i,j] <- NA
-		trt.s2[i,j] <- NA
-
-		
+		trt.s2[i,j] <- NA	
 	}}
 
 	if(!is.null(X)) {

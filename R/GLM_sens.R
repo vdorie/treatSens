@@ -3,6 +3,7 @@ source("object_def.R")
 source("grid_range.R")
 source("housekeeping.R")
 source("warnings.R")
+source("pweight.R")
 
 ###############
 #Main function call
@@ -88,8 +89,8 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
     if (!any(weights==c("ATE","ATT","ATC"))) {
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
 
-    if (!identical(trt.family,binomial)) {
-      stop(paste("trt.family must be binomial when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
+    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
+      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
     
     if (identical(weights,"ATE")) {
       weights <- 1/null.trt$fitted
@@ -222,10 +223,10 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BX, cont
   weights = control.fit$weights
   
   #MH:transform zeta_z
-  require(arm, quietly)  #load arm for invlogit function
-  if(identical(trt.family, binomial)) {
-    rZ = invlogit(rZ + BX) - invlogit(BX) 
-  }
+  #require(arm, quietly)  #load arm for invlogit function
+  #if(identical(trt.family, binomial)) {
+  #  rZ = invlogit(rZ + BX) - invlogit(BX) 
+  #}
   
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
@@ -247,19 +248,26 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BX, cont
     #Do we want to return a warning/the error message/our own error message if try fails?
     #fit models with U
     if(std) U = std.nonbinary(U)
+    
+    
     if(!is.null(X)) {
-      fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)
-      fit.trt <- glm(Z~U+X, family=trt.family)		
+      if(!is.null(weights)){  # run svyglm to get right SEs
+        fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+        sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
+      }else{
+        fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+        sens.se = summary(fit.glm)$coefficients[2,2]
+      }
+      fit.trt <- glm(Z~U+X, family=trt.family)  	
     }else{
       fit.glm <- glm(Y~Z+U, family=resp.family)
+      sens.se = summary(fit.glm)$coefficients[2,2]
       fit.trt <- glm(Z~U, family=trt.family)		
     }
     
-    n = length(fit.trt$coef)
-    
     return(list(
       sens.coef = fit.glm$coef[2],
-      sens.se = summary(fit.glm)$coefficients[2,2], 	#SE of Z coef
+      sens.se = sens.se, 	#SE of Z coef
       delta = fit.glm$coef[3], 					              #estimated coefficient of U in response model
       alpha = fit.trt$coef[2],				    	          #estimated coef of U in trt model
       delta.se = summary(fit.glm)$coefficients[3,2], 	#SE of U coef in response model

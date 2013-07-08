@@ -6,20 +6,20 @@
 ###############
 
 contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
-
-	n <- length(Y)
- 
-	delta = zeta_z/v_Z
-	gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) #MH: as.numeric added to avoid non-conformable error
-
-	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
-
-	eps.u = rnorm(n, 0, sqrt(var.U))
-	eps.u = lm(eps.u ~ Y + Z + X)$resid
-	#eps.u = eps.u * sqrt(var.U)/sd(eps.u)
-
-	U = Y*gamma + Z*delta + eps.u
-	return(U)
+  
+  n <- length(Y)
+  
+  delta = zeta_z/v_Z
+  gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) #MH: as.numeric added to avoid non-conformable error
+  
+  var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
+  
+  eps.u = rnorm(n, 0, sqrt(var.U))
+  eps.u = lm(eps.u ~ Y + Z + X)$resid
+  #eps.u = eps.u * sqrt(var.U)/sd(eps.u)
+  
+  U = Y*gamma + Z*delta + eps.u
+  return(U)
 }
 
 ###############
@@ -30,17 +30,17 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 ###############
 
 contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { #Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX
- 	n = length(y)
-	c1 = theta*dnorm(z+rz*theta-rz, 0, sqrt(vz-theta*(1-theta)*rz^2))/(theta*dnorm(z+rz*theta-rz, 0, sqrt(vz-theta*(1-theta)*rz^2)) + 
-				(1-theta)*dnorm(z+rz*theta, 0, sqrt(vz-theta*(1-theta)*rz^2)))
-	norms = function(u){
-		theta^u*(1-theta)^(1-u)*dnorm(z+rz*theta-rz*u, 0, sqrt(vz-theta*(1-theta)*rz^2))*
-			dnorm(y+c1*ry-ry*u+z*theta*(1-theta)*ry*rz/vz, 0, 
-				sqrt((vy-ry*sqrt(theta*(1-theta))*(1-rz^2/(vz-theta*(1-theta)*rz^2)))))
-	} 
-	pdot = norms(1)/(norms(1)+norms(0))
-	U = rbinom(length(y), 1, pdot)
-	return(U)
+  n = length(y)
+  c1 = theta*dnorm(z+rz*theta-rz, 0, sqrt(vz-theta*(1-theta)*rz^2))/(theta*dnorm(z+rz*theta-rz, 0, sqrt(vz-theta*(1-theta)*rz^2)) + 
+                                                                       (1-theta)*dnorm(z+rz*theta, 0, sqrt(vz-theta*(1-theta)*rz^2)))
+  norms = function(u){
+    theta^u*(1-theta)^(1-u)*dnorm(z+rz*theta-rz*u, 0, sqrt(vz-theta*(1-theta)*rz^2))*
+      dnorm(y+c1*ry-ry*u+z*theta*(1-theta)*ry*rz/vz, 0, 
+            sqrt((vy-ry*sqrt(theta*(1-theta))*(1-rz^2/(vz-theta*(1-theta)*rz^2)))))
+  } 
+  pdot = norms(1)/(norms(1)+norms(0))
+  U = rbinom(length(y), 1, pdot)
+  return(U)
 }
 
 ###############
@@ -54,13 +54,13 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta) {
   n = length(y)
   nx = dim(X)[2]
   null.resp = lm(y~z+x)
-  null.trt = glm(z~x, family = binomial(link = 'probit'))
+  null.trt = glm(z~x, family = binomial(link ="probit"))
   v_Y = var(null.resp$resid)*(n-1)/(n-nx-2)
   v_Z = var(null.trt$resid)*(n-1)/(n-nx-1)
-
+  
   p = 0.5
-
-  for(j in 1:50) {
+  
+  for(j in 1:10) {
     U = rbinom(n,1,p)
     
     U.fit = lm(y~z+x+U)
@@ -69,18 +69,18 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta) {
     z.coef = glm(z~x+U, family=binomial(link="probit"))$coef
     z.coef[length(z.coef)] = cz
     v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
-  
+    
     pyzu = dnorm(y-cbind(1,z,x,1)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
       (1-pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1)))^(1-z)*
       pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1))^z*theta
-  
+    
     pyz = dnorm(y-cbind(1,z,x,0)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
       (1-pnorm(cbind(1,x,0)%*%matrix(z.coef, ncol = 1)))^(1-z)*
       pnorm(cbind(1,x,0)%*%matrix(z.coef, ncol = 1))^z*(1-theta) +
       dnorm(y-cbind(1,z,x,1)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
       (1-pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1)))^(1-z)*
       pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1))^z*theta
-  
+    
     p = pyzu/pyz
   }
   U = rbinom(n,1,p)
