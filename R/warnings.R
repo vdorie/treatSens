@@ -1,3 +1,5 @@
+source("housekeeping.R")
+
 warnings <- function(formula,     	#formula: assume treatment is 1st term on rhs
                      resp.family,	#family for GLM of model for response
                      trt.family,	#family for GLM of model for treatment
@@ -10,6 +12,7 @@ warnings <- function(formula,     	#formula: assume treatment is 1st term on rhs
                      verbose,
                      buffer, 		#restriction to range of coef on U to ensure stability around the edges
                      weights, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
+                     seed = 1234,     #default seed is 1234.
                      data) {
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
@@ -35,15 +38,15 @@ warnings <- function(formula,     	#formula: assume treatment is 1st term on rhs
       if(verbose) warning("Gaussian family with identity link function is assumed in the treatment model.")
       trt.family = gaussian
     }
-    if(identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
-      if(verbose) warning("Binomial family with logistic link function is assumed in the treatment model.")
-      trt.family = binomial
-    }
+    if(identical(trt.family,binomial)||identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"probit")) {
+      if(verbose) warning("Binomial family with probit link function is assumed in the treatment model.")
+      trt.family = binomial(link="probit")
+    }    
   }
   
-  if(!identical(class(trt.family),"function")) {
-    stop(paste("trt.family is not correctly specified."))
-  }
+  #if(!identical(class(trt.family),"function")) {
+  #  stop(paste("trt.family is not correctly specified."))
+  #}
   
   if(identical(class(resp.family),"character")) {
     if(identical(resp.family,"normal")) {
@@ -59,7 +62,6 @@ warnings <- function(formula,     	#formula: assume treatment is 1st term on rhs
   if(!identical(class(resp.family),"function")) {
     stop(paste("resp.family is not correctly specified."))
   }
-  
   
   #change the name of U.model in a way consistent with the program.
   if(identical(class(U.model),"function")) {

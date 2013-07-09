@@ -31,12 +31,12 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
 
 contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { #Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX
   n = length(y)
-  c1 = theta*dnorm(z+rz*theta-rz, 0, sqrt(vz-theta*(1-theta)*rz^2))/(theta*dnorm(z+rz*theta-rz, 0, sqrt(vz-theta*(1-theta)*rz^2)) + 
-                                                                       (1-theta)*dnorm(z+rz*theta, 0, sqrt(vz-theta*(1-theta)*rz^2)))
+  c1 = theta*dnorm(z+cz*theta-cz, 0, sqrt(vz-theta*(1-theta)*cz^2))/(theta*dnorm(z+cz*theta-cz, 0, sqrt(vz-theta*(1-theta)*cz^2)) + 
+                                                                       (1-theta)*dnorm(z+cz*theta, 0, sqrt(vz-theta*(1-theta)*cz^2)))
   norms = function(u){
-    theta^u*(1-theta)^(1-u)*dnorm(z+rz*theta-rz*u, 0, sqrt(vz-theta*(1-theta)*rz^2))*
-      dnorm(y+c1*ry-ry*u+z*theta*(1-theta)*ry*rz/vz, 0, 
-            sqrt((vy-ry*sqrt(theta*(1-theta))*(1-rz^2/(vz-theta*(1-theta)*rz^2)))))
+    theta^u*(1-theta)^(1-u)*dnorm(z+cz*theta-cz*u, 0, sqrt(vz-theta*(1-theta)*cz^2))*
+      dnorm(y+c1*cy-cy*u+z*theta*(1-theta)*cy*cz/vz, 0, 
+            sqrt((vy-cy*sqrt(theta*(1-theta))*(1-cz^2/(vz-theta*(1-theta)*cz^2)))))
   } 
   pdot = norms(1)/(norms(1)+norms(0))
   U = rbinom(length(y), 1, pdot)

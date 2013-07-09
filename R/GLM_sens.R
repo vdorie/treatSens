@@ -175,8 +175,9 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
       
       for(k in 1:nsim){
 
-        fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, BX = null.trt$linear.predictors,
-                                control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, standardize=standardize, weights=weights))
+        fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta,
+                                control.fit = list(resp.family=resp.family, trt.family=trt.family, 
+                                                   U.model=U.model, standardize=standardize, weights=weights))
         
         sens.coef[i,j,k] <- fit.sens$sens.coef
         sens.se[i,j,k] <- fit.sens$sens.se
@@ -215,7 +216,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
 #fit.GLM.sens
 ###########
 
-fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, BX, control.fit) {
+fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
   U.model = control.fit$U.model

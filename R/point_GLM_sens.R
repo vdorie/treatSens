@@ -84,8 +84,8 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
     if (!any(weights==c("ATE","ATT","ATC"))) {
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
     
-    if (!identical(trt.family,binomial)) {
-      stop(paste("trt.family must be binomial when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
+    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
+      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
     
     if (identical(weights,"ATE")) {
       weights <- 1/null.trt$fitted
@@ -133,7 +133,9 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
     
     #running GLM_sens on single point
 #debug(fit.GLM.sens)
-    out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
+    out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, 
+                                    control.fit = list(resp.family = resp.family, trt.family = trt.family, 
+                                                       U.model =U.model, standardize = standardize, weights=weights))
 #undebug(fit.GLM.sens) 
     #record the output to the results.
     results[i,1] <- out.fit.GLM.sens$sens.coef
