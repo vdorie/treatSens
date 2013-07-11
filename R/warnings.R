@@ -12,7 +12,6 @@ warnings <- function(formula,     	#formula: assume treatment is 1st term on rhs
                      verbose,
                      buffer, 		#restriction to range of coef on U to ensure stability around the edges
                      weights, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
-                     seed = 1234,     #default seed is 1234.
                      data) {
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
