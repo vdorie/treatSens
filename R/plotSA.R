@@ -17,8 +17,8 @@ plotSA = function(x,
   #note in help: if contours are too rough, up nsim in sens fn
   Zcors = as.numeric(dimnames(x$alpha)[[2]]) #horizontal grids of U
   Ycors = as.numeric(dimnames(x$delta)[[1]]) #vertical grids of U
-  xlab = "Alpha"
-  ylab = "Delta"
+  xlab = "zeta^z"
+  ylab = "zeta^y"
   Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.
   Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
   Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
