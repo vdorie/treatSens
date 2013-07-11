@@ -143,8 +143,8 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   
   if(zero.loc == "full"){
-    grid.range.full = extreme.coef
-    grid.range.full[1,1] = 0
+    grid.range.full = extreme.coef*.95
+    grid.range.full[1,1] = 0.01
     grid.range = grid.range.full
   }else{
     #find ranges for final grid
