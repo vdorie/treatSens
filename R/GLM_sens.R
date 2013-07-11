@@ -27,6 +27,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   set.seed(seed)
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
+  if (F){
   out.warnings <- warnings(formula, resp.family, trt.family, U.model,	theta, grid.dim, 
            standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
   
@@ -43,7 +44,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   buffer=out.warnings$buffer
   weights=out.warnings$weights
   data=out.warnings$data
-  
+  }
   
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
@@ -148,10 +149,10 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   }else{
     #find ranges for final grid
     cat("Finding grid range...\n")
-    
+
     #debug(grid.search)
-    grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, Y.res, Z.res,v_Y, v_Z, theta, 
-                             null.resp$fitted, null.trt$linear.predictors, sgnTau0 = sign(null.resp$coef[2]), 
+    grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
+                             Y.res, Z.res, v_Y, v_Z, theta, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
   }
 #undebug(grid.search)
