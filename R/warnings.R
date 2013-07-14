@@ -1,6 +1,6 @@
 source("housekeeping.R")
 
-warnings <- function(formula,     	#formula: assume treatment is 1st term on rhs
+warnings <- function(formula,       #formula: assume treatment is 1st term on rhs
                      resp.family,	#family for GLM of model for response
                      trt.family,	#family for GLM of model for treatment
                      U.model,	#form of model for confounder: can be one of "binomial" and "normal"
@@ -31,38 +31,46 @@ warnings <- function(formula,     	#formula: assume treatment is 1st term on rhs
     }    
   }
   
-  #change the name of link function in a way consistent with glm()
-  if(identical(class(trt.family),"character")) {
-    if(identical(trt.family,"gaussian")||identical(trt.family,"normal")) {
-      if(verbose) warning("Gaussian family with identity link function is assumed in the treatment model.")
-      trt.family = gaussian
-    }
-    if(identical(trt.family,binomial)||identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"probit")) {
-      if(verbose) warning("Binomial family with probit link function is assumed in the treatment model.")
-      trt.family = binomial(link="probit")
-    }    
+  #check trt.family
+  if(identical(trt.family,gaussian)||identical(trt.family,"gaussian")||identical(trt.family,"normal")||identical(trt.family,"identity")||identical(trt.family,"continuous")) {
+    if(verbose) warning("Gaussian family with identity link function is assumed in the treatment model.")
+    trt.family = gaussian
   }
   
-  #if(!identical(class(trt.family),"function")) {
-  #  stop(paste("trt.family is not correctly specified."))
-  #}
+  if(is.binary(Z)){
+    if((identical(class(trt.family),"family") && identical(trt.family$link,"probit"))||identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"probit")) {
+      if(verbose) warning("Binomial family with probit link function is assumed in the treatment model.")
+      trt.family = binomial(link="probit")
+    }
+        
+    if((identical(class(trt.family),"family") && identical(trt.family$link,"logit"))||identical(trt.family,binomial)||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
+      warning("GLM.sens is not compatible with logistic link. Binomial family with probit link function is assumed in the treatment model.")
+      trt.family = binomial(link="probit")
+    }
+    
+  }else{ #Z is continuous
+    if((identical(class(trt.family),"family") && identical(trt.family$link,"probit"))||identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"probit")||identical(trt.family,binomial)||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
+      stop(paste("binomial family can only be specified with a binary treatment."))
+    } 
+  }
+  
+  #check resp.family
+  if(identical(class(resp.family),"function")) {
+    if(identical(resp.family,gaussian)) {
+      if(verbose) warning("Gaussian family with identity link function is assumed in the response model.")        
+    }else{
+      stop(paste("GLM.sens is not ready for the resp.family specified."))
+    }
+  }
   
   if(identical(class(resp.family),"character")) {
-    if(identical(resp.family,"normal")) {
+    if(identical(resp.family,"normal")||identical(resp.family,"continuous")||identical(resp.family,"gaussian")) {
       if(verbose) warning("Gaussian family with identity link function is assumed in the response model.")        
       resp.family = gaussian
     }
-    if(identical(resp.family,"binary")||identical(resp.family,"logit")||identical(resp.family,"logistic")) {
-      if(verbose) warning("Binomial family with logistic link function is assumed in the response model.")
-      resp.family = binomial
-    }
   }  
   
-  if(!identical(class(resp.family),"function")) {
-    stop(paste("resp.family is not correctly specified."))
-  }
-  
-  #change the name of U.model in a way consistent with the program.
+  #check and change U.model
   if(identical(class(U.model),"function")) {
     if(identical(U.model,gaussian)) {
       if(verbose) warning("Normally distributed continous U is assumed.")    

@@ -8,10 +8,10 @@ source("pweight.R")
 ###############
 #Main function call
 ###############
-GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
+GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
                      resp.family = gaussian,	#family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
-                     U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
+                     U.model = "normal",	#form of model for confounder: can be one of "binomial" and "normal"
                      theta = 0.5, 		#Pr(U=1) for binomial model
                      grid.dim = c(20,20),	#final dimensions of output grid
                      standardize = TRUE,	#Logical: should variables be standardized?
@@ -27,24 +27,21 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   set.seed(seed)
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
-  if (F){
-  out.warnings <- warnings(formula, resp.family, trt.family, U.model,	theta, grid.dim, 
-           standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
-  
-  formula=out.warnings$formula
-  resp.family=out.warnings$resp.family
-  trt.family=out.warnings$trt.family
-  U.model=out.warnings$U.model
-  theta=out.warnings$theta
-  grid.dim=out.warnings$grid.dim
-  standardize=out.warnings$standardize
-  nsim=out.warnings$nsim
-  zero.loc=out.warnings$zero.loc
-  verbose=out.warnings$verbose
-  buffer=out.warnings$buffer
-  weights=out.warnings$weights
-  data=out.warnings$data
-  }
+    out.warnings <- warnings(formula, resp.family, trt.family, U.model,	theta, grid.dim, 
+                             standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
+    formula=out.warnings$formula
+    resp.family=out.warnings$resp.family
+    trt.family=out.warnings$trt.family
+    U.model=out.warnings$U.model
+    theta=out.warnings$theta
+    grid.dim=out.warnings$grid.dim
+    standardize=out.warnings$standardize
+    nsim=out.warnings$nsim
+    zero.loc=out.warnings$zero.loc
+    verbose=out.warnings$verbose
+    buffer=out.warnings$buffer
+    weights=out.warnings$weights
+    data=out.warnings$data
   
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
@@ -81,7 +78,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   #NEW CODE FOR WEIGHTS
   ###############################
   #create weights if the user specifies either ATE, ATT, or ATC.
-
+  
   nt = sum(Z==1)
   nc = sum(Z==0)
   
@@ -89,9 +86,9 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
     
     if (!any(weights==c("ATE","ATT","ATC"))) {
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
-
-    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
-      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
+    
+#    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
+#      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
     
     if (identical(weights,"ATE")) {
       weights <- 1/null.trt$fitted
@@ -111,7 +108,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
       weights[Z==1] = weights[Z==1]*(nt/sum(weights[Z==1])) #normalizing weight
       cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")}
   }
-
+  
   cat("Fitting null models...\n")
   #fit null model for the outcome & get residuals
   #the following codes must be placed after codes for weights 
@@ -143,19 +140,19 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
   Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   
   if(zero.loc == "full"){
-    grid.range.full = extreme.coef*.95
-    grid.range.full[1,1] = 0.01
+    grid.range.full = extreme.coef*.95  #MH: *.95 is added to avoid estimation near the boundary.
+    grid.range.full[1,1] = 0.01         #MH: jitter is added.
     grid.range = grid.range.full
   }else{
     #find ranges for final grid
     cat("Finding grid range...\n")
-
+    
     #debug(grid.search)
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
                              Y.res, Z.res, v_Y, v_Z, theta, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
   }
-#undebug(grid.search)
+  #undebug(grid.search)
   zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
   zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
   
@@ -175,7 +172,7 @@ GLM.sens <- function(formula,   		#formula: assume treatment is 1st term on rhs
       rZ = zetaZ[j]
       
       for(k in 1:nsim){
-
+        
         fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta,
                                 control.fit = list(resp.family=resp.family, trt.family=trt.family, 
                                                    U.model=U.model, standardize=standardize, weights=weights))
@@ -244,7 +241,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
   if(U.model == "binomial" & is.binary(Z)){
     U <- try(contYbinaryZU(Y, Z, X, rY, rZ, theta))
   }
-
+  
   if(!(class(U) == "try-error")){
     #try keeps loop from failing if rho_yu = 0 (or other failure, but this is the only one I've seen)
     #Do we want to return a warning/the error message/our own error message if try fails?
@@ -254,13 +251,24 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
     
     if(!is.null(X)) {
       if(!is.null(weights)){  # run svyglm to get right SEs
-        fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+        fit.glm <- glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U)        
         sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
       }else{
-        fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+        fit.glm <- glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U)        
         sens.se = summary(fit.glm)$coefficients[2,2]
       }
-      fit.trt <- glm(Z~U+X, family=trt.family)  	
+      fit.trt <- glm(Z~X, family=trt.family, offset=rZ*U)
+      
+      if (F){ #original codes
+        if(!is.null(weights)){  # run svyglm to get right SEs
+          fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+          sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
+        }else{
+          fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+          sens.se = summary(fit.glm)$coefficients[2,2]
+        }
+        fit.trt <- glm(Z~U+X, family=trt.family)      
+      }
     }else{
       fit.glm <- glm(Y~Z+U, family=resp.family)
       sens.se = summary(fit.glm)$coefficients[2,2]
