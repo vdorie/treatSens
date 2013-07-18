@@ -72,11 +72,6 @@ warnings <- function(formula,       #formula: assume treatment is 1st term on rh
   
   #check and change U.model
   
-  if(identical(trt.family$link,"probit")) {
-    if(verbose) warning("Binary U with binomial distribution is assumed.")    
-    U.model = "normal"    
-  }
-  
   if(identical(class(U.model),"function")) {
     if(identical(U.model,gaussian)) {
       if(identical(trt.family$link,"probit")) {
