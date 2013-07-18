@@ -71,10 +71,21 @@ warnings <- function(formula,       #formula: assume treatment is 1st term on rh
   }  
   
   #check and change U.model
+  
+  if(identical(trt.family$link,"probit")) {
+    if(verbose) warning("Binary U with binomial distribution is assumed.")    
+    U.model = "normal"    
+  }
+  
   if(identical(class(U.model),"function")) {
     if(identical(U.model,gaussian)) {
-      if(verbose) warning("Normally distributed continous U is assumed.")    
-      U.model = "normal"
+      if(identical(trt.family$link,"probit")) {
+        if(verbose) warning("Binary U with binomial distribution is assumed because binomial family with probit link function is assumed in the treatment model.")    
+        U.model = "binomial"    
+      }else{
+        if(verbose) warning("Normally distributed continous U is assumed.")    
+        U.model = "normal"        
+      }
     }
     if(identical(U.model,binomial)) {
       if(verbose) warning("Binary U with binomial distribution is assumed.")    
@@ -84,8 +95,13 @@ warnings <- function(formula,       #formula: assume treatment is 1st term on rh
   
   if(identical(class(U.model),"character")) {
     if(identical(U.model,"gaussian")||identical(U.model,"continuous")) {
-      if(verbose) warning("Normally distributed continous U is assumed.")
-      U.model = "normal"
+      if(identical(trt.family$link,"probit")) {
+        if(verbose) warning("Binary U with binomial distribution is assumed because binomial family with probit link function is assumed in the treatment model.")    
+        U.model = "binomial"    
+      }else{
+        if(verbose) warning("Normally distributed continous U is assumed.")
+        U.model = "normal"
+      }
     }
     if(identical(U.model,"binary")) {
       if(verbose) warning("Binary U with binomial distribution is assumed.")
