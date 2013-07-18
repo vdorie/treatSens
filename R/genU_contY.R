@@ -50,7 +50,7 @@ contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { #Y.res, Z.res, rY, rZ,v
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU <- function(y, z, x, cy, cz, theta) { 
+contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j) { 
   n = length(y)
   nx = dim(x)[2]
   null.resp = lm(y~z+x)
@@ -60,7 +60,7 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta) {
   
   p = 0.5
   
-  for(j in 1:5) {
+  for(j in 1:iter.j) {
     U = rbinom(n,1,p)
     
     if (F) {  #original code

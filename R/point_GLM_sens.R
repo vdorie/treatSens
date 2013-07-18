@@ -11,7 +11,7 @@ source("GLM_sens.R")
 point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
                            resp.family = gaussian,	#family for GLM of model for response
                            trt.family = gaussian,	#family for GLM of model for treatment
-                           U.model = "normal",	#form of model for confounder: can be one of "binomial" and "normal"
+                           U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
                            zetaY = NA,    #sensitivity parameter
                            zetaZ = NA,    #sensitivity parameter
                            theta = 0.5, 		#Pr(U=1) for binomial model
@@ -19,29 +19,33 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
                            nsim = 20,			#number of simulated Us to average over per cell in grid
                            verbose = F,
                            weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.                      
+                           data = NULL,
                            seed = 1234,     #default seed is 1234.
-                           data = NULL) {
+                           iter.j = 10) {
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   grid.dim = NULL
   zero.loc = NULL
   buffer = NULL
-  out.warnings <- warnings(formula, resp.family, trt.family, U.model,  theta, grid.dim, 
-                           standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
   
-  formula=out.warnings$formula
-  resp.family=out.warnings$resp.family
-  trt.family=out.warnings$trt.family
-  U.model=out.warnings$U.model
-  theta=out.warnings$theta
-  grid.dim=out.warnings$grid.dim
-  standardize=out.warnings$standardize
-  nsim=out.warnings$nsim
-  zero.loc=out.warnings$zero.loc
-  verbose=out.warnings$verbose
-  buffer=out.warnings$buffer
-  weights=out.warnings$weights
-  data=out.warnings$data
+  if (F){
+    out.warnings <- warnings(formula, resp.family, trt.family, U.model, theta, grid.dim, 
+                             standardize, nsim, zero.loc, verbose, buffer, weights, data)
+    
+    formula=out.warnings$formula
+    resp.family=out.warnings$resp.family
+    trt.family=out.warnings$trt.family
+    U.model=out.warnings$U.model
+    theta=out.warnings$theta
+    grid.dim=out.warnings$grid.dim
+    standardize=out.warnings$standardize
+    nsim=out.warnings$nsim
+    zero.loc=out.warnings$zero.loc
+    verbose=out.warnings$verbose
+    buffer=out.warnings$buffer
+    weights=out.warnings$weights
+    data=out.warnings$data
+  }
   
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
@@ -84,8 +88,8 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
     if (!any(weights==c("ATE","ATT","ATC"))) {
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
     
-    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
-      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
+#    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
+#      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
     
     if (identical(weights,"ATE")) {
       weights <- 1/null.trt$fitted
@@ -134,8 +138,8 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
     #running GLM_sens on single point
 #debug(fit.GLM.sens)
     out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, 
-                                    control.fit = list(resp.family = resp.family, trt.family = trt.family, 
-                                                       U.model =U.model, standardize = standardize, weights=weights))
+                                    control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
+                                                       standardize = standardize, weights = weights, iter.j = iter.j))
 #undebug(fit.GLM.sens) 
     #record the output to the results.
     results[i,1] <- out.fit.GLM.sens$sens.coef
@@ -148,5 +152,4 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
     results[i,8] <- out.fit.GLM.sens$trt.sigma2  
   }
   return(results)
-  
 }

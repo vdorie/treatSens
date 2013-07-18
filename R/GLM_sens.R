@@ -20,15 +20,18 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
                      verbose = F,
                      buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
                      weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
+                     data = NULL,
                      seed = 1234,     #default seed is 1234.
-                     data = NULL) {
+                     iter.j = 10) {
   
   # set seed
   set.seed(seed)
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
+#debug(warnings)
     out.warnings <- warnings(formula, resp.family, trt.family, U.model,	theta, grid.dim, 
                              standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
+#undebug(warnings)
     formula=out.warnings$formula
     resp.family=out.warnings$resp.family
     trt.family=out.warnings$trt.family
@@ -42,7 +45,7 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
     buffer=out.warnings$buffer
     weights=out.warnings$weights
     data=out.warnings$data
-  
+    
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
   
@@ -150,7 +153,8 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
     #debug(grid.search)
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
                              Y.res, Z.res, v_Y, v_Z, theta, sgnTau0 = sign(null.resp$coef[2]), 
-                             control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model =U.model, standardize = standardize, weights=weights))
+                             control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
+                                                standardize = standardize, weights = weights, iter.j = iter.j))
   }
   #undebug(grid.search)
   zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
@@ -172,11 +176,11 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
       rZ = zetaZ[j]
       
       for(k in 1:nsim){
-        
+#debug(fit.GLM.sens)
         fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta,
-                                control.fit = list(resp.family=resp.family, trt.family=trt.family, 
-                                                   U.model=U.model, standardize=standardize, weights=weights))
-        
+                                control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
+                                                   standardize=standardize, weights=weights, iter.j=iter.j))
+#undebug(fit.GLM.sens)        
         sens.coef[i,j,k] <- fit.sens$sens.coef
         sens.se[i,j,k] <- fit.sens$sens.se
         delta[i,j,k] <- fit.sens$delta
@@ -220,7 +224,8 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
   U.model = control.fit$U.model
   std = control.fit$standardize
   weights = control.fit$weights
-  
+  iter.j = control.fit$iter.j
+    
   #MH:transform zeta_z
   #require(arm, quietly)  #load arm for invlogit function
   #if(identical(trt.family, binomial)) {
@@ -234,12 +239,14 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
     #undebug(contYZU)
   }
   
-  if(U.model == "binomial" & !is.binary(Z)){
-    U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta))
-  }
-  
-  if(U.model == "binomial" & is.binary(Z)){
-    U <- try(contYbinaryZU(Y, Z, X, rY, rZ, theta))
+  if(U.model == "binomial"){
+    if(identical(trt.family$link,"probit")){
+#debug(contYbinaryZU)
+      U <- try(contYbinaryZU(Y, Z, X, rY, rZ, theta, iter.j))
+#undebug(contYbinaryZU)
+    }else{
+      U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta))
+    }
   }
   
   if(!(class(U) == "try-error")){
@@ -247,34 +254,35 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
     #Do we want to return a warning/the error message/our own error message if try fails?
     #fit models with U
     if(std) U = std.nonbinary(U)
-    
-    
-    if(!is.null(X)) {
-      if(!is.null(weights)){  # run svyglm to get right SEs
-        fit.glm <- glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U)        
-        sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
-      }else{
-        fit.glm <- glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U)        
-        sens.se = summary(fit.glm)$coefficients[2,2]
-      }
-      fit.trt <- glm(Z~X, family=trt.family, offset=rZ*U)
       
-      if (F){ #original codes
+    if(!is.null(X)) {
+      
+      if (F){ #glm+offset codes      
         if(!is.null(weights)){  # run svyglm to get right SEs
-          fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+          fit.glm <- glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U)        
           sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
         }else{
-          fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+          fit.glm <- glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U)        
           sens.se = summary(fit.glm)$coefficients[2,2]
         }
-        fit.trt <- glm(Z~U+X, family=trt.family)      
+        fit.trt <- glm(Z~X, family=trt.family, offset=rZ*U)
       }
+      
+      if(!is.null(weights)){  # run svyglm to get right SEs
+        fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+        sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
+      }else{
+        fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+        sens.se = summary(fit.glm)$coefficients[2,2]
+      }
+      fit.trt <- glm(Z~U+X, family=trt.family)      
+      
     }else{
       fit.glm <- glm(Y~Z+U, family=resp.family)
       sens.se = summary(fit.glm)$coefficients[2,2]
       fit.trt <- glm(Z~U, family=trt.family)		
     }
-    
+
     return(list(
       sens.coef = fit.glm$coef[2],
       sens.se = sens.se, 	#SE of Z coef
