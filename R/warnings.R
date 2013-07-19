@@ -89,7 +89,7 @@ warnings <- function(formula,       #formula: assume treatment is 1st term on rh
   }
   
   if(identical(class(U.model),"character")) {
-    if(identical(U.model,"gaussian")||identical(U.model,"continuous")) {
+    if(identical(U.model,"normal")||identical(U.model,"gaussian")||identical(U.model,"continuous")) {
       if(identical(trt.family$link,"probit")) {
         if(verbose) warning("Binary U with binomial distribution is assumed because binomial family with probit link function is assumed in the treatment model.")    
         U.model = "binomial"    

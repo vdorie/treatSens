@@ -21,8 +21,10 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
                            weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.                      
                            data = NULL,
                            seed = 1234,     #default seed is 1234.
-                           iter.j = 10) {
-  
+                           iter.j = 10,
+                           method.contYZU = "orth", # "vanilla" not orthogonaled,"orth" orthogonal,"orth.var" orthogonal+variance adjustment
+                           method.glm = "vanilla"){ #"vanilla" simple glm, "offset" glm+offset(zetay*U)
+    
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   grid.dim = NULL
   zero.loc = NULL
@@ -139,7 +141,9 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
 #debug(fit.GLM.sens)
     out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, 
                                     control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
-                                                       standardize = standardize, weights = weights, iter.j = iter.j))
+                                                       standardize = standardize, weights = weights, iter.j = iter.j,
+                                                       method.contYZU = method.contYZU, method.glm = method.glm))
+    
 #undebug(fit.GLM.sens) 
     #record the output to the results.
     results[i,1] <- out.fit.GLM.sens$sens.coef

@@ -22,7 +22,9 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
                      weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
                      data = NULL,
                      seed = 1234,     #default seed is 1234.
-                     iter.j = 10) {
+                     iter.j = 10,
+                     method.contYZU = "orth", # "vanilla" not orthogonaled,"orth" orthogonal,"orth.var" orthogonal+variance adjustment
+                     method.glm = "vanilla"){ #"vanilla" simple glm, "offset" glm+offset(zetay*U)
   
   # set seed
   set.seed(seed)
@@ -154,7 +156,8 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
                              Y.res, Z.res, v_Y, v_Z, theta, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
-                                                standardize = standardize, weights = weights, iter.j = iter.j))
+                                                standardize = standardize, weights = weights, iter.j = iter.j, 
+                                                method.contYZU = method.contYZU, method.glm = method.glm))
   }
   #undebug(grid.search)
   zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
@@ -179,7 +182,8 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
 #debug(fit.GLM.sens)
         fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta,
                                 control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
-                                                   standardize=standardize, weights=weights, iter.j=iter.j))
+                                                   standardize=standardize, weights=weights, iter.j=iter.j, 
+                                                   method.contYZU = method.contYZU, method.glm = method.glm))
 #undebug(fit.GLM.sens)        
         sens.coef[i,j,k] <- fit.sens$sens.coef
         sens.se[i,j,k] <- fit.sens$sens.se
@@ -225,7 +229,9 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
   std = control.fit$standardize
   weights = control.fit$weights
   iter.j = control.fit$iter.j
-    
+  method.contYZU = control.fit$method.contYZU
+  method.glm = control.fit$method.glm
+  
   #MH:transform zeta_z
   #require(arm, quietly)  #load arm for invlogit function
   #if(identical(trt.family, binomial)) {
@@ -235,7 +241,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
     #debug(contYZU)
-    U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z, X))      
+    U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z, X, method.contYZU))      
     #undebug(contYZU)
   }
   
@@ -256,29 +262,23 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
     if(std) U = std.nonbinary(U)
       
     if(!is.null(X)) {
-      
-      if (F){ #glm+offset codes      
-        if(!is.null(weights)){  # run svyglm to get right SEs
-          fit.glm <- glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U)        
-          sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
-        }else{
-          fit.glm <- glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U)        
-          sens.se = summary(fit.glm)$coefficients[2,2]
-        }
-        fit.trt <- glm(Z~X, family=trt.family, offset=rZ*U)
-      }
-      
       if(!is.null(weights)){  # run svyglm to get right SEs
-        fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+        fit.glm <- switch(method.glm,
+                          vanilla = glm(Y~Z+U+X, family=resp.family, weights=weights),
+                          offset = glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U))
         sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
       }else{
-        fit.glm <- glm(Y~Z+U+X, family=resp.family, weights=weights)        
+        fit.glm <- switch(method.glm,
+                          vanilla = glm(Y~Z+U+X, family=resp.family, weights=weights),
+                          offset = glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U))     
         sens.se = summary(fit.glm)$coefficients[2,2]
       }
-      fit.trt <- glm(Z~U+X, family=trt.family)      
-      
+      fit.trt <- glm(Z~U+X, family=trt.family)
+
     }else{
-      fit.glm <- glm(Y~Z+U, family=resp.family)
+      fit.glm <- switch(method.glm,
+                        vanilla = glm(Y~Z+U, family=resp.family, weights=weights),
+                        offset = glm(Y~Z, family=resp.family, weights=weights, offset=rY*U))    
       sens.se = summary(fit.glm)$coefficients[2,2]
       fit.trt <- glm(Z~U, family=trt.family)		
     }

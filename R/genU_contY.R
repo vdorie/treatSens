@@ -5,20 +5,18 @@
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
+contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X, method.contYZU="default") {
   
   n <- length(Y)
   
   delta = zeta_z/v_Z
   gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) #MH: as.numeric added to avoid non-conformable error
-  
   var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
-  
   eps.u = rnorm(n, 0, sqrt(var.U))
-  eps.u = lm(eps.u ~ Y + Z + X)$resid
-  #eps.u = eps.u * sqrt(var.U)/sd(eps.u)
-  
-  U = Y*gamma + Z*delta + eps.u
+  U = switch(method.contYZU,
+             vanilla = Y*gamma + Z*delta + eps.u,
+             orth = Y*gamma + Z*delta + lm(eps.u ~ Y + Z + X)$resid,
+             orth.var = Y*gamma + Z*delta + lm(eps.u ~ Y + Z + X)$resid*sqrt(var.U)/sd(eps.u))
   return(U)
 }
 
@@ -90,6 +88,7 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10) {
       pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1))^z*theta
     
     p = pyzu/pyz
+    p[pyz==0] = 0
   }
   U = rbinom(n,1,p)
   return(U)
