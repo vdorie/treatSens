@@ -22,7 +22,7 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
                      weights = NULL, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
                      data = NULL,
                      seed = 1234,     #default seed is 1234.
-                     iter.j = 10,
+                     iter.j = 10,     #number of iteration in trt.family=binomial(link="probit")
                      method.contYZU = "orth", # "vanilla" not orthogonaled,"orth" orthogonal,"orth.var" orthogonal+variance adjustment
                      method.glm = "vanilla"){ #"vanilla" simple glm, "offset" glm+offset(zetay*U)
   
