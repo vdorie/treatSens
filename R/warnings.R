@@ -1,17 +1,17 @@
 source("housekeeping.R")
 
-warnings <- function(formula,       #formula: assume treatment is 1st term on rhs
+warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
                      resp.family,	#family for GLM of model for response
                      trt.family,	#family for GLM of model for treatment
-                     U.model,	#form of model for confounder: can be one of "binomial" and "normal"
-                     theta, 		#Pr(U=1) for binomial model
-                     grid.dim,	#final dimensions of output grid
+                     U.model,	    #form of model for confounder: can be one of "binomial" and "normal"
+                     theta, 	  	#Pr(U=1) for binomial model
+                     grid.dim,  	#final dimensions of output grid
                      standardize,	#Logical: should variables be standardized?
-                     nsim,			#number of simulated Us to average over per cell in grid
+                     nsim,			  #number of simulated Us to average over per cell in grid
                      zero.loc,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
                      verbose,
-                     buffer, 		#restriction to range of coef on U to ensure stability around the edges
-                     weights, #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
+                     buffer, 		  #restriction to range of coef on U to ensure stability around the edges
+                     weights,     #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
                      data) {
   #extract variables from formula
   form.vars <- parse.formula(formula, data)

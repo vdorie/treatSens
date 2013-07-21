@@ -8,7 +8,7 @@ source("GLM_sens.R")
 ###############
 #Main function call
 ###############
-point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
+point.GLM.sens <- function(formula,       #formula: assume treatment is 1st term on rhs
                            resp.family = gaussian,	#family for GLM of model for response
                            trt.family = gaussian,	#family for GLM of model for treatment
                            U.model = "binomial",	#form of model for confounder: can be one of "binomial" and "normal"
@@ -23,8 +23,11 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
                            seed = 1234,     #default seed is 1234.
                            iter.j = 10,
                            method.contYZU = "orth", # "vanilla" not orthogonaled,"orth" orthogonal,"orth.var" orthogonal+variance adjustment
-                           method.glm = "vanilla"){ #"vanilla" simple glm, "offset" glm+offset(zetay*U)
-    
+                           method.glm = "vanilla",
+                           core = NULL #number of CPU cores used (Max=8). Compatibility with Mac is unknown.
+                           ){ #"vanilla" simple glm, "offset" glm+offset(zetay*U)
+  set.seed(seed)
+  
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   grid.dim = NULL
   zero.loc = NULL
@@ -81,7 +84,6 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
   #NEW CODE FOR WEIGHTS
   ###############################
   #create weights if the user specifies either ATE, ATT, or ATC.
-  
   nt = sum(Z==1)
   nc = sum(Z==0)
   
@@ -134,26 +136,41 @@ point.GLM.sens <- function(formula,     	#formula: assume treatment is 1st term 
   results = matrix(NA,nsim,8)
   dimnames(results)[[2]] = c("sens.coef","sens.se","delta","alpha","delta.se","alpha.se","resp.sigma2","trt.sigma2")
   
-  for(i in 1:nsim){
-    set.seed(i) #set seed
-    
-    #running GLM_sens on single point
-#debug(fit.GLM.sens)
-    out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, 
-                                    control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
-                                                       standardize = standardize, weights = weights, iter.j = iter.j,
-                                                       method.contYZU = method.contYZU, method.glm = method.glm))
-    
-#undebug(fit.GLM.sens) 
-    #record the output to the results.
-    results[i,1] <- out.fit.GLM.sens$sens.coef
-    results[i,2] <- out.fit.GLM.sens$sens.se
-    results[i,3] <- out.fit.GLM.sens$delta
-    results[i,4] <- out.fit.GLM.sens$alpha
-    results[i,5] <- out.fit.GLM.sens$delta.se
-    results[i,6] <- out.fit.GLM.sens$alpha.se
-    results[i,7] <- out.fit.GLM.sens$resp.sigma2
-    results[i,8] <- out.fit.GLM.sens$trt.sigma2  
+  control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
+                     standardize = standardize, weights = weights, iter.j = iter.j,
+                     method.contYZU = method.contYZU, method.glm = method.glm)
+  
+  if(is.null(core)){
+    for(i in 1:nsim){    
+      #running GLM_sens on single point
+      #debug(fit.GLM.sens)
+      out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
+      #undebug(fit.GLM.sens) 
+      #record the output to the results.
+      results[i,1] <- out.fit.GLM.sens$sens.coef
+      results[i,2] <- out.fit.GLM.sens$sens.se
+      results[i,3] <- out.fit.GLM.sens$delta
+      results[i,4] <- out.fit.GLM.sens$alpha
+      results[i,5] <- out.fit.GLM.sens$delta.se
+      results[i,6] <- out.fit.GLM.sens$alpha.se
+      results[i,7] <- out.fit.GLM.sens$resp.sigma2
+      results[i,8] <- out.fit.GLM.sens$trt.sigma2  
+    }
+  }else{
+    out.fit.GLM.sens <- foreach(i=1:nsim,.combine=rbind,.verbose=F)%dopar%{
+      #debug(fit.GLM.sens)
+      source("GLM_sens.R")
+      fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
+      #undebug(fit.GLM.sens)
+    }
+    results[,1] <- unlist(out.fit.GLM.sens[,1])
+    results[,2] <- unlist(out.fit.GLM.sens[,2])
+    results[,3] <- unlist(out.fit.GLM.sens[,3])
+    results[,4] <- unlist(out.fit.GLM.sens[,4])
+    results[,5] <- unlist(out.fit.GLM.sens[,5])
+    results[,6] <- unlist(out.fit.GLM.sens[,6])
+    results[,7] <- unlist(out.fit.GLM.sens[,7])
+    results[,8] <- unlist(out.fit.GLM.sens[,8])
   }
   return(results)
 }

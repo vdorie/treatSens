@@ -8,7 +8,7 @@ source("pweight.R")
 ###############
 #Main function call
 ###############
-GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
+GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st term on rhs
                      resp.family = gaussian,	#family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
                      U.model = "normal",	#form of model for confounder: can be one of "binomial" and "normal"
@@ -24,8 +24,17 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
                      seed = 1234,     #default seed is 1234.
                      iter.j = 10,     #number of iteration in trt.family=binomial(link="probit")
                      method.contYZU = "orth", # "vanilla" not orthogonaled,"orth" orthogonal,"orth.var" orthogonal+variance adjustment
-                     method.glm = "vanilla"){ #"vanilla" simple glm, "offset" glm+offset(zetay*U)
+                     method.glm = "vanilla", #"vanilla" simple glm, "offset" glm+offset(zetay*U)
+                     core = NULL #number of CPU cores used (Max=8). Compatibility with Mac is unknown.
+                     ){ 
   
+  if(!is.null(core)){
+    require(doSNOW)
+    require(foreach)
+    cl<-makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
+    registerDoSNOW(cl)
+  }
+    
   # set seed
   set.seed(seed)
   
@@ -170,6 +179,11 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
   sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
   cat("Computing final grid...\n")
+  #register control.fit
+  control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
+                     standardize=standardize, weights=weights, iter.j=iter.j, 
+                     method.contYZU = method.contYZU, method.glm = method.glm)
+  
   #fill in grid
   cell = 0
   for(i in grid.dim[1]:1) {
@@ -178,22 +192,35 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
       rY = zetaY[i]
       rZ = zetaZ[j]
       
-      for(k in 1:nsim){
+      if(is.null(core)){
+        for(k in 1:nsim){
 #debug(fit.GLM.sens)
-        fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta,
-                                control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
-                                                   standardize=standardize, weights=weights, iter.j=iter.j, 
-                                                   method.contYZU = method.contYZU, method.glm = method.glm))
+          fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
 #undebug(fit.GLM.sens)        
-        sens.coef[i,j,k] <- fit.sens$sens.coef
-        sens.se[i,j,k] <- fit.sens$sens.se
-        delta[i,j,k] <- fit.sens$delta
-        alpha[i,j,k] <- fit.sens$alpha
-        delta.se[i,j,k] <- fit.sens$delta.se
-        alpha.se[i,j,k] <- fit.sens$alpha.se
-        resp.s2[i,j,k] <- fit.sens$resp.sigma2
-        trt.s2[i,j,k] <- fit.sens$trt.sigma2
-        
+          sens.coef[i,j,k] <- fit.sens$sens.coef
+          sens.se[i,j,k] <- fit.sens$sens.se
+          delta[i,j,k] <- fit.sens$delta
+          alpha[i,j,k] <- fit.sens$alpha
+          delta.se[i,j,k] <- fit.sens$delta.se
+          alpha.se[i,j,k] <- fit.sens$alpha.se
+          resp.s2[i,j,k] <- fit.sens$resp.sigma2
+          trt.s2[i,j,k] <- fit.sens$trt.sigma2
+        }        
+      }else{ #code for multicore
+        fit.sens <- foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
+#debug(fit.GLM.sens)
+          source("GLM_sens.R")
+          fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
+#undebug(fit.GLM.sens)
+        }
+        sens.coef[i,j,] <- unlist(fit.sens[,1])
+        sens.se[i,j,] <- unlist(fit.sens[,2])
+        delta[i,j,] <- unlist(fit.sens[,3])
+        alpha[i,j,] <- unlist(fit.sens[,4])
+        delta.se[i,j,] <- unlist(fit.sens[,5])
+        alpha.se[i,j,] <- unlist(fit.sens[,6])
+        resp.s2[i,j,] <- unlist(fit.sens[,7])
+        trt.s2[i,j,] <- unlist(fit.sens[,8])
       }
       if(verbose) cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
     }}
@@ -215,6 +242,9 @@ GLM.sens <- function(formula,     	#formula: assume treatment is 1st term on rhs
                    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
     class(result) <- "sensitivity"
   }
+  
+  if(!is.null(core)) stopCluster(cl)   # Stop using multicore.
+  
   return(result)
 }
 
@@ -240,9 +270,9 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
   
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
-    #debug(contYZU)
+#debug(contYZU)
     U <- try(contYZU(Y.res, Z.res, rY, rZ,v_Y, v_Z, X, method.contYZU))      
-    #undebug(contYZU)
+#undebug(contYZU)
   }
   
   if(U.model == "binomial"){
