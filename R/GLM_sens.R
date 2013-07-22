@@ -93,7 +93,7 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   }else{
     null.trt <- glm(Z~1, trt.family)
   }
-  Z.res <- Z-null.trt$fitted.values
+  Z.res <- z-null.trt$fitted.values
   v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
   
   ###############################
@@ -152,7 +152,16 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   }
   
   extreme.coef = matrix(c(-sqrt((v_Y-buffer)/(1-buffer)), -sqrt(v_Z-buffer), sqrt((v_Y-buffer)/(1-buffer)), sqrt(v_Z-buffer)), nrow = 2) 
-  if(U.model == "binomial") extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
+  if(U.model == "binomial" & !is.binary(Z)){ 
+    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
+  }
+  if(U.model == "binomial" & is.binary(Z)){ 
+    #fixed range option:
+    #extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -2, sqrt(4*v_Y-buffer), 2), nrow = 2) 
+    #following option cuts off when 75% of obs would have p(Z=1) > pnorm(2) = 97.7%
+    lp.quant = quantile(null.trt$linear.predictors, 0.25)
+    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -(2-lp.quant), sqrt(4*v_Y-buffer), 2-lp.quant), nrow = 2) 
+  }
   
   #MH: Codes to multiply X by -1 to limit plot to 1 & 2 quadrants.
   Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))

@@ -130,7 +130,7 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		sig.u=1
 		
 		sens.coef[i,j] <- null.resp$coef[2]-rY*rZ/v_Z
-		sens.se = sqrt((v_Y-rY^2*sig.u + rY^2*rZ/v_Z*rZ)/(n.obs*(v_Z-rZ^2*sig.u)))   #MH: second sign changed to +, sqrt((v_Y-beta.u*(1-(cov.zu)^2/v_Z))/(n*(v_Z-cov.zu)))
+		sens.se = sqrt((v_Y-rY^2*sig.u + rY^2*rZ/v_Z*rZ)/(n.obs*(v_Z-rZ^2/sig.u)))   #MH: second sign changed to +, sqrt((v_Y-beta.u*(1-(cov.zu)^2/v_Z))/(n*(v_Z-cov.zu)))
 		delta[i,j] <- rY
 		alpha[i,j] <- rZ
 		delta.se[i,j] <- NA
