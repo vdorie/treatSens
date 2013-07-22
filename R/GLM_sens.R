@@ -25,9 +25,17 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
                      iter.j = 10,     #number of iteration in trt.family=binomial(link="probit")
                      method.contYZU = "orth", # "vanilla" not orthogonaled,"orth" orthogonal,"orth.var" orthogonal+variance adjustment
                      method.glm = "vanilla", #"vanilla" simple glm, "offset" glm+offset(zetay*U)
-                     core = NULL #number of CPU cores used (Max=8). Compatibility with Mac is unknown.
-                     ){ 
+                     core = NULL, #number of CPU cores used (Max=8). Compatibility with Mac is unknown.
+                     zetay.range = NULL,  #custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
+                     zetaz.range = NULL   #custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
+                     ){
+
+  #MH: return error if only either zetay.range or zetaz.range is specified.
+  if((is.null(zetay.range) & !is.null(zetaz.range))|(!is.null(zetay.range) & is.null(zetaz.range))){
+    stop(paste("Either zetay.range or zetaz.range is missing."))
+  }
   
+  #MH: callinig necessary packages for multicore processing.
   if(!is.null(core)){
     require(doSNOW)
     require(foreach)
@@ -153,14 +161,17 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   null.trt.plot <- glm(Z~X.positive, family=trt.family)
   Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   
-  if(zero.loc == "full"){
+  if(!is.null(zetay.range) & !is.null(zetaz.range)){ #MH: custom grid range.
+    zetay.range[zetay.range==0] = zetay.range[zetay.range==0]+.00001  #MH: add a tiny value to show axes.
+    zetaz.range[zetaz.range==0] = zetaz.range[zetaz.range==0]+.00001  #MH: add a tiny value to show axes.
+    grid.range = matrix(c(zetay.range[1], zetaz.range[1], zetay.range[2], zetaz.range[2]), nrow = 2)
+  }else if(zero.loc == "full"){
     grid.range.full = extreme.coef*.95  #MH: *.95 is added to avoid estimation near the boundary.
-    grid.range.full[1,1] = 0.01         #MH: jitter is added.
-    grid.range = grid.range.full
+    grid.range.full[1,1] = 0.00001      #MH: add a tiny value to show axes.
+    grid.range = grid.range.full    
   }else{
     #find ranges for final grid
     cat("Finding grid range...\n")
-    
     #debug(grid.search)
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
                              Y.res, Z.res, v_Y, v_Z, theta, sgnTau0 = sign(null.resp$coef[2]), 
@@ -168,6 +179,7 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
                                                 standardize = standardize, weights = weights, iter.j = iter.j, 
                                                 method.contYZU = method.contYZU, method.glm = method.glm))
   }
+
   #undebug(grid.search)
   zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
   zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -206,7 +218,7 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
           resp.s2[i,j,k] <- fit.sens$resp.sigma2
           trt.s2[i,j,k] <- fit.sens$trt.sigma2
         }        
-      }else{ #code for multicore
+      }else{ #MH: code for multicore below. For debug change %dopar% to %do%.
         fit.sens <- foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
 #debug(fit.GLM.sens)
           source("GLM_sens.R")
@@ -292,19 +304,14 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
     if(std) U = std.nonbinary(U)
       
     if(!is.null(X)) {
-      if(!is.null(weights)){  # run svyglm to get right SEs
-        fit.glm <- switch(method.glm,
-                          vanilla = glm(Y~Z+U+X, family=resp.family, weights=weights),
-                          offset = glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U))
-        sens.se = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights) #pweight is custom function
-      }else{
-        fit.glm <- switch(method.glm,
+      fit.glm <- switch(method.glm,
                           vanilla = glm(Y~Z+U+X, family=resp.family, weights=weights),
                           offset = glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U))     
-        sens.se = summary(fit.glm)$coefficients[2,2]
-      }
+      sens.se <- switch(class(weights),
+                        "NULL" = summary(fit.glm)$coefficients[2,2],
+                        "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
+                        "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
       fit.trt <- glm(Z~U+X, family=trt.family)
-
     }else{
       fit.glm <- switch(method.glm,
                         vanilla = glm(Y~Z+U, family=resp.family, weights=weights),

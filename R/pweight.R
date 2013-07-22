@@ -1,4 +1,4 @@
-pweight <- function(Z,X,r,wt,program){ # Z:treat, X:X, r:residual (from (g)lm with weight), wt:weight
+pweight <- function(Z,X,r,wt,program=3){ # Z:treat, X:X, r:residual (from (g)lm with weight), wt:weight
   
   N = length(r) # number of observations
   
@@ -11,6 +11,12 @@ pweight <- function(Z,X,r,wt,program){ # Z:treat, X:X, r:residual (from (g)lm wi
   XWeeWX = XWX = matrix(0,k,k)
   
   # calculate meat of sandwitch
+  
+  if (program==3){
+    r.wt = r*wt
+    XWeeWX.vec = apply(r.wt*ZX1,1,tcrossprod)
+    XWeeWX = matrix(as.numeric(apply(XWeeWX.vec,1,sum)),k,k)
+  }
   
   if (program==1){
     XWeeWX.all = array(NA, c(k,k,N))
@@ -29,13 +35,7 @@ pweight <- function(Z,X,r,wt,program){ # Z:treat, X:X, r:residual (from (g)lm wi
     }
     XWeeWX = Reduce("+",XWeeWX.all)
   }
-  
-  if (program==3){
-    r.wt = r*wt
-    XWeeWX.vec = apply(r.wt*ZX1,1,tcrossprod)
-    XWeeWX = matrix(as.numeric(apply(XWeeWX.vec,1,sum)),k,k)
-  }
-  
+
   if (program==4){
     XWeeWX = matrix(as.numeric(apply(apply(r*wt*ZX1,1,tcrossprod),1,sum)),k,k)
   }
