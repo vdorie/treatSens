@@ -93,7 +93,7 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   }else{
     null.trt <- glm(Z~1, trt.family)
   }
-  Z.res <- z-null.trt$fitted.values
+  Z.res <- Z-null.trt$fitted.values
   v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
   
   ###############################
