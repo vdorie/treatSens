@@ -172,13 +172,12 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   
   if(!is.null(zetay.range) & !is.null(zetaz.range)){ #MH: custom grid range.
     jitter=F #MH: flag to add jitter to sens.parm.
-    zetay.range[zetay.range==0] = zetay.range[zetay.range==0]+.00001  #MH: add a tiny value to show axes.
-    zetaz.range[zetaz.range==0] = zetaz.range[zetaz.range==0]+.00001  #MH: add a tiny value to show axes.
+    zetay.range[zetay.range==0] = zetay.range[zetay.range==0]+.00001  #MH: add a tiny value to show horizontal axes.
     grid.range = matrix(c(zetay.range[1], zetaz.range[1], zetay.range[2], zetaz.range[2]), nrow = 2)
   }else if(zero.loc == "full"){
     jitter=F #MH: flag to add jitter to sens.parm.
     grid.range.full = extreme.coef*.95  #MH: *.95 is added to avoid estimation near the boundary.
-    grid.range.full[1,1] = 0.00001      #MH: add a tiny value to show axes.
+    grid.range.full[1,1] = 0.00001      #MH: add a tiny value to show horizontal axes.
     grid.range = grid.range.full    
   }else{
     #find ranges for final grid
