@@ -171,15 +171,18 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   
   if(!is.null(zetay.range) & !is.null(zetaz.range)){ #MH: custom grid range.
+    jitter=F #MH: flag to add jitter to sens.parm.
     zetay.range[zetay.range==0] = zetay.range[zetay.range==0]+.00001  #MH: add a tiny value to show axes.
     zetaz.range[zetaz.range==0] = zetaz.range[zetaz.range==0]+.00001  #MH: add a tiny value to show axes.
     grid.range = matrix(c(zetay.range[1], zetaz.range[1], zetay.range[2], zetaz.range[2]), nrow = 2)
   }else if(zero.loc == "full"){
+    jitter=F #MH: flag to add jitter to sens.parm.
     grid.range.full = extreme.coef*.95  #MH: *.95 is added to avoid estimation near the boundary.
     grid.range.full[1,1] = 0.00001      #MH: add a tiny value to show axes.
     grid.range = grid.range.full    
   }else{
     #find ranges for final grid
+    jitter=T #MH: flag to add jitter to sens.parm.
     cat("Finding grid range...\n")
     #debug(grid.search)
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
@@ -194,8 +197,8 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
   
   #if 0 in sequences, shift it a bit - U generation will fail at 0 and we know what the value s/b anyway
-  zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
-  zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
+  if (jitter) zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
+  if (jitter) zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
   
   sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
