@@ -160,7 +160,9 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
     #extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -2, sqrt(4*v_Y-buffer), 2), nrow = 2) 
     #following option cuts off when 75% of obs would have p(Z=1) > pnorm(2) = 97.7%
     lp.quant = quantile(null.trt$linear.predictors, 0.25)
-    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -(2-lp.quant), sqrt(4*v_Y-buffer), 2-lp.quant), nrow = 2) 
+    zetaz.min = max(-(2-lp.quant), -3) #MH: less extremev value is used.
+    zetaz.max = min((2-lp.quant), 3)   #MH: less extremev value is used.
+    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), zetaz.min, sqrt(4*v_Y-buffer), zetaz.max), nrow = 2)
   }
   
   #MH: Codes to multiply X by -1 to limit plot to 1 & 2 quadrants.

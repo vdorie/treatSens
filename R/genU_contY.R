@@ -51,10 +51,6 @@ contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { #Y.res, Z.res, rY, rZ,v
 contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10) { 
   n = length(y)
   nx = dim(x)[2]
-  null.resp = lm(y~z+x)
-  null.trt = glm(z~x, family = binomial(link ="probit"))
-  v_Y = var(null.resp$resid)*(n-1)/(n-nx-2)
-  v_Z = var(null.trt$resid)*(n-1)/(n-nx-1)
   
   p = 0.5
   
