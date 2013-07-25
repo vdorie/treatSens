@@ -27,7 +27,9 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
                      method.glm = "vanilla", #"vanilla" simple glm, "offset" glm+offset(zetay*U)
                      core = NULL, #number of CPU cores used (Max=8). Compatibility with Mac is unknown.
                      zetay.range = NULL,  #custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
-                     zetaz.range = NULL   #custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
+                     zetaz.range = NULL,  #custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
+                     jitter = FALSE,    #add jitter to grids near the axis.
+                     trim.wt = 10     #the maximum size of weight is set at "trim.wt"% of sample size. type NULL to turn off.
                      ){
 
   #MH: return error if only either zetay.range or zetaz.range is specified.
@@ -129,6 +131,11 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
       weights[Z==0] <- 1
       weights[Z==1] = weights[Z==1]*(nt/sum(weights[Z==1])) #normalizing weight
       cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")}
+  
+    if(!is.null(trim.wt)){
+      max.wt = trim.wt/100*n.obs
+      weights[weights>max.wt] = max.wt
+    }
   }
   
   cat("Fitting null models...\n")
@@ -160,8 +167,8 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
     #extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -2, sqrt(4*v_Y-buffer), 2), nrow = 2) 
     #following option cuts off when 75% of obs would have p(Z=1) > pnorm(2) = 97.7%
     lp.quant = quantile(null.trt$linear.predictors, 0.25)
-    zetaz.min = max(-(2-lp.quant), -3) #MH: less extremev value is used.
-    zetaz.max = min((2-lp.quant), 3)   #MH: less extremev value is used.
+    zetaz.min = max(-(2-lp.quant), -3) #MH: less extreme value is used.
+    zetaz.max = min((2-lp.quant), 3)   #MH: less extreme value is used.
     extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), zetaz.min, sqrt(4*v_Y-buffer), zetaz.max), nrow = 2)
   }
   
@@ -173,17 +180,60 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   
   if(!is.null(zetay.range) & !is.null(zetaz.range)){ #MH: custom grid range.
-    jitter=F #MH: flag to add jitter to sens.parm.
-    zetay.range[zetay.range==0] = zetay.range[zetay.range==0]+.00001  #MH: add a tiny value to show horizontal axes.
-    grid.range = matrix(c(zetay.range[1], zetaz.range[1], zetay.range[2], zetaz.range[2]), nrow = 2)
+    if(sign(zetaz.range[1])==sign(zetaz.range[2])|any(zetaz.range==0)){ #MH: one quadrant.
+      #MH: define the vector of sens.parm for treatment
+      zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[2])
+      #MH: add jitter if zetaz = 0
+      zetaZ[zetaZ == 0] <- zetaz.range[2]/(grid.dim[2]*3) 
+    }else{ #MH: two quadrants.
+      if(jitter){
+        #MH: change z-dimention to even number
+        grid.dim[2]=ifelse(grid.dim[2]%%2==1,grid.dim[2]+1,grid.dim[2])
+        #MH: create temporary seq to find border.
+        zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[2])
+        #MH: number of dimention for left and right of vertical axis.
+        dim.left = which.min(abs(zetaZ[which(zetaZ<0)]))
+        dim.right = grid.dim[2] - (dim.left + which.min(zetaZ[which(zetaZ>=0)])) + 1
+        #MH: define the vector of sens.parm for treatment
+        zetaZ <- c(seq(zetaz.range[1], zetaz.range[1]/(dim.left*3), length.out=dim.left),
+                   seq(zetaz.range[2]/(dim.right*3), zetaz.range[2], length.out=dim.right))
+      }else{
+        zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[2])
+      }
+    }
+    
+    if(sign(zetay.range[1])==sign(zetay.range[2])|any(zetay.range==0)){ #MH: one quadrant.
+      #MH: define vector of sens.parm for treatment
+      zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[1])
+      #MH: add a tiny value to show horizontal axes.
+      zetaY[zetaY==0] = zetaY[zetaY==0]+.00001
+    }else{#MH: two quadrants in vertical direction.
+      if(jitter){
+        #MH: change y-dimention to even number
+        grid.dim[1]=ifelse(grid.dim[1]%%2==1,grid.dim[1]+1,grid.dim[1])
+        #MH: create temporary seq to find border.
+        zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[1])
+        #MH: number of dimention for down and up of horizontal axis.
+        dim.down = which.min(abs(zetaY[which(zetaY<0)]))
+        dim.up = grid.dim[1] - (dim.down + which.min(zetaY[which(zetaY>=0)])) + 1
+        #MH: define the vector of sens.parm for treatment
+        zetaY <- c(seq(zetay.range[1], zetay.range[1]/(dim.down*3), length.out=dim.down),
+                   seq(zetay.range[2]/(dim.up*3), zetay.range[2], length.out=dim.up))        
+      }else{
+        zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[1])
+      }
+    }
   }else if(zero.loc == "full"){
-    jitter=F #MH: flag to add jitter to sens.parm.
-    grid.range.full = extreme.coef*.95  #MH: *.95 is added to avoid estimation near the boundary.
-    grid.range.full[1,1] = 0.00001      #MH: add a tiny value to show horizontal axes.
-    grid.range = grid.range.full    
+    #MH: change z-dimention to even number
+    grid.dim[2]=ifelse(grid.dim[2]%%2==1,grid.dim[2]+1,grid.dim[2])
+    #MH: number of dimention for left and right of vertical axis.
+    dim.left = dim.right = grid.dim[2]/2
+    #MH: define the vector of sens.parm for treatment
+    zetaZ <- c(seq(extreme.coef[2,1]*.95, extreme.coef[2,1]*.95/(dim.left*3), length.out=dim.left),
+               seq(extreme.coef[2,2]*.95/(dim.right*3), extreme.coef[2,2]*.95, length.out=dim.right))
+    zetaY <- seq(0.00001, extreme.coef[1,2]*.95, length.out = grid.dim[1])
   }else{
     #find ranges for final grid
-    jitter=T #MH: flag to add jitter to sens.parm.
     cat("Finding grid range...\n")
     #debug(grid.search)
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
@@ -191,16 +241,15 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
                              control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
                                                 standardize = standardize, weights = weights, iter.j = iter.j, 
                                                 method.contYZU = method.contYZU, method.glm = method.glm))
+    #undebug(grid.search)
+    zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
+    zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
+    
+    #if 0 in sequences, shift it a bit - U generation will fail at 0 and we know what the value s/b anyway
+    zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
+    zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
   }
 
-  #undebug(grid.search)
-  zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
-  zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
-  
-  #if 0 in sequences, shift it a bit - U generation will fail at 0 and we know what the value s/b anyway
-  if (jitter) zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
-  if (jitter) zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
-  
   sens.coef <- sens.se <- alpha <- delta <- alpha.se <- delta.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
   cat("Computing final grid...\n")
@@ -208,7 +257,7 @@ GLM.sens <- function(formula = Y~Z+X,     	#formula: assume treatment is 1st ter
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
                      method.contYZU = method.contYZU, method.glm = method.glm)
-  
+
   #fill in grid
   cell = 0
   for(i in grid.dim[1]:1) {
@@ -303,7 +352,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ,v_Y, v_Z, theta, control.
   if(U.model == "binomial"){
     if(identical(trt.family$link,"probit")){
 #debug(contYbinaryZU)
-      U <- try(contYbinaryZU(Y, Z, X, rY, rZ, theta, iter.j))
+      U <- try(contYbinaryZU(Y, Z, X, rY, rZ, theta, iter.j, weights))
 #undebug(contYbinaryZU)
     }else{
       U <- try(contYZbinaryU(Y.res, Z.res, rY, rZ,v_Y, v_Z, theta))

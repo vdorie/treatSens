@@ -48,9 +48,13 @@ contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { #Y.res, Z.res, rY, rZ,v
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10) { 
+contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL) { 
   n = length(y)
   nx = dim(x)[2]
+  null.resp = lm(y~z+x, weights=weights)
+  null.trt = glm(z~x, family = binomial(link ="probit"))
+  v_Y = var(null.resp$resid)*(n-1)/(n-nx-2)
+  v_Z = var(null.trt$resid)*(n-1)/(n-nx-1)
   
   p = 0.5
   
@@ -58,7 +62,7 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10) {
     U = rbinom(n,1,p)
     
     if (F) {  #original code
-      U.fit = lm(y~z+x+U)
+      U.fit = lm(y~z+x+U, weights=weights)
       y.coef = U.fit$coef
       y.coef[length(y.coef)]  = cy
       z.coef = glm(z~x+U, family=binomial(link="probit"))$coef
@@ -67,7 +71,7 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10) {
     }
     
     #MH: New codes that uses glm + offset.
-    U.fit = lm(y~z+x, offset=cy*U)
+    U.fit = lm(y~z+x, offset=cy*U, weights=weights)
     y.coef = c(U.fit$coef, cy)
     z.coef = c(glm(z~x, family=binomial(link="probit"), offset=cz*U)$coef, cz)
     v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
