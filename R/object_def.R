@@ -1,4 +1,4 @@
-source("plotSA.R")
+source("C:/Users/Jennifer Hill/Desktop/from.tablet/research.new/sensitivity analysis/causalSA/R_package/trunk/R/plotSA.R")
 #############
 #Define "sensitivity" object
 #Currently specific to GLM.sens
