@@ -91,9 +91,9 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Xcoef.plot, Y, Z, X,
 		Zmax = sign(rZ[3])*min(abs(rZ[3]),abs(1/zero.loc*loc0$rZ))
     
 		#MH: update Zmax so that it include all plots.
-    if ((sgnTau0 == 1) && (all(Xcoef.plot[,1])<extreme.cors[2,2]*.95)) {
+    if ((sgnTau0 == 1) && (all(Xcoef.plot[,1]<extreme.cors[2,2]*.95))) {
       Zmax = ifelse(Zmax>max(Xcoef.plot[,1]),Zmax,max(Xcoef.plot[,1]))}
-		if ((sgnTau0 == -1) && (all(Xcoef.plot[,1])>extreme.cors[2,1]*.95)) {
+		if ((sgnTau0 == -1) && (all(Xcoef.plot[,1]>extreme.cors[2,1]*.95))) {
 		  Zmax = ifelse(Zmax<max(Xcoef.plot[,1]),Zmax,max(Xcoef.plot[,1]))}
     
     #	Z.range = c(min(Zmax, 0), max(Zmax,0))
