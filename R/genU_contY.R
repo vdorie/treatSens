@@ -5,7 +5,7 @@
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X, method.contYZU="default") {
+contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X, method.contYZU="vanilla") {
   
   n <- length(Y)
   
