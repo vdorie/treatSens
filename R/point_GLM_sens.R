@@ -1,10 +1,3 @@
-source("genU_contY.R")
-source("object_def.R")
-source("grid_range.R")
-source("housekeeping.R")
-source("warnings.R")
-source("GLM_sens.R")
-
 ###############
 #Main function call
 ###############
@@ -22,7 +15,6 @@ point.GLM.sens <- function(formula,       #formula: assume treatment is 1st term
                            data = NULL,
                            seed = 1234,     #default seed is 1234.
                            iter.j = 10,
-                           method.contYZU = "orth", # "vanilla" not orthogonaled,"orth" orthogonal,"orth.var" orthogonal+variance adjustment
                            method.glm = "vanilla",
                            core = NULL #number of CPU cores used (Max=8). Compatibility with Mac is unknown.
                            ){ #"vanilla" simple glm, "offset" glm+offset(zetay*U)
@@ -138,7 +130,7 @@ point.GLM.sens <- function(formula,       #formula: assume treatment is 1st term
   
   control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
                      standardize = standardize, weights = weights, iter.j = iter.j,
-                     method.contYZU = method.contYZU, method.glm = method.glm)
+                     method.glm = method.glm)
   
   if(is.null(core)){
     for(i in 1:nsim){    

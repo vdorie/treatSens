@@ -1,4 +1,13 @@
-pweight <- function(Z,X,r,wt,program=3){ # Z:treat, X:X, r:residual (from (g)lm with weight), wt:weight
+############
+#pweight: Calculate weighted standard error
+#Z: treatment variable
+#X: covariates
+#r: residuals of weighted regression of Y on Z, X
+#wt: vector of weights
+#program: ???
+############
+
+pweight <- function(Z,X,r,wt,program=3){ 
   
   N = length(r) # number of observations
   

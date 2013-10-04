@@ -1,33 +1,31 @@
 ###############
-#Generate U 
+#Generate continuous U 
 #Y: continuous response variable
 #Z: continuous treatment variable
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X, method.contYZU="vanilla") {
+contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
   
   n <- length(Y)
   
   delta = zeta_z/v_Z
-  gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) #MH: as.numeric added to avoid non-conformable error
+  gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) 
   var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
   eps.u = rnorm(n, 0, sqrt(var.U))
-  U = switch(method.contYZU,
-             vanilla = Y*gamma + Z*delta + eps.u,
-             orth = Y*gamma + Z*delta + lm(eps.u ~ Y + Z + X)$resid,
-             orth.var = Y*gamma + Z*delta + lm(eps.u ~ Y + Z + X)$resid*sqrt(var.U)/sd(eps.u))
+  U = Y*gamma + Z*delta + eps.u
+
   return(U)
 }
 
 ###############
-#Generate U 
+#Generate binary U 
 #Y: continuous response variable
 #Z: continuous treatment variable
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { #Y.res, Z.res, rY, rZ,v_Y, v_Z, theta, BzX
+contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { 
   n = length(y)
   c1 = theta*dnorm(z+cz*theta-cz, 0, sqrt(vz-theta*(1-theta)*cz^2))/(theta*dnorm(z+cz*theta-cz, 0, sqrt(vz-theta*(1-theta)*cz^2)) + 
                                                                        (1-theta)*dnorm(z+cz*theta, 0, sqrt(vz-theta*(1-theta)*cz^2)))
@@ -42,7 +40,7 @@ contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) { #Y.res, Z.res, rY, rZ,v
 }
 
 ###############
-#Generate U 
+#Generate binary U 
 #Y: continuous response variable
 #Z: binary treatment variable
 #rho_y, rho_z: desired correlations between U and Y or Z
@@ -60,7 +58,9 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL) {
   
   for(j in 1:iter.j) {
     U = rbinom(n,1,p)
-    
+##########
+###NEED TO CHOOSE OFFSET OR NO AND UPDATE CODE
+############   
     if (F) {  #original code
       U.fit = lm(y~z+x+U, weights=weights)
       y.coef = U.fit$coef

@@ -1,8 +1,3 @@
-source("object_def.R")
-source("grid_range.R")
-source("housekeeping.R")
-source("GLM_sens.R")
-
 ###############
 #Main function call
 ###############
@@ -131,26 +126,26 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		
 		sens.coef[i,j] <- null.resp$coef[2]-rY*rZ/v_Z
 		sens.se = sqrt((v_Y-rY^2*sig.u + rY^2*rZ/v_Z*rZ)/(n.obs*(v_Z-rZ^2/sig.u)))   #MH: second sign changed to +, sqrt((v_Y-beta.u*(1-(cov.zu)^2/v_Z))/(n*(v_Z-cov.zu)))
-		delta[i,j] <- rY
-		alpha[i,j] <- rZ
-		delta.se[i,j] <- NA
-		alpha.se[i,j] <- NA
+		zeta.y[i,j] <- rY
+		zeta.z[i,j] <- rZ
+		zy.se[i,j] <- NA
+		zz.se[i,j] <- NA
 		resp.s2[i,j] <- NA
 		trt.s2[i,j] <- NA	
 	}}
 
 	if(!is.null(X)) {
 		result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
-				alpha = alpha, delta = delta, 
-				se.alpha = alpha.se, se.delta = delta.se, 
+				zeta.z = zeta.z, zeta.y = zeta.y, 
+				se.zz = zz.se, se.zy = zy.se, 
 				Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xcoef = Xcoef)
 		class(result) <- "sensitivity"
 	}else{
 		result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
-				alpha = alpha, delta = delta, 
-				se.alpha = alpha.se, se.delta = delta.se, 
+				zeta.z = zeta.z, zeta.y = zeta.y, 
+				se.zz = zz.se, se.zy = zy.se, 
 				Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))

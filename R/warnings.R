@@ -1,5 +1,3 @@
-source("housekeeping.R")
-
 warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
                      resp.family,	#family for GLM of model for response
                      trt.family,	#family for GLM of model for treatment
