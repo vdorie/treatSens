@@ -3,30 +3,27 @@
 \alias{causalSA}
 \docType{package}
 \title{
-What the package does (short line)
-~~ package title ~~
-}
+Sensitivity analysis for causal inference}
 \description{
-More about what it does (maybe more than one line)
-~~ A concise (1-5 lines) description of the package ~~
-}
+Utilities to investigate sensitivity to unmeasured confounding in causal models of several types.}
 \details{
 \tabular{ll}{
 Package: \tab causalSA\cr
 Type: \tab Package\cr
 Version: \tab 1.0\cr
-Date: \tab 2011-08-26\cr
-License: \tab What license is it under?\cr
+Date: \tab 2013-10-30\cr
+License: \tab GPL-2\cr
 LazyLoad: \tab yes\cr
 }
 ~~ An overview of how to use the package, including the most important ~~
 ~~ functions ~~
 }
 \author{
-Who wrote it
+Nicole Bohme Carnegie <carnegie@hsph.harvard.edu>
+Masataka Harada <mh166@nyu.edu>
+Jennifer Hill <jennifer.hill@nyu.edu>
 
-Maintainer: Who to complain to <yourfault@somewhere.net>
-~~ The author and/or maintainer of the package ~~
+Maintainer: Nicole Bohme Carnegie <carnegie@hsph.harvard.edu>
 }
 \references{
 ~~ Literature or other references for background information ~~
