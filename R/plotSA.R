@@ -2,7 +2,7 @@
 #plotSA - plot results of sensitivity analysis
 #############
 
-plotSA = function(x,
+plotSA = function(x, 
 			contour.levels = NULL,
 			zero.col = "red",
 			lty.zero = 1,
@@ -15,10 +15,19 @@ plotSA = function(x,
       limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
 			...) {
   #note in help: if contours are too rough, up nsim in sens fn
+
+  ##Add row/column for zeta = 0 if not included in grid
+  null.tau=x$tau0
+  null.se=x$se.tau0
   Zcors = as.numeric(dimnames(x$alpha)[[2]]) #horizontal grids of U
   Ycors = as.numeric(dimnames(x$delta)[[1]]) #vertical grids of U
-  xlab = expression(zeta^z)
-  ylab = expression(zeta^y)
+
+  addYdim = sum(Ycors==0)==0
+  Zcors = sort(c(Zcors,0))	#Note don't need if stmt for Z because main code excludes zeta.z = 0
+  if(addYdim==TRUE){
+    Ycors = c(0,Ycors)
+  }
+  
   Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.
   Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
   Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
@@ -28,12 +37,35 @@ plotSA = function(x,
   if(is.null(X.pch)){
     X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
   }
-  
-  taus = t(apply(x$tau, c(1,2), mean, na.rm = T))
+
+  nr = length(Zcors); nc = length(Ycors)
+  taus.est = t(apply(x$tau, c(1,2), mean, na.rm = T))
+  se.est = t(apply(x$se.tau, c(1,2), mean))
+  taus = matrix(null.tau,nr,nc)
+  se.taus = matrix(null.se,nr,nc)
+  row0 = c(1:length(Zcors))%*%((Zcors==0)*1) 
+  if(addYdim==TRUE){
+    taus[1:(row0-1),2:nc] = taus.est[1:(row0-1),]
+    taus[(row0+1):length(Zcors),2:nc] = taus.est[(row0):nrow(se.est),]
+    se.taus[1:(row0-1),2:nc] = se.est[1:(row0-1),]
+    se.taus[(row0+1):length(Zcors),2:nc] = se.est[(row0):nrow(se.est),]
+  }
+  else{
+    taus[1:(row0-1),] = taus.est[1:(row0-1),]
+    taus[(row0+1):length(Zcors),] = taus.est[(row0):nrow(taus.est),]
+    se.taus[1:(row0-1),] = se.est[1:(row0-1),]
+    se.taus[(row0+1):length(Zcors),] = se.est[(row0):nrow(taus.est),]
+  }
+  dimnames(taus)[[1]] = Zcors
+  dimnames(taus)[[2]] = Ycors
+  taus <<- taus
+  dimnames(se.taus)[[1]] = Zcors
+  dimnames(se.taus)[[2]] = Ycors
+  se.taus <<- se.taus
   
   if(is.null(contour.levels)){
-    exTau = c(taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]]) #MH: extreme values of tau at right end
-    clevels = round(seq(exTau[2]*.8, exTau[1]*.8, length.out = 14), 2) #MH: vals at which contours are drawn. round(seq(x$tau0*0.8, exTau*.8, length.out = 8),2)
+    exTau = c(taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]]) #extreme values of tau at right end
+    clevels = round(seq(exTau[2]*.8, exTau[1]*.8, length.out = 14), 2) #vals at which contours are drawn
   }else{
     clevels = contour.levels
   } 
@@ -43,7 +75,9 @@ plotSA = function(x,
   }
 
   par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
-  
+  xlab = expression(zeta^z)
+  ylab = expression(zeta^y)
+
   if (limit.Xplot) {
     #old codes
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
@@ -61,12 +95,12 @@ plotSA = function(x,
   abline(v = 0)
   
   contour(Zcors, Ycors, taus, levels = clevels, 
-          add = T, labcex = labcex,...)
+          add = T, labcex = labcex, ...)
   
   contour(Zcors, Ycors, taus, levels = 0, 
           add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
   
-  contour(Zcors, Ycors, taus/t(apply(x$se.tau, c(1,2), mean)), labels = "N.S.",
+  contour(Zcors, Ycors, taus/se.taus, labels = "N.S.",
           levels = -sign(x$tau0)*qnorm(signif.level/2), add = T, col = insig.col,
           lty = lty.insig, labcex = labcex,...)
   
@@ -81,13 +115,13 @@ plotSA = function(x,
       proj.pts = apply(Xpart, 1, mean)
       max.pt = Xpart[proj.pts == max(proj.pts[sign(Xpart[,1])==sign(x$tau0)]),]
       zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
-      if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ #MH: ||(zcor==length(Zcors)) is added to avoid error
+      if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ 
         zpts = c(zcor-1, zcor)
       }else{
         zpts = c(zcor, zcor+1)
       }
       ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
-      if((Ycors[ycor] > max.pt[2] & ycor > 1)||(ycor==length(Ycors))){ #MH: ||(ycor==length(Ycors)) is added to avoid error
+      if((Ycors[ycor] > max.pt[2] & ycor > 1)||(ycor==length(Ycors))){ 
         ypts = c(ycor-1, ycor)
       }else{
         ypts = c(ycor, ycor+1)
@@ -107,6 +141,7 @@ plotSA = function(x,
     }
   }
 } #end of plotSA
+
 
 ############
 #plotSA.cont
