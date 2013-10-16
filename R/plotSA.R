@@ -19,16 +19,15 @@ plotSA = function(x,
   ##Add row/column for zeta = 0 if not included in grid
   null.tau=x$tau0
   null.se=x$se.tau0
-  Zcors = as.numeric(dimnames(x$alpha)[[2]]) #horizontal grids of U
-  Ycors = as.numeric(dimnames(x$delta)[[1]]) #vertical grids of U
-
+  Zcors = as.numeric(dimnames(x$zeta.z)[[2]]) #horizontal grids of U
+  Ycors = as.numeric(dimnames(x$zeta.y)[[1]]) #vertical grids of U
   addYdim = sum(Ycors==0)==0
   Zcors = sort(c(Zcors,0))	#Note don't need if stmt for Z because main code excludes zeta.z = 0
   if(addYdim==TRUE){
     Ycors = c(0,Ycors)
   }
   
-  Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.
+  Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
   Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
   Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
   #note that due to correlation among Xs, some may not appear on plot
@@ -75,8 +74,8 @@ plotSA = function(x,
   }
 
   par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
-  xlab = expression(zeta^z)
-  ylab = expression(zeta^y)
+  xlab = expression(paste("Coef. on U in model for treatment, ", zeta^z))
+  ylab = expression(paste("Coef. on U in model for response, ", zeta^y))
 
   if (limit.Xplot) {
     #old codes
@@ -94,20 +93,24 @@ plotSA = function(x,
   abline(h = 0)
   abline(v = 0)
   
+  legend(0.8*max(Zcors), 0, legend = round(x$tau0,2), cex = labcex,
+         yjust = 0.5, x.intersp = 0, y.intersp = 0,
+         bg = ifelse(par("bg")== "transparent", "white", par("bg")), 
+         box.lty = 0)
+  
+  box()
+  
   contour(Zcors, Ycors, taus, levels = clevels, 
           add = T, labcex = labcex, ...)
   
-  contour(Zcors, Ycors, taus, levels = 0, 
+  contour(Zcors, Ycors, taus, levels = 0, lwd = 2,
           add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
   
   contour(Zcors, Ycors, taus/se.taus, labels = "N.S.",
-          levels = -sign(x$tau0)*qnorm(signif.level/2), add = T, col = insig.col,
-          lty = lty.insig, labcex = labcex,...)
+          levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = insig.col,
+          lty = lty.insig, labcex = labcex, lwd = 2,...)
   
-  legend(0.8*max(Zcors), 0, legend = round(x$tau0,2), cex = labcex,
-         yjust = 0.5, x.intersp = 0,
-         bg = ifelse(par("bg")== "transparent", "white", par("bg")), box.lty = 0)
-  
+    
   if (all(sign(Xpart[,1])!=sign(x$tau0))){
     warning("Cannot add data line because XXXXX.")
   }else{
@@ -134,13 +137,14 @@ plotSA = function(x,
                        -(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
                      nrow = 2, byrow = T))
       contour(Zcors, Ycors, taus, levels = round(clevel,2),
-              add = T, col = "grey",labcex = labcex,...)
+              add = T, col = "grey",labcex = labcex, lwd = 2,...)
     }else{
       if(data.line)
         warning("Cannot add data line because there are no non-treatment covariates.")
     }
   }
 } #end of plotSA
+
 
 
 ############

@@ -1,5 +1,3 @@
-source("housekeeping.R")
-
 warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
                      resp.family,	#family for GLM of model for response
                      trt.family,	#family for GLM of model for treatment
@@ -11,6 +9,8 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
                      zero.loc,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
                      verbose,
                      buffer, 		  #restriction to range of coef on U to ensure stability around the edges
+                     zetay.range,  	#custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
+                     zetaz.range,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
                      weights,     #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
                      data) {
   #extract variables from formula
@@ -34,13 +34,13 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
   
   #check trt.family
   if(identical(trt.family,gaussian)||identical(trt.family,"gaussian")||identical(trt.family,"normal")||identical(trt.family,"identity")||identical(trt.family,"continuous")) {
-    if(verbose) warning("Gaussian family with identity link function is assumed in the treatment model.")
+    if(verbose) cat("Gaussian family with identity link function is assumed in the treatment model.\n")
     trt.family = gaussian
   }
   
   if(is.binary(Z)){
     if((identical(class(trt.family),"family") && identical(trt.family$link,"probit"))||identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"probit")) {
-      if(verbose) warning("Binomial family with probit link function is assumed in the treatment model.")
+      if(verbose) cat("Binomial family with probit link function is assumed in the treatment model.\n")
       trt.family = binomial(link="probit")
     }
         
@@ -59,7 +59,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
   #check resp.family
   if(identical(class(resp.family),"function")) {
     if(identical(resp.family,gaussian)) {
-      if(verbose) warning("Gaussian family with identity link function is assumed in the response model.")        
+      if(verbose) cat("Gaussian family with identity link function is assumed in the response model.\n")        
     }else{
       stop(paste("GLM.sens is not ready for the resp.family specified."))
     }
@@ -67,7 +67,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
   
   if(identical(class(resp.family),"character")) {
     if(identical(resp.family,"normal")||identical(resp.family,"continuous")||identical(resp.family,"gaussian")) {
-      if(verbose) warning("Gaussian family with identity link function is assumed in the response model.")        
+      if(verbose) cat("Gaussian family with identity link function is assumed in the response model.\n")        
       resp.family = gaussian
     }
   }  
@@ -81,23 +81,23 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
         if(verbose) warning("Binary U with binomial distribution is assumed because binomial family with probit link function is assumed in the treatment model.")    
         U.model = "binomial"    
       }else{
-        if(verbose) warning("Normally distributed continous U is assumed.")    
+        if(verbose) cat("Normally distributed continous U is assumed.\n")    
         U.model = "normal"        
       }
     }
     if(identical(U.model,binomial)) {
-      if(verbose) warning("Binary U with binomial distribution is assumed.")    
+      if(verbose) cat("Binary U with binomial distribution is assumed.\n")    
       U.model = "binomial"
     }
   }
   
   if(identical(class(U.model),"function") & identical(class(trt.family),"function")) {
     if(identical(U.model,gaussian)) {
-      if(verbose) warning("Normally distributed continous U is assumed.")    
+      if(verbose) cat("Normally distributed continous U is assumed.\n")    
       U.model = "normal"        
     }
     if(identical(U.model,binomial)) {
-      if(verbose) warning("Binary U with binomial distribution is assumed.")    
+      if(verbose) cat("Binary U with binomial distribution is assumed.\n")    
       U.model = "binomial"
     }
   }
@@ -108,23 +108,23 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
         if(verbose) warning("Binary U with binomial distribution is assumed because binomial family with probit link function is assumed in the treatment model.")    
         U.model = "binomial"    
       }else{
-        if(verbose) warning("Normally distributed continous U is assumed.")
+        if(verbose) cat("Normally distributed continous U is assumed.\n")
         U.model = "normal"
       }
     }
     if(identical(U.model,"binary")) {
-      if(verbose) warning("Binary U with binomial distribution is assumed.")
+      if(verbose) cat("Binary U with binomial distribution is assumed.\n")
       U.model = "binomial"
     }
   }
   
   if(identical(class(U.model),"character") & identical(class(trt.family),"function")) {
     if(identical(U.model,"normal")||identical(U.model,"gaussian")||identical(U.model,"continuous")) {
-      if(verbose) warning("Normally distributed continous U is assumed.")
+      if(verbose) cat("Normally distributed continous U is assumed.\n")
       U.model = "normal"
     }
     if(identical(U.model,"binary")) {
-      if(verbose) warning("Binary U with binomial distribution is assumed.")
+      if(verbose) cat("Binary U with binomial distribution is assumed.\n")
       U.model = "binomial"
     }
   }
@@ -139,6 +139,20 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
     stop(paste("Error: grid dimenstions must a vector of length 2"))
   }
   
+  #If single value entered for range with 1 cell grid, expand to length 2 to avoid errors
+  if(!is.null(zetay.range) && length(zetay.range) == 1 && (grid.dim == 1 | all.equal(grid.dim, c(1,1)))) 
+	zetay.range = c(zetay.range, zetay.range)
+  if(!is.null(zetaz.range) && length(zetaz.range) == 1 && (grid.dim == 1 | all.equal(grid.dim, c(1,1)))) 
+	zetaz.range = c(zetaz.range, zetaz.range)
+
+  #If single value entered for range with >1 cell grid, return an error
+  if(!is.null(zetay.range) && (length(zetay.range) != 2)) {
+    stop(paste("Error: zeta.y range must a vector of length 2"))
+  }
+  if(!is.null(zetaz.range) && (length(zetaz.range) != 2)) {
+    stop(paste("Error: zeta.z range must a vector of length 2"))
+  }
+
   return(list(formula=formula,
               resp.family=resp.family,
               trt.family=trt.family,
@@ -151,5 +165,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
               verbose=verbose,
               buffer=buffer,
               weights=weights,
+		  zetay.range=zetay.range,
+		  zetaz.range=zetaz.range,
               data=data))
 }            
