@@ -39,7 +39,10 @@ plotSA = function(x,
 
   nr = length(Zcors); nc = length(Ycors)
   taus.est = t(apply(x$tau, c(1,2), mean, na.rm = T))
-  se.est = t(apply(x$se.tau, c(1,2), mean))
+  K = dim(x$se.tau)[3]
+  W = apply(x$se.tau^2, c(1,2), mean, na.rm = T)
+  B = apply(x$tau, c(1,2), sd, na.rm = T)^2
+  se.est = t(sqrt(W+(1+1/K)*B))
   taus = matrix(null.tau,nr,nc)
   se.taus = matrix(null.se,nr,nc)
   row0 = c(1:length(Zcors))%*%((Zcors==0)*1) 
