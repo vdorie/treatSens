@@ -48,7 +48,7 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
   set.seed(seed)
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
-
+  #debug(warnings)
     out.warnings <- warnings(formula, resp.family, trt.family, U.model,	theta, grid.dim, 
                              standardize,	nsim,	zero.loc,	verbose, buffer, zetay.range, zetaz.range, weights, data)
 
@@ -67,7 +67,8 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
     data=out.warnings$data
     zetay.range=out.warnings$zetay.range
     zetaz.range=out.warnings$zetaz.range
-    
+    data=out.warnings$data #listwise deletion
+  
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
   
@@ -278,6 +279,7 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
         }        
       }else{ #code for multicore below. For debug change %dopar% to %do%.
         fit.sens <- foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
+          source("GLM_sens.R")
           fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
         }
         sens.coef[i,j,] <- unlist(fit.sens[,1])
@@ -298,7 +300,8 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
                    se.zz = zz.se, se.zy = zy.se, 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot)
+                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
+                   varnames = all.vars(formula))
     class(result) <- "sensitivity"
   }else{
     result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
@@ -306,7 +309,8 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
                    se.zz = zz.se, se.zy = zy.se, 
                    Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-                   Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
+                   Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]),
+                   varnames = all.vars(formula))
     class(result) <- "sensitivity"
   }
   

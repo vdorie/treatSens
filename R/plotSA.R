@@ -13,6 +13,8 @@ plotSA = function(x,
 			signif.level = 0.05,
 			labcex = 0.75,
       limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
+      txtlab = F,  #add text label to the plots of covariates.
+      which.txtlab = NULL, #enter numeric vector to specify which label to show. e.g. c(1:3) shows first 3 covariates.
 			...) {
   #note in help: if contours are too rough, up nsim in sens fn
 
@@ -91,6 +93,18 @@ plotSA = function(x,
     yplot.max = ifelse(max(Ycors, na.rm = T)>max(Xpart.plot[,2]),max(Ycors, na.rm = T),max(Xpart.plot[,2]))  
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(xplot.min,xplot.max),
          ylim = c(0,yplot.max), pch = X.pch, xlab = xlab, ylab = ylab,...)
+  }
+  
+  #codes for txtlab
+  if (txtlab) {
+    if (is.null(which.txtlab)) { #show all text label
+      text(Xpart.plot2[,1], Xpart.plot2[,2], labels=x$varnames[-c(1,2)], cex=labcex, pos=1)
+    } else { #show selected label
+      which.txtlab2 = which.txtlab + 2
+      varnames2 = x$varnames
+      varnames2[as.numeric(paste(- which.txtlab2))] = ""
+      text(Xpart.plot2[,1], Xpart.plot2[,2], labels=varnames2[-c(1,2)], cex=labcex, pos=1)
+    }
   }
 
   abline(h = 0)

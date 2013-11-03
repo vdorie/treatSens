@@ -1,6 +1,6 @@
 warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
-                     resp.family,	#family for GLM of model for response
-                     trt.family,	#family for GLM of model for treatment
+                     resp.family,  #family for GLM of model for response
+                     trt.family,  #family for GLM of model for treatment
                      U.model,	    #form of model for confounder: can be one of "binomial" and "normal"
                      theta, 	  	#Pr(U=1) for binomial model
                      grid.dim,  	#final dimensions of output grid
@@ -13,24 +13,32 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
                      zetaz.range,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
                      weights,     #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
                      data) {
+  
+  if(is.null(data)) stop(paste("Either a matrix or data.frame object must be specified in data field."))
+  
+  #check that data is a data frame
+  if(identical(class(data),"matrix")) {
+    if(verbose) warning("coerced matrix to data frame")
+    data = data.frame(data)
+  }
+  else if(!identical(class(data),"data.frame")) {
+    stop(paste("Data is not a data.frame object"))
+  } 
+  
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
   
   Y = form.vars$resp
   Z = form.vars$trt
-  X = form.vars$covars
+  X = form.vars$covars 
   
-  #check that data is a data frame
-  if(!is.null(data)) {
-    if(identical(class(data),"matrix")) {
-      if(verbose) warning("coerced matrix to data frame")
-      data = data.frame(data)
-    }
-    else if(!identical(class(data),"data.frame")) {
-      stop(paste("Data is not a data.frame object"))
-    }    
-  }
-  
+  #Code for listwise deletion
+  postdata=na.omit(data)
+  nobs.deleted = dim(data)[1] - dim(postdata)[1]
+  if ((verbose) & nobs.deleted>0) warning(nobs.deleted, " observations were deleted listwise.\n")    
+  Y = postdata[,1]
+  Z = postdata[,2]
+  X = postdata[,-c(1:2)]
   
   #check trt.family
   if(identical(trt.family,gaussian)||identical(trt.family,"gaussian")||identical(trt.family,"normal")||identical(trt.family,"identity")||identical(trt.family,"continuous")) {
@@ -43,7 +51,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
       if(verbose) cat("Binomial family with probit link function is assumed in the treatment model.\n")
       trt.family = binomial(link="probit")
     }
-        
+    
     if((identical(class(trt.family),"family") && identical(trt.family$link,"logit"))||identical(trt.family,binomial)||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
       warning("GLM.sens is not compatible with logistic link. Binomial family with probit link function is assumed in the treatment model.")
       trt.family = binomial(link="probit")
@@ -74,7 +82,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
   
   
   #check and change U.model
-
+  
   if(identical(class(U.model),"function") & identical(class(trt.family),"family")) {
     if(identical(U.model,gaussian)) {
       if(identical(trt.family$link,"probit")) {
@@ -141,10 +149,10 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
   
   #If single value entered for range with 1 cell grid, expand to length 2 to avoid errors
   if(!is.null(zetay.range) && length(zetay.range) == 1 && (grid.dim == 1 | all.equal(grid.dim, c(1,1)))) 
-	zetay.range = c(zetay.range, zetay.range)
+    zetay.range = c(zetay.range, zetay.range)
   if(!is.null(zetaz.range) && length(zetaz.range) == 1 && (grid.dim == 1 | all.equal(grid.dim, c(1,1)))) 
-	zetaz.range = c(zetaz.range, zetaz.range)
-
+    zetaz.range = c(zetaz.range, zetaz.range)
+  
   #If single value entered for range with >1 cell grid, return an error
   if(!is.null(zetay.range) && (length(zetay.range) != 2)) {
     stop(paste("Error: zeta.y range must a vector of length 2"))
@@ -152,7 +160,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
   if(!is.null(zetaz.range) && (length(zetaz.range) != 2)) {
     stop(paste("Error: zeta.z range must a vector of length 2"))
   }
-
+  
   return(list(formula=formula,
               resp.family=resp.family,
               trt.family=trt.family,
@@ -165,7 +173,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
               verbose=verbose,
               buffer=buffer,
               weights=weights,
-		  zetay.range=zetay.range,
-		  zetaz.range=zetaz.range,
-              data=data))
+              zetay.range=zetay.range,
+              zetaz.range=zetaz.range,
+              data=postdata))
 }            
