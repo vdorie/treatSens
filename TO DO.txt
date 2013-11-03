@@ -1,10 +1,6 @@
 genU_contY.R: Need to decide whether we are using offset and update fns accordingly.  Currently mixed.
 
-Warnings/errors in GLM_sens
-
-Does point_GLM_sens do anything different from GLM_sens with specified grid dim (1,1) and values?  Can we do this within GLM_sens?
-
-Basically same questions for OLS versions as GLM versions
+Bring OLS sens up to current complexity of GLM_sens
 
 Merge appropriate updates back to trunk.
 

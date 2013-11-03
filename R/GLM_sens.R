@@ -16,7 +16,7 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
                      data = NULL,
                      seed = 1234,     	#default seed is 1234.
                      iter.j = 10,     	#number of iteration in trt.family=binomial(link="probit")
-                     method.glm = "vanilla", 	#"vanilla" simple glm, "offset" glm+offset(zetay*U)
+                     offset = TRUE, 		#Logical: fit models with zeta*U fixed at target value, or with zeta fitted
                      core = NULL, 		#number of CPU cores used (Max=8). Compatibility with Mac is unknown.
                      zetay.range = NULL,  	#custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
                      zetaz.range = NULL,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
@@ -43,7 +43,7 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
   #Check whether data, options, and etc. conform to the format in "warnings.R"
 
     out.warnings <- warnings(formula, resp.family, trt.family, U.model,	theta, grid.dim, 
-                             standardize,	nsim,	zero.loc,	verbose, buffer, weights, data)
+                             standardize,	nsim,	zero.loc,	verbose, buffer, zetay.range, zetaz.range, weights, data)
 
     formula=out.warnings$formula
     resp.family=out.warnings$resp.family
@@ -58,7 +58,10 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
     buffer=out.warnings$buffer
     weights=out.warnings$weights
     data=out.warnings$data
-    
+    zetay.range=out.warnings$zetay.range
+    zetaz.range=out.warnings$zetaz.range
+    data=out.warnings$data
+  
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
   
@@ -132,7 +135,6 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
 
   cat("Fitting null models...\n")
   #fit null model for the outcome & get residuals
-  #the following codes must be placed after codes for weights 
   if(!is.null(X)) {
     null.resp <- glm(Y~Z+X, family=resp.family, weights=weights)
   }else{
@@ -169,7 +171,12 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
   null.trt.plot <- glm(Z~X.positive, family=trt.family)
   Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   
-  if(!is.null(zetay.range) & !is.null(zetaz.range)){ #custom grid range.
+ #register control.fit
+  control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
+                     standardize=standardize, weights=weights, iter.j=iter.j, 
+                     offset = offset)
+ 
+ if(!is.null(zetay.range) & !is.null(zetaz.range)){ #custom grid range.
     if(sign(zetaz.range[1])==sign(zetaz.range[2])|any(zetaz.range==0)){ #one quadrant.
       #define the vector of sens.parm for treatment
       zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[2])
@@ -228,9 +235,7 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
 
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
                              Y.res, Z.res, v_Y, v_Z, theta, sgnTau0 = sign(null.resp$coef[2]), 
-                             control.fit = list(resp.family = resp.family, trt.family = trt.family, U.model = U.model,
-                                                standardize = standardize, weights = weights, iter.j = iter.j, 
-                                                method.glm = method.glm))
+                             control.fit = control.fit)
 
     zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
     zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -243,11 +248,7 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
   sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
   cat("Computing final grid...\n")
-  #register control.fit
-  control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
-                     standardize=standardize, weights=weights, iter.j=iter.j, 
-                     method.glm = method.glm)
-
+  
   #fill in grid
   cell = 0
   for(i in grid.dim[1]:1) {
@@ -291,7 +292,8 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
                    se.zz = zz.se, se.zy = zy.se, 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot)
+                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
+                   varnames = all.vars(formula))
     class(result) <- "sensitivity"
   }else{
     result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
@@ -299,7 +301,8 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
                    se.zz = zz.se, se.zy = zy.se, 
                    Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-                   Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
+                   Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]),
+                   varnames = all.vars(formula))
     class(result) <- "sensitivity"
   }
   
@@ -319,7 +322,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
   std = control.fit$standardize
   weights = control.fit$weights
   iter.j = control.fit$iter.j
-  method.glm = control.fit$method.glm
+  offset = control.fit$offset
   
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
@@ -328,7 +331,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
   
   if(U.model == "binomial"){
     if(identical(trt.family$link,"probit")){
-      U <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights))
+      U <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset))
     }else{
       U <- try(contYZbinaryU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, theta))
     }
@@ -341,18 +344,19 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
     if(std) U = std.nonbinary(U)
       
     if(!is.null(X)) {
-      fit.glm <- switch(method.glm,
-                          vanilla = glm(Y~Z+U+X, family=resp.family, weights=weights),
-                          offset = glm(Y~Z+X, family=resp.family, weights=weights, offset=rY*U))     
+      fit.glm <- switch(offset+1,
+					"FALSE" = glm(Y~Z+U+X, family=resp.family, weights=weights),
+                           "TRUE" = glm(Y~Z+X, family=resp.family, weights=weights, offset=zetaY*U))   
+                       
       sens.se <- switch(class(weights),
                         "NULL" = summary(fit.glm)$coefficients[2,2],
                         "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
                         "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
       fit.trt <- glm(Z~U+X, family=trt.family)
     }else{
-      fit.glm <- switch(method.glm,
-                        vanilla = glm(Y~Z+U, family=resp.family, weights=weights),
-                        offset = glm(Y~Z, family=resp.family, weights=weights, offset=rY*U))    
+      fit.glm <- switch(offset+1,
+					"FALSE" = glm(Y~Z+U, family=resp.family, weights=weights),
+                           "TRUE" = glm(Y~Z, family=resp.family, weights=weights, offset=zetaY*U))   
       sens.se = summary(fit.glm)$coefficients[2,2]
       fit.trt <- glm(Z~U, family=trt.family)		
     }

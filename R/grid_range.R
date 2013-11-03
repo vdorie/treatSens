@@ -51,7 +51,7 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Xcoef.plot, Y, Z, X,
 	}else{
 		fname <- ifelse(is.null(control.fit$g), "fit.BART.sens", "fit.LMER.sens")
 	}
-	fn.call <- call(fname, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, rY=NA, rZ=NA, v_Y = v_Y, v_Z = v_Z,
+	fn.call <- call(fname, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, zetaY=NA, zetaZ=NA, v_Y = v_Y, v_Z = v_Z,
 		control.fit = control.fit, theta = theta)
 
 	tau = rep(NA, 3)

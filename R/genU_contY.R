@@ -46,7 +46,7 @@ contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL) { 
+contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offset) { 
   n = length(y)
   nx = dim(x)[2]
   null.resp = lm(y~z+x, weights=weights)
@@ -58,24 +58,21 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL) {
   
   for(j in 1:iter.j) {
     U = rbinom(n,1,p)
-##########
-###NEED TO CHOOSE OFFSET OR NO AND UPDATE CODE
-############   
-    if (F) {  #original code
+
+    if (!offset) { 
       U.fit = lm(y~z+x+U, weights=weights)
       y.coef = U.fit$coef
       y.coef[length(y.coef)]  = cy
       z.coef = glm(z~x+U, family=binomial(link="probit"))$coef
       z.coef[length(z.coef)] = cz
       v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
+    } else {
+      U.fit = lm(y~z+x, offset=cy*U, weights=weights)
+      y.coef = c(U.fit$coef, cy)
+      z.coef = c(glm(z~x, family=binomial(link="probit"), offset=cz*U)$coef, cz)
+      v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
     }
-    
-    #MH: New codes that uses glm + offset.
-    U.fit = lm(y~z+x, offset=cy*U, weights=weights)
-    y.coef = c(U.fit$coef, cy)
-    z.coef = c(glm(z~x, family=binomial(link="probit"), offset=cz*U)$coef, cz)
-    v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
-    
+
     pyzu = dnorm(y-cbind(1,z,x,1)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
       (1-pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1)))^(1-z)*
       pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1))^z*theta

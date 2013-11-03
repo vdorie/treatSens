@@ -3,9 +3,10 @@ Type: Package
 Title: Sensitivity analysis for causal inference
 Version: 0.1
 Date: 2011-08-26
+Author: "Nicole Bohme Carnegie"
 Author@R: c(person("Nicole Bohme", "Carnegie", email = "carnegie@hsph.harvard.edu"), person("Jennifer", "Hill", email = jennifer.hill@nyu.edu))
 Maintainer: "Nicole Bohme Carnegie" <carnegie@hsph.harvard.edu>
-Depends: R (>= 2.13.0), BayesTree, lme4, lattice
+Depends: R (>= 2.13.0)
 Description: Utilities to investigate sensitivity to unmeasured confounding in causal models of several types.
 License: GPL-2
 LazyLoad: yes

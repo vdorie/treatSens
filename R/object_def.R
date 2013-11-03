@@ -44,41 +44,41 @@ print.sensitivity = function(x, digits=3 ){
 	 	resp.coef <- as.numeric(dimnames(x$tau)[[1]])
 	 	trt.coef <- as.numeric(dimnames(x$tau)[[2]])
 
-		table <- round(apply(x$tau, c(1,2), mean),digits)
-	 	colnames(table) <- resp.coef
-	 	rownames(table) <- trt.coef
- 		cat("Estimated treatment effects\n")
-		print(table)
-
-		table <- round(apply(x$se.tau, c(1,2), mean),digits)
-	 	colnames(table) <- resp.coef
-	 	rownames(table) <- trt.coef
- 		cat("Standard error of estimated treatment effects\n")
-		print(table)
-
-		table <- round(apply(x$zeta.y, c(1,2), mean),digits)
-	 	colnames(table) <- resp.coef
-	 	rownames(table) <- trt.coef
- 		cat("Estimated zeta.y - coefficient of U in response model\n")
-		print(table)
-
-		table <- round(apply(x$se.zy, c(1,2), mean),digits)
-	 	colnames(table) <- resp.coef
-	 	rownames(table) <- trt.coef
-		cat("Standard error of zeta.y\n")
-		print(table)
-
-		table <- round(apply(x$zeta.z, c(1,2), mean),digits)
-	 	colnames(table) <- resp.coef
-	 	rownames(table) <- trt.coef
-		cat("Estimated zeta.z - coefficient of U in treatment model\n")
-		print(table)
-
-		table <- round(apply(x$se.zz, c(1,2), mean),digits)
-	 	colnames(table) <- resp.coef
-	 	rownames(table) <- trt.coef
- 		cat("Standard error of zeta.z\n")
-		print(table)
+	 	table <- round(apply(x$tau, c(1,2), mean),digits)
+	 	colnames(table) <- trt.coef
+	 	rownames(table) <- resp.coef
+	 	cat("Estimated treatment effects\n")
+	 	print(table)
+	 	
+	 	table <- round(apply(x$se.tau, c(1,2), mean),digits)
+	 	colnames(table) <- trt.coef
+	 	rownames(table) <- resp.coef
+	 	cat("Standard error of estimated treatment effects\n")
+	 	print(table)
+	 	
+	 	table <- round(apply(x$zeta.y, c(1,2), mean),digits)
+	 	colnames(table) <- trt.coef
+	 	rownames(table) <- resp.coef
+	 	cat("Estimated zeta.y - coefficient of U in response model\n")
+	 	print(table)
+	 	
+	 	table <- round(apply(x$se.zy, c(1,2), mean),digits)
+	 	colnames(table) <- trt.coef
+	 	rownames(table) <- resp.coef
+	 	cat("Standard error of zeta.y\n")
+	 	print(table)
+	 	
+	 	table <- round(apply(x$zeta.z, c(1,2), mean),digits)
+	 	colnames(table) <- trt.coef
+	 	rownames(table) <- resp.coef
+	 	cat("Estimated zeta.z - coefficient of U in treatment model\n")
+	 	print(table)
+	 	
+	 	table <- round(apply(x$se.zz, c(1,2), mean),digits)
+	 	colnames(table) <- trt.coef
+	 	rownames(table) <- resp.coef
+	 	cat("Standard error of zeta.z\n")
+	 	print(table)
 	}
 
 

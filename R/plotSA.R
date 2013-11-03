@@ -3,24 +3,26 @@
 #############
 
 plotSA = function(x, 
-			contour.levels = NULL,
-			zero.col = "red",
-			lty.zero = 1,
-			insig.col = "blue",
-			lty.insig = 1,
-			data.line = TRUE,
-			X.pch = NULL,
-			signif.level = 0.05,
-			labcex = 0.75,
-      limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
-			...) {
+                  contour.levels = NULL,
+                  zero.col = "red",
+                  lty.zero = 1,
+                  insig.col = "blue",
+                  lty.insig = 1,
+                  data.line = TRUE,
+                  X.pch = NULL,
+                  signif.level = 0.05,
+                  labcex = 0.75,
+                  limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
+                  txtlab = F,  #add text label to the plots of covariates.
+                  which.txtlab = NULL, #enter numeric vector to specify which label to show. e.g. c(1:3) shows first 3 covariates.
+                  ...) {
   #note in help: if contours are too rough, up nsim in sens fn
-
+  
   ##Add row/column for zeta = 0 if not included in grid
   null.tau=x$tau0
   null.se=x$se.tau0
-  Zcors = as.numeric(dimnames(x$alpha)[[2]]) #horizontal grids of U
-  Ycors = as.numeric(dimnames(x$delta)[[1]]) #vertical grids of U
+  Zcors = as.numeric(dimnames(x$zeta.z)[[2]]) #horizontal grids of U
+  Ycors = as.numeric(dimnames(x$zeta.y)[[1]]) #vertical grids of U
   addYdim = sum(Ycors==0)==0
   Zcors = sort(c(Zcors,0))	#Note don't need if stmt for Z because main code excludes zeta.z = 0
   if(addYdim==TRUE){
@@ -36,10 +38,13 @@ plotSA = function(x,
   if(is.null(X.pch)){
     X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
   }
-
+  
   nr = length(Zcors); nc = length(Ycors)
   taus.est = t(apply(x$tau, c(1,2), mean, na.rm = T))
-  se.est = t(apply(x$se.tau, c(1,2), mean))
+  K = dim(x$se.tau)[3]
+  W = apply(x$se.tau^2, c(1,2), mean, na.rm = T)
+  B = apply(x$tau, c(1,2), sd, na.rm = T)^2
+  se.est = t(sqrt(W+(1+1/K)*B))
   taus = matrix(null.tau,nr,nc)
   se.taus = matrix(null.se,nr,nc)
   row0 = c(1:length(Zcors))%*%((Zcors==0)*1) 
@@ -72,11 +77,11 @@ plotSA = function(x,
   if (any(Xpart[,2]<0)) {
     cat("Note: Predictors with negative coefficients for the response surface have been transformed through multiplication by -1 and are displayed as inverted triangles.", "\n")    
   }
-
+  
   par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
-  xlab = expression(zeta^z)
-  ylab = expression(zeta^y)
-
+  xlab = expression(paste("Coef. on U in model for treatment, ", zeta^z))
+  ylab = expression(paste("Coef. on U in model for response, ", zeta^y))
+  
   if (limit.Xplot) {
     #old codes
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
@@ -89,23 +94,38 @@ plotSA = function(x,
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(xplot.min,xplot.max),
          ylim = c(0,yplot.max), pch = X.pch, xlab = xlab, ylab = ylab,...)
   }
-
+  
+  #codes for txtlab
+  if (txtlab) {
+    if (is.null(which.txtlab)) { #show all text label
+      text(Xpart.plot2[,1], Xpart.plot2[,2], labels=x$varnames[-c(1,2)], cex=labcex, pos=1)
+    } else { #show selected label
+      which.txtlab2 = which.txtlab + 2
+      varnames2 = x$varnames
+      varnames2[as.numeric(paste(- which.txtlab2))] = ""
+      text(Xpart.plot2[,1], Xpart.plot2[,2], labels=varnames2[-c(1,2)], cex=labcex, pos=1)
+    }
+  }
+  
   abline(h = 0)
   abline(v = 0)
+  
+  legend(0.8*max(Zcors), 0, legend = round(x$tau0,2), cex = labcex,
+         yjust = 0.5, x.intersp = 0, y.intersp = 0,
+         bg = ifelse(par("bg")== "transparent", "white", par("bg")), 
+         box.lty = 0)
+  
+  box()
   
   contour(Zcors, Ycors, taus, levels = clevels, 
           add = T, labcex = labcex, ...)
   
-  contour(Zcors, Ycors, taus, levels = 0, 
+  contour(Zcors, Ycors, taus, levels = 0, lwd = 2,
           add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
   
   contour(Zcors, Ycors, taus/se.taus, labels = "N.S.",
-          levels = -sign(x$tau0)*qnorm(signif.level/2), add = T, col = insig.col,
-          lty = lty.insig, labcex = labcex,...)
-  
-  legend(0.8*max(Zcors), 0, legend = round(x$tau0,2), cex = labcex,
-         yjust = 0.5, x.intersp = 0,
-         bg = ifelse(par("bg")== "transparent", "white", par("bg")), box.lty = 0)
+          levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = insig.col,
+          lty = lty.insig, labcex = labcex, lwd = 2,...)
   
   if (all(sign(Xpart[,1])!=sign(x$tau0))){
     warning("Cannot add data line because XXXXX.")
@@ -133,7 +153,7 @@ plotSA = function(x,
                        -(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
                      nrow = 2, byrow = T))
       contour(Zcors, Ycors, taus, levels = round(clevel,2),
-              add = T, col = "grey",labcex = labcex,...)
+              add = T, col = "grey",labcex = labcex, lwd = 2,...)
     }else{
       if(data.line)
         warning("Cannot add data line because there are no non-treatment covariates.")
