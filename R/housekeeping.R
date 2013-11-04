@@ -7,7 +7,7 @@
 ###
 
 is.binary <- function(x) {
-  return(identical(as.numeric(unique(x), c(1,0))) + identical(as.numeric(unique(x), c(0,1))) ==1)
+  return(identical(as.numeric(unique(x)), c(1,0)) + identical(as.numeric(unique(x)), c(0,1)) ==1)
 }
 
 #old code issues following warnings, so updated.
