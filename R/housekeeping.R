@@ -7,16 +7,8 @@
 ###
 
 is.binary <- function(x) {
-  return(identical(unique(x), c(1,0)) + identical(unique(x), c(0,1)) ==1)
+  return(identical(as.numeric(unique(x), c(1,0))) + identical(as.numeric(unique(x), c(0,1))) ==1)
 }
-
-#old code issues following warnings, so updated.
-#2: In unique(x) == c(1, 0) :
-#longer object length is not a multiple of shorter object length
-#
-#is.binary <- function(x) {
-#  return(sum(unique(x) == c(1,0)) + sum(unique(x) == c(0,1)) ==2)
-#}
 
 ###
 #Parses out response, treatment and covariates from formula
