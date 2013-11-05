@@ -272,6 +272,7 @@ GLM.sens <- function(formula = Y~Z+X,     		#formula: assume treatment is 1st te
         }        
       }else{ #code for multicore below. For debug change %dopar% to %do%.
         fit.sens <- foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
+		require(causalSA)
           fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
         }
         sens.coef[i,j,] <- unlist(fit.sens[,1])
