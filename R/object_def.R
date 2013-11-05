@@ -4,36 +4,42 @@
 #Default to dimensions labeled with target sensitivity parameters
 #commented lines will relabel with average realized s.p.
 ############
-
 summary.sensitivity <- function(object, digits = 3, signif.level = 0.05, ...){
- 	Tau <- object$tau
- 	table <- round(apply(Tau, c(1,2), mean),digits	)
-	taus <- apply(object$tau, c(1,2), mean)
- 	resp.coef <- as.numeric(dimnames(taus)[[1]])
- 	trt.coef <- as.numeric(dimnames(taus)[[2]])
- 
-	zeroCoords = contourLines(resp.coef, trt.coef, taus, levels = 0)
-	noSigCoords = contourLines(resp.coef, trt.coef, taus/apply(object$se.tau, c(1,2), mean), levels = -sign(object$tau0)*qnorm(signif.level/2))
-	
-	zeroCors = round(cbind(zeroCoords[[1]]$y, zeroCoords[[1]]$x),digits)
-	noSigCors = round(cbind(noSigCoords[[1]]$y, noSigCoords[[1]]$x),digits)
-
-	colnames(zeroCors) <- colnames(noSigCors) <- c("Y", "Z")
-	rownames(zeroCors) <- rep("", dim(zeroCors)[1])
-	rownames(noSigCors) <- rep("", dim(noSigCors)[1])
-	cat("Coefficients on U where tau = 0:\n")
-	print(zeroCors)
-	cat("\n\n")
-
-	cat("Coefficients on U where significance level", signif.level, "is lost:\n")
-	print(noSigCors)
-	cat("\n\n")
-
-	colnames(table) <- trt.coef
- 	rownames(table) <- resp.coef
-	cat("Estimated treatment effects\n")
-	print(table)
- }
+  Tau <- object$tau
+  table <- round(apply(Tau, c(1,2), mean),digits  )
+  taus <- apply(object$tau, c(1,2), mean)
+  resp.coef <- as.numeric(dimnames(taus)[[1]])
+  trt.coef <- as.numeric(dimnames(taus)[[2]])
+  
+  zeroCoords = contourLines(resp.coef, trt.coef, taus, levels = 0)
+  if(is.null(names(zeroCoords))){
+    cat("Coefficients on U where tau = 0 could not be calculated.\n\n")
+  } else {    
+    zeroCors = round(cbind(zeroCoords[[1]]$y, zeroCoords[[1]]$x),digits)
+    colnames(zeroCors) <- c("Y", "Z")
+    rownames(zeroCors) <- rep("", dim(zeroCors)[1])
+    cat("Coefficients on U where tau = 0:\n")
+    print(zeroCors)
+    cat("\n\n")
+  } 
+  
+  noSigCoords = contourLines(resp.coef, trt.coef, taus/apply(object$se.tau, c(1,2), mean), levels = -sign(object$tau0)*qnorm(signif.level/2))
+  if(is.null(names(noSigCoords))){
+    cat("Coefficients on U where significance level", signif.level, "is lost could not be calculated.\n\n")
+  } else {
+    noSigCors = round(cbind(noSigCoords[[1]]$y, noSigCoords[[1]]$x),digits)
+    colnames(noSigCors) <- c("Y", "Z")
+    rownames(noSigCors) <- rep("", dim(noSigCors)[1])
+    cat("Coefficients on U where significance level", signif.level, "is lost:\n")
+    print(noSigCors)
+    cat("\n\n")
+  }
+  
+  colnames(table) <- trt.coef
+  rownames(table) <- resp.coef
+  cat("Estimated treatment effects\n")
+  print(table)
+}
 
 
 ##############
@@ -51,7 +57,11 @@ print.sensitivity = function(x, digits=3 ){
   cat("Estimated treatment effects\n")
   print(table)
   
-  table <- round(apply(x$se.tau, c(1,2), mean),digits)
+  K = dim(x$se.tau)[3]
+  W = apply(x$se.tau^2, c(1,2), mean)
+  B = apply(x$tau, c(1,2), sd)^2
+  table <- round(sqrt(W+(1+1/K)*B),digits)
+  #table <- round(apply(x$se.tau, c(1,2), mean),digits)
   colnames(table) <- trt.coef
   rownames(table) <- resp.coef
   cat("Standard error of estimated treatment effects\n")
@@ -63,7 +73,11 @@ print.sensitivity = function(x, digits=3 ){
   cat("Estimated zeta.y - coefficient of U in response model\n")
   print(table)
   
-  table <- round(apply(x$se.zy, c(1,2), mean),digits)
+  K = dim(x$se.zy)[3]
+  W = apply(x$se.zy^2, c(1,2), mean)
+  B = apply(x$zeta.y, c(1,2), sd)^2
+  table <- round(sqrt(W+(1+1/K)*B),digits)
+  #table <- round(apply(x$se.zy, c(1,2), mean),digits)
   colnames(table) <- trt.coef
   rownames(table) <- resp.coef
   cat("Standard error of zeta.y\n")
@@ -75,7 +89,11 @@ print.sensitivity = function(x, digits=3 ){
   cat("Estimated zeta.z - coefficient of U in treatment model\n")
   print(table)
   
-  table <- round(apply(x$se.zz, c(1,2), mean),digits)
+  K = dim(x$se.zz)[3]
+  W = apply(x$se.zz^2, c(1,2), mean)
+  B = apply(x$zeta.z, c(1,2), sd)^2
+  table <- round(sqrt(W+(1+1/K)*B),digits)
+  #table <- round(apply(x$se.zz, c(1,2), mean),digits)
   colnames(table) <- trt.coef
   rownames(table) <- resp.coef
   cat("Standard error of zeta.z\n")
@@ -87,23 +105,28 @@ print.sensitivity = function(x, digits=3 ){
 #show.sensitivity
 #displays means of all slots in object with no processing
 #############
+if(F){
 show.sensitivity = function(object){
-	 	resp.coef <- as.numeric(dimnames(object$tau)[[1]])
-	 	trt.coef <- as.numeric(dimnames(object$tau)[[2]])
-
-		table <- apply(object$tau, c(1,2), mean)
-	 	colnames(table) <- resp.coef
-	 	rownames(table) <- trt.coef
- 		cat("Estimated treatment effects\n")
-		print(table)
-
-		table <- apply(object$se.tau, c(1,2), mean)
-	 	colnames(table) <- resp.coef
-	 	rownames(table) <- trt.coef
- 		cat("Standard error of estimated treatment effects\n")
-		print(table)
-
-	}
+  sp.coef <- as.numeric(dimnames(object$tau)[[1]])
+  trt.coef <- as.numeric(dimnames(object$tau)[[2]])
+  
+  table <- apply(object$tau, c(1,2), mean)
+  colnames(table) <- resp.coef
+  rownames(table) <- trt.coef
+  cat("Estimated treatment effects\n")
+  print(table)
+  
+  K = dim(object$se.tau)[3]
+  W = apply(object$se.tau^2, c(1,2), mean)
+  B = apply(object$tau, c(1,2), sd)^2
+  table <- sqrt(W+(1+1/K)*B)
+  #table <- apply(object$se.tau, c(1,2), mean)
+  colnames(table) <- resp.coef
+  rownames(table) <- trt.coef
+  cat("Standard error of estimated treatment effects\n")
+  print(table)
+}
+}
 
 
 #############
@@ -114,13 +137,13 @@ show.sensitivity = function(object){
 #setMethod("plot", c("sensitivity", "missing"),
 #	definition = function(x,y,...){
 plot.sensitivity = function(x,y,...){
-		if(x$model.type == "BART.cont") {
-		  plotSA.cont(x,...)
-		}	else {
-#undebug(plotSA)
-		  plotSA(x,...)
-#undebug(plotSA)
-		}
-
-	}
+  if(x$model.type == "BART.cont") {
+    plotSA.cont(x,...)
+  }	else {
+    #debug(plotSA)
+    plotSA(x,...)
+    #undebug(plotSA)
+  }
+  
+}
 #)
