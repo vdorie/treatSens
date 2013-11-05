@@ -132,8 +132,8 @@ plotSA = function(x,
     warning("Cannot add data line because XXXXX.")
   }else{
     if(data.line & length(Xpart)>1){
-      proj.pts = apply(Xpart, 1, mean)
-      max.pt = Xpart[proj.pts == max(proj.pts[sign(Xpart[,1])==sign(x$tau0)]),]
+      proj.pts = apply(Xpart.plot, 1, mean)
+      max.pt = Xpart.plot[proj.pts == max(proj.pts[sign(Xpart.plot[,1])==sign(x$tau0)]),]
       zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
       if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ 
         zpts = c(zcor-1, zcor)
