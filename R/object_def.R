@@ -12,7 +12,7 @@ summary.sensitivity <- function(object, digits = 3, signif.level = 0.05, ...){
   trt.coef <- as.numeric(dimnames(taus)[[2]])
   
   zeroCoords = contourLines(resp.coef, trt.coef, taus, levels = 0)
-  if(is.null(names(zeroCoords))){
+  if(class(unlist(zeroCoords))=="NULL") {
     cat("Coefficients on U where tau = 0 could not be calculated.\n\n")
   } else {    
     zeroCors = round(cbind(zeroCoords[[1]]$y, zeroCoords[[1]]$x),digits)
@@ -24,7 +24,7 @@ summary.sensitivity <- function(object, digits = 3, signif.level = 0.05, ...){
   } 
   
   noSigCoords = contourLines(resp.coef, trt.coef, taus/apply(object$se.tau, c(1,2), mean), levels = -sign(object$tau0)*qnorm(signif.level/2))
-  if(is.null(names(noSigCoords))){
+  if(class(unlist(noSigCoords))=="NULL") {
     cat("Coefficients on U where significance level", signif.level, "is lost could not be calculated.\n\n")
   } else {
     noSigCors = round(cbind(noSigCoords[[1]]$y, noSigCoords[[1]]$x),digits)
@@ -106,26 +106,26 @@ print.sensitivity = function(x, digits=3 ){
 #displays means of all slots in object with no processing
 #############
 if(F){
-show.sensitivity = function(object){
-  sp.coef <- as.numeric(dimnames(object$tau)[[1]])
-  trt.coef <- as.numeric(dimnames(object$tau)[[2]])
-  
-  table <- apply(object$tau, c(1,2), mean)
-  colnames(table) <- resp.coef
-  rownames(table) <- trt.coef
-  cat("Estimated treatment effects\n")
-  print(table)
-  
-  K = dim(object$se.tau)[3]
-  W = apply(object$se.tau^2, c(1,2), mean)
-  B = apply(object$tau, c(1,2), sd)^2
-  table <- sqrt(W+(1+1/K)*B)
-  #table <- apply(object$se.tau, c(1,2), mean)
-  colnames(table) <- resp.coef
-  rownames(table) <- trt.coef
-  cat("Standard error of estimated treatment effects\n")
-  print(table)
-}
+  show.sensitivity = function(object){
+    sp.coef <- as.numeric(dimnames(object$tau)[[1]])
+    trt.coef <- as.numeric(dimnames(object$tau)[[2]])
+    
+    table <- apply(object$tau, c(1,2), mean)
+    colnames(table) <- resp.coef
+    rownames(table) <- trt.coef
+    cat("Estimated treatment effects\n")
+    print(table)
+    
+    K = dim(object$se.tau)[3]
+    W = apply(object$se.tau^2, c(1,2), mean)
+    B = apply(object$tau, c(1,2), sd)^2
+    table <- sqrt(W+(1+1/K)*B)
+    #table <- apply(object$se.tau, c(1,2), mean)
+    colnames(table) <- resp.coef
+    rownames(table) <- trt.coef
+    cat("Standard error of estimated treatment effects\n")
+    print(table)
+  }
 }
 
 
@@ -135,7 +135,7 @@ show.sensitivity = function(object){
 #############
 
 #setMethod("plot", c("sensitivity", "missing"),
-#	definition = function(x,y,...){
+#  definition = function(x,y,...){
 plot.sensitivity = function(x,y,...){
   if(x$model.type == "BART.cont") {
     plotSA.cont(x,...)

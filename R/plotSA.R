@@ -3,21 +3,21 @@
 #############
 
 plotSA = function(x, 
-			contour.levels = NULL,
-			zero.col = "red",
-			lty.zero = 1,
-			insig.col = "blue",
-			lty.insig = 1,
-			data.line = TRUE,
-			X.pch = NULL,
-			signif.level = 0.05,
-			labcex = 0.75,
-      limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
-      txtlab = F,  #add text label to the plots of covariates.
-      which.txtlab = NULL, #enter numeric vector to specify which label to show. e.g. c(1:3) shows first 3 covariates.
-			...) {
+                  contour.levels = NULL,
+                  zero.col = "red",
+                  lty.zero = 1,
+                  insig.col = "blue",
+                  lty.insig = 1,
+                  data.line = TRUE,
+                  X.pch = NULL,
+                  signif.level = 0.05,
+                  labcex = 0.75,
+                  limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
+                  txtlab = F,  #add text label to the plots of covariates.
+                  which.txtlab = NULL, #enter numeric vector to specify which label to show. e.g. c(1:3) shows first 3 covariates.
+                  ...) {
   #note in help: if contours are too rough, up nsim in sens fn
-
+  
   ##Add row/column for zeta = 0 if not included in grid
   null.tau=x$tau0
   null.se=x$se.tau0
@@ -38,7 +38,7 @@ plotSA = function(x,
   if(is.null(X.pch)){
     X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
   }
-
+  
   nr = length(Zcors); nc = length(Ycors)
   taus.est = t(apply(x$tau, c(1,2), mean, na.rm = T))
   K = dim(x$se.tau)[3]
@@ -77,11 +77,11 @@ plotSA = function(x,
   if (any(Xpart[,2]<0)) {
     cat("Note: Predictors with negative coefficients for the response surface have been transformed through multiplication by -1 and are displayed as inverted triangles.", "\n")    
   }
-
+  
   par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
   xlab = expression(paste("Coef. on U in model for treatment, ", zeta^z))
   ylab = expression(paste("Coef. on U in model for response, ", zeta^y))
-
+  
   if (limit.Xplot) {
     #old codes
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
@@ -106,7 +106,7 @@ plotSA = function(x,
       text(Xpart.plot2[,1], Xpart.plot2[,2], labels=varnames2[-c(1,2)], cex=labcex, pos=1)
     }
   }
-
+  
   abline(h = 0)
   abline(v = 0)
   
@@ -127,7 +127,7 @@ plotSA = function(x,
           levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = insig.col,
           lty = lty.insig, labcex = labcex, lwd = 2,...)
   
-    
+  
   if (all(sign(Xpart[,1])!=sign(x$tau0))){
     warning("Cannot add data line because XXXXX.")
   }else{
@@ -168,61 +168,61 @@ plotSA = function(x,
 #plotSA.cont
 ############
 plotSA.cont = function(x, coef.axes = F,
-			signif.level = 0.05,
-			labcex = 0.75,
-			nullCI = TRUE,
-			...) {
-require(lattice)
-
-	trt.ests <- sd.ests <- LCI <- UCI <- LCI0 <- UCI0 <- Z <- tau0 <- cell <- NULL
-	ct = 0
-	for(i in 1:dim(x$tau)[1]) {
-	for(j in 1:dim(x$tau)[2]) {
-		ct = ct+1
-		trt.temp = apply(x$tau[i,j,,], 2, mean)
-		sd.temp = apply(x$se.tau[i,j,,],2,mean)
-
-		trt.ests = c(trt.ests, trt.temp)
-		sd.ests = c(sd.ests, sd.temp)
-
-		LCI = c(LCI,trt.temp + qnorm(signif.level/2)*sd.temp)
-		UCI = c(UCI,trt.temp + qnorm(1-signif.level/2)*sd.temp)
-
-		tau0 = c(tau0, x$tau0)
-		LCI0 = c(LCI0, loess(x$tau0 + qnorm(signif.level/2)*x$se.tau0~x$Z)$fitted)
-		UCI0 = c(UCI0, loess(x$tau0 + qnorm(1-signif.level/2)*x$se.tau0~x$Z)$fitted)
-
-			
-		Z = c(Z, x$Z)
-
-		trt.cor = round(apply(x$trt.cor, 2, mean, na.rm = T),2)
-		resp.cor = round(apply(x$resp.cor, 1, mean, na.rm = T),2)
-		cell = c(cell, rep(paste("(", trt.cor[i], ",", resp.cor[j],")",sep = ""),length(x$Z)))
-	}} 
-
-	panel.bands <- function(x,y,upper,lower,subscripts,...,font,fontface) {
-		cat("length x", length(x), "\n")
-		cat("length lower", length(lower), "\n")
-		resort <- order(x)
-		upper <- upper[subscripts]
-		lower <- lower[subscripts]
-		panel.polygon(c(x[resort],rev(x[resort])), c(upper[resort], rev(lower[resort])),border = NA,...)
-	}
-
-	xyplot(tau0 + trt.ests + LCI + UCI ~ Z | cell, xlab = "Treatment", ylab = "Treatment effect", 
-		layout = dim(x$tau)[c(1,2)], ylim = c(.95*min(c(LCI, x$tau0)), 1.05*max(c(UCI, x$tau0))),
-		type = "smooth", col.line = c("white", "black", "blue", "blue"),
-		sub = "(partial r^2 treatment, partial r^2 response)", cex.sub = 0.5,
-		upper = UCI0, 
-		lower = LCI0,
-		col = "gray80",
-		panel = function(x,y,upper,lower,...){
-			resort <- order(x)
-			if(nullCI) {
-				panel.polygon(c(x[resort],rev(x[resort])), c(upper[resort], rev(lower[resort])),border = NA,...)
-			}
-			panel.xyplot(x, y,...)
-		}) 
+                       signif.level = 0.05,
+                       labcex = 0.75,
+                       nullCI = TRUE,
+                       ...) {
+  require(lattice)
+  
+  trt.ests <- sd.ests <- LCI <- UCI <- LCI0 <- UCI0 <- Z <- tau0 <- cell <- NULL
+  ct = 0
+  for(i in 1:dim(x$tau)[1]) {
+    for(j in 1:dim(x$tau)[2]) {
+      ct = ct+1
+      trt.temp = apply(x$tau[i,j,,], 2, mean)
+      sd.temp = apply(x$se.tau[i,j,,],2,mean)
+      
+      trt.ests = c(trt.ests, trt.temp)
+      sd.ests = c(sd.ests, sd.temp)
+      
+      LCI = c(LCI,trt.temp + qnorm(signif.level/2)*sd.temp)
+      UCI = c(UCI,trt.temp + qnorm(1-signif.level/2)*sd.temp)
+      
+      tau0 = c(tau0, x$tau0)
+      LCI0 = c(LCI0, loess(x$tau0 + qnorm(signif.level/2)*x$se.tau0~x$Z)$fitted)
+      UCI0 = c(UCI0, loess(x$tau0 + qnorm(1-signif.level/2)*x$se.tau0~x$Z)$fitted)
+      
+      
+      Z = c(Z, x$Z)
+      
+      trt.cor = round(apply(x$trt.cor, 2, mean, na.rm = T),2)
+      resp.cor = round(apply(x$resp.cor, 1, mean, na.rm = T),2)
+      cell = c(cell, rep(paste("(", trt.cor[i], ",", resp.cor[j],")",sep = ""),length(x$Z)))
+    }} 
+  
+  panel.bands <- function(x,y,upper,lower,subscripts,...,font,fontface) {
+    cat("length x", length(x), "\n")
+    cat("length lower", length(lower), "\n")
+    resort <- order(x)
+    upper <- upper[subscripts]
+    lower <- lower[subscripts]
+    panel.polygon(c(x[resort],rev(x[resort])), c(upper[resort], rev(lower[resort])),border = NA,...)
+  }
+  
+  xyplot(tau0 + trt.ests + LCI + UCI ~ Z | cell, xlab = "Treatment", ylab = "Treatment effect", 
+         layout = dim(x$tau)[c(1,2)], ylim = c(.95*min(c(LCI, x$tau0)), 1.05*max(c(UCI, x$tau0))),
+         type = "smooth", col.line = c("white", "black", "blue", "blue"),
+         sub = "(partial r^2 treatment, partial r^2 response)", cex.sub = 0.5,
+         upper = UCI0, 
+         lower = LCI0,
+         col = "gray80",
+         panel = function(x,y,upper,lower,...){
+           resort <- order(x)
+           if(nullCI) {
+             panel.polygon(c(x[resort],rev(x[resort])), c(upper[resort], rev(lower[resort])),border = NA,...)
+           }
+           panel.xyplot(x, y,...)
+         }) 
 }
 
 #############
@@ -230,28 +230,27 @@ require(lattice)
 #############
 
 plot.null = function(x, coef.axes = F,
-			signif.level = 0.05,
-			labcex = 0.75,
-			...) {
-	require(lattice)
-	require(latticeExtra)
-
-	tau0 = x$tau0
-	LCI = tau0 + qnorm(signif.level/2)*x$se.tau0
-	UCI = tau0 + qnorm(1-signif.level/2)*x$se.tau0
-
-	line.plots <- xyplot(tau0 + LCI + UCI ~ x$Z, xlab = "Treatment", ylab = "Treatment effect", 
-		#ylim = c(.95*min(c(LCI, x$tau0)), 1.05*max(c(UCI, x$tau0))),
-		type = "smooth", col = c("black", "blue", "blue"),
-		span = .75,
-		scales = list(tck = c(1,0))
-		) 
-	hist.plot <- histogram(~ x$Z, freq = F, type = "density", col = "white",
-			ylim = c(0, 4*max(hist(x$Z,plot=F)$density)))
-
-	line.plots + as.layer(hist.plot, y.same = FALSE, axes = NULL, opposite = FALSE)
+                     signif.level = 0.05,
+                     labcex = 0.75,
+                     ...) {
+  require(lattice)
+  require(latticeExtra)
+  
+  tau0 = x$tau0
+  LCI = tau0 + qnorm(signif.level/2)*x$se.tau0
+  UCI = tau0 + qnorm(1-signif.level/2)*x$se.tau0
+  
+  line.plots <- xyplot(tau0 + LCI + UCI ~ x$Z, xlab = "Treatment", ylab = "Treatment effect", 
+                       #ylim = c(.95*min(c(LCI, x$tau0)), 1.05*max(c(UCI, x$tau0))),
+                       type = "smooth", col = c("black", "blue", "blue"),
+                       span = .75,
+                       scales = list(tck = c(1,0))
+  ) 
+  hist.plot <- histogram(~ x$Z, freq = F, type = "density", col = "white",
+                         ylim = c(0, 4*max(hist(x$Z,plot=F)$density)))
+  
+  line.plots + as.layer(hist.plot, y.same = FALSE, axes = NULL, opposite = FALSE)
 }
-
 
 
 

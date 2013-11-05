@@ -26,26 +26,26 @@ is.binary <- function(x) {
 ###
 
 parse.formula <- function(form, data) {
-    	varnames <- all.vars(form)
-    	inp <- parse(text = paste("list(", paste(varnames, collapse = ","), 
-        ")"))
-	if(missing(data))
-		data = environment(form)
-	env = environment(form)
-    	variables <- eval(inp, data, env)
-
-	#extract variables from formula & data
-	trt <- variables[[2]]				#assume treatment is 1st var on RHS
-	resp <- variables[[1]]				#response from LHS
-	variables[[2]] <- NULL
-	variables[[1]] <- NULL
-	if(length(variables) > 0) {
-		covars <- matrix(unlist(variables), nrow = length(resp), byrow = F)			#variables on RHS, less the intercept, treatment(possibly multiple columns if factor)
-	}else{
-		covars = NULL
-	}
-	
-	return(list(resp = resp, trt = trt, covars = covars))
+  varnames <- all.vars(form)
+  inp <- parse(text = paste("list(", paste(varnames, collapse = ","), 
+                            ")"))
+  if(missing(data))
+    data = environment(form)
+  env = environment(form)
+  variables <- eval(inp, data, env)
+  
+  #extract variables from formula & data
+  trt <- variables[[2]]				#assume treatment is 1st var on RHS
+  resp <- variables[[1]]				#response from LHS
+  variables[[2]] <- NULL
+  variables[[1]] <- NULL
+  if(length(variables) > 0) {
+    covars <- matrix(unlist(variables), nrow = length(resp), byrow = F)			#variables on RHS, less the intercept, treatment(possibly multiple columns if factor)
+  }else{
+    covars = NULL
+  }
+  
+  return(list(resp = resp, trt = trt, covars = covars))
 }
 
 ###
@@ -55,13 +55,12 @@ parse.formula <- function(form, data) {
 ###
 
 std.nonbinary <- function(X) {
-	#returns standardized values of vector not consisting of only 0s and 1s
-	if(class(X) == "factor")
-		return(X)
-	if(length(unique(X))!=2)
-		X = (X - mean(X, na.rm = T))/sd(X, na.rm = T)
-	else if(!is.binary(X))
-		X = (X - mean(X, na.rm = T))/sd(X, na.rm = T)
-	return(X)
+  #returns standardized values of vector not consisting of only 0s and 1s
+  if(class(X) == "factor")
+    return(X)
+  if(length(unique(X))!=2)
+    X = (X - mean(X, na.rm = T))/sd(X, na.rm = T)
+  else if(!is.binary(X))
+    X = (X - mean(X, na.rm = T))/sd(X, na.rm = T)
+  return(X)
 }
-
