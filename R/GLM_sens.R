@@ -101,12 +101,13 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   #fit null model for treatment model & get residuals
   if(!is.null(X)) {
     null.trt <- glm(Z~X, family=trt.family)
+    Z.res <- Z-null.trt$fitted.values
+    v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
   }else{
     null.trt <- glm(Z~1, trt.family)
-  }
-  Z.res <- Z-null.trt$fitted.values
-  v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
-  
+    Z.res <- Z-null.trt$fitted.values
+    v_Z <- var(Z.res)*(n.obs-1)/(n.obs-1)
+  }  
   
   #####WEIGHTED ESTIMATES
   #create weights if the user specifies either ATE, ATT, or ATC.
@@ -157,8 +158,12 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   
   n = length(null.resp$coef)
   Y.res <- Y-null.resp$fitted.values
-  v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
-  Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
+  if(!is.null(X)) {
+    v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
+    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
+  }else{
+    v_Y <- var(Y.res)*(n.obs-1)/(n.obs-2)
+  }
   
   # change buffer = 0 when v_Y or v_Z is small.
   if ((v_Y-buffer<=0)||(v_Z-buffer<=0)||(v_Z/(theta*(1-theta))-buffer<=0)) {
@@ -178,12 +183,14 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
     extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), zetaz.min, sqrt(4*v_Y-buffer), zetaz.max), nrow = 2)
   }
   
-  #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
+  if(!is.null(X)) {
+    #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
   Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
   X.positive = t(t(X)*Xcoef.flg)
   null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
   null.trt.plot <- glm(Z~X.positive, family=trt.family)
   Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
+  }
   
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
@@ -277,7 +284,6 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
       
       if(is.null(core)){
         for(k in 1:nsim){
-          #debug(fit.GLM.sens)
           fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
           
           sens.coef[i,j,k] <- fit.sens$sens.coef
@@ -319,7 +325,7 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
     result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
                    zeta.z = zeta.z, zeta.y = zeta.y, 
                    se.zz = zz.se, se.zy = zy.se, 
-                   Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
+                   Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
                    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]),
                    varnames = all.vars(formula))
@@ -346,12 +352,16 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
   
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
-    U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, X))      
+    U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z))      
   }
   
   if(U.model == "binomial"){
     if(identical(trt.family$link,"probit")){
-      U <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset))
+      if(!is.null(X)) {
+        U <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset))
+      } else {
+        U <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset))
+      }
     }else{
       U <- try(contYZbinaryU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, theta))
     }
@@ -384,9 +394,9 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
     return(list(
       sens.coef = fit.glm$coef[2],
       sens.se = sens.se, 	#SE of Z coef
-      zeta.y = fit.glm$coef[3], 				#estimated coefficient of U in response model
+      zeta.y = ifelse(offset==1,zetaY,fit.glm$coef[3]),     		#estimated coefficient of U in response model
       zeta.z = fit.trt$coef[2],				    	#estimated coef of U in trt model
-      zy.se = summary(fit.glm)$coefficients[3,2], 	#SE of U coef in response model
+      zy.se = ifelse(offset==1,NA,summary(fit.glm)$coefficients[3,2]),   #SE of U coef in response model
       zz.se = summary(fit.trt)$coefficients[2,2], 	#SE of U coef in trt model
       resp.sigma2 = sum(fit.glm$resid^2)/fit.glm$df.residual,
       trt.sigma2 = sum(fit.trt$resid^2)/fit.trt$df.residual

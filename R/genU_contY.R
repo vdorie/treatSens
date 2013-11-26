@@ -5,7 +5,7 @@
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, X) {
+contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z) {
   
   n <- length(Y)
   
@@ -91,5 +91,55 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offse
   return(U)
 }
 
+###############
+#Generate binary U without X in RHS
+#Y: continuous response variable
+#Z: binary treatment variable
+#rho_y, rho_z: desired correlations between U and Y or Z
+###############
 
+contYbinaryZU.noX <- function(y, z, cy, cz, theta, iter.j=10, weights=NULL, offset) { 
+  n = length(y)
+  null.resp = lm(y~z, weights=weights)
+  null.trt = glm(z~1, family = binomial(link ="probit"))
+  v_Y = var(null.resp$resid)*(n-1)/(n-2)
+  v_Z = var(null.trt$resid)*(n-1)/(n-1)
+  mat.1.0 = matrix(rep(c(1,0),each=length(y)),length(y),2)
+  mat.1.1 = matrix(1,length(y),2)              
+  p = 0.5
+  
+  for(j in 1:iter.j) {
+    U = rbinom(n,1,p)
+    
+    if (!offset) { 
+      U.fit = lm(y~z+U, weights=weights)
+      y.coef = U.fit$coef
+      y.coef[length(y.coef)]  = cy
+      z.coef = glm(z~U, family=binomial(link="probit"))$coef
+      z.coef[length(z.coef)] = cz
+      v_Y = var(U.fit$resid)*(n-1)/(n-2)
+    } else {
+      U.fit = lm(y~z, offset=cy*U, weights=weights)
+      y.coef = c(U.fit$coef, cy)
+      z.coef = c(glm(z~1, family=binomial(link="probit"), offset=cz*U)$coef, cz)
+      v_Y = var(U.fit$resid)*(n-1)/(n-2)
+    }
+    
+    pyzu = dnorm(y-cbind(1,z,1)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
+      (1-pnorm(mat.1.1%*%matrix(z.coef, ncol = 1)))^(1-z)*
+      pnorm(mat.1.1%*%matrix(z.coef, ncol = 1))^z*theta
+    
+    pyz = dnorm(y-cbind(1,z,0)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
+      (1-pnorm(mat.1.0%*%matrix(z.coef, ncol = 1)))^(1-z)*
+      pnorm(mat.1.0%*%matrix(z.coef, ncol = 1))^z*(1-theta) +
+      dnorm(y-cbind(1,z,1)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
+      (1-pnorm(mat.1.1%*%matrix(z.coef, ncol = 1)))^(1-z)*
+      pnorm(mat.1.1%*%matrix(z.coef, ncol = 1))^z*theta
+    
+    p = pyzu/pyz
+    p[pyz==0] = 0
+  }
+  U = rbinom(n,1,p)
+  return(U)
+}
 
