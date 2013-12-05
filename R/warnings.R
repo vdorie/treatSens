@@ -1,10 +1,10 @@
 warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
                      resp.family,  #family for GLM of model for response
                      trt.family,  #family for GLM of model for treatment
-                     theta,     	#Pr(U=1) for binomial model
-                     grid.dim,  	#final dimensions of output grid
-                     standardize,	#Logical: should variables be standardized?
-                     nsim,			  #number of simulated Us to average over per cell in grid
+                     theta,       #Pr(U=1) for binomial model
+                     grid.dim,    #final dimensions of output grid
+                     standardize,  #Logical: should variables be standardized?
+                     nsim,        #number of simulated Us to average over per cell in grid
                      zero.loc,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
                      verbose,
                      buffer, 		  #restriction to range of coef on U to ensure stability around the edges
@@ -39,45 +39,115 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
   Z = postdata[,2]
   X = postdata[,-c(1:2)]
   
-  #check trt.family
-  if(identical(trt.family,gaussian)||identical(trt.family,"gaussian")||identical(trt.family,"normal")||identical(trt.family,"identity")||identical(trt.family,"continuous")) {
-    if(verbose) cat("Gaussian family with identity link function is assumed in the treatment model.\n")
-    trt.family = gaussian
-  }
   
-  if(is.binary(Z)){
-    if((identical(class(trt.family),"family") && identical(trt.family$link,"probit"))||identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"probit")) {
-      if(verbose) cat("Binomial family with probit link function is assumed in the treatment model.\n")
-      trt.family = binomial(link="probit")
+  #check trt.family
+  if(is.binary(Z)){ #binary treatment
+    
+    if(identical(class(trt.family),"family")) {
+      if(identical(trt.family$family,"binomial")) {
+        if(identical(trt.family$link,"probit")) {
+          if(verbose) cat("Binomial family with probit link function is assumed in the treatment model.\n")
+        }else if(identical(trt.family$link,"logit")) {
+          warning("GLM.sens is not compatible with logistic link. Binomial family with probit link function is assumed in the treatment model.")
+          trt.family = binomial(link="probit")
+        }else{
+          stop(paste("binomial(link=\"probit\") is the only available option for the binary treatment."))
+        }
+      }else{
+        stop(paste("binomial(link=\"probit\") is the only available option for the binary treatment."))
+      }
     }
     
-    if((identical(class(trt.family),"family") && identical(trt.family$link,"logit"))||identical(trt.family,binomial)||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
-      warning("GLM.sens is not compatible with logistic link. Binomial family with probit link function is assumed in the treatment model.")
-      trt.family = binomial(link="probit")
+    if(identical(class(trt.family),"function")) {
+      if(identical(trt.family,binomial)) {
+        if(verbose) cat("Binomial family with probit link function is assumed in the treatment model.\n")
+        trt.family = binomial(link="probit")        
+      }else{
+        stop(paste("binomial(link=\"probit\") is the only available option with a binary treatment."))
+      }
     }
     
-  }else{ #Z is continuous
-    if((identical(class(trt.family),"family") && identical(trt.family$link,"probit"))||identical(trt.family,"binomial")||identical(trt.family,"binary")||identical(trt.family,"probit")||identical(trt.family,binomial)||identical(trt.family,"logit")||identical(trt.family,"logistic")) {
-      stop(paste("binomial family can only be specified with a binary treatment."))
-    } 
+    if(identical(class(trt.family),"character")) {
+      if(identical(trt.family,"probit")||identical(trt.family,"binomial")||identical(trt.family,"binary")){
+        if(verbose) cat("Binomial family with probit link function is assumed in the treatment model.\n")
+        trt.family = binomial(link="probit")
+      }else if(identical(trt.family,"logit")||identical(trt.family,"logistic")){
+        warning("GLM.sens is not compatible with logistic link. Binomial family with probit link function is assumed in the treatment model.")
+        trt.family = binomial(link="probit")        
+      }else{
+        stop(paste("binomial(link=\"probit\") is the only available option with a binary treatment."))
+      }
+    }
+  }else{ #continuous treatment
+    
+    if(identical(class(trt.family),"family")) {
+      if(identical(trt.family$family,"gaussian")) {
+        if(identical(trt.family$link,"identity")) {
+          if(verbose) cat("Gaussian family with identity link function is assumed in the treatment model.\n")
+          trt.family = gaussian
+        }else{
+          stop(paste("Gaussian family with identity link function is the only available option with a continuous treatment."))
+        }
+      }else{
+        stop(paste("Gaussian family with identity link function is the only available option with a continuous treatment."))
+      }
+    }
+    
+    if(identical(class(trt.family),"function")) {
+      if(identical(trt.family,gaussian)) {
+        if(verbose) cat("Gaussian family with identity link function is assumed in the treatment model.\n")
+      }else{
+        stop(paste("Gaussian family is the only available option with a continuous treatment."))
+      }
+    }
+    
+    if(identical(class(trt.family),"character")) {
+      if(identical(trt.family,"gaussian")||identical(trt.family,"Gaussian")||identical(trt.family,"normal")||identical(trt.family,"identity")||identical(trt.family,"continuous")) {
+        if(verbose) cat("Gaussian family with identity link function is assumed in the treatment model.\n")
+        trt.family = gaussian     
+      }else{
+        stop(paste("Gaussian family is the only available option with a continuous treatment."))
+      }
+    }
   }
   
   
   #check resp.family
-  if(identical(class(resp.family),"function")) {
-    if(identical(resp.family,gaussian)) {
-      if(verbose) cat("Gaussian family with identity link function is assumed in the response model.\n")        
-    }else{
-      stop(paste("GLM.sens is not ready for the resp.family specified."))
+  if(is.binary(Y)){ #binary outcome
+    stop(paste("An outcome variable needs to be continuous."))
+  }else{ #continuous outcome
+    
+    if(identical(class(resp.family),"family")) {
+      if(identical(resp.family$family,"gaussian")) {
+        if(identical(resp.family$link,"identity")) {
+          if(verbose) cat("Gaussian family with identity link function is assumed in the response model.\n")
+          resp.family = gaussian
+        }else{
+          stop(paste("Gaussian family with identity link function is the only available option in the response model."))
+        }
+      }else{
+        stop(paste("Gaussian family with identity link function is the only available option in the response model."))
+      }
+    }
+    
+    if(identical(class(resp.family),"function")) {
+      if(identical(resp.family,gaussian)) {
+        if(verbose) cat("Gaussian family with identity link function is assumed in the response model.\n")        
+      }else{
+        stop(paste("Gaussian family with identity link function is the only available option in the response model."))
+      }
+    }
+    
+    if(identical(class(resp.family),"character")) {
+      if(identical(resp.family,"normal")||identical(resp.family,"continuous")||identical(resp.family,"gaussian")) {
+        if(verbose) cat("Gaussian family with identity link function is assumed in the response model.\n")        
+        resp.family = gaussian
+      }else{
+        stop(paste("Gaussian family with identity link function is the only available option in the response model."))
+      }
     }
   }
   
-  if(identical(class(resp.family),"character")) {
-    if(identical(resp.family,"normal")||identical(resp.family,"continuous")||identical(resp.family,"gaussian")) {
-      if(verbose) cat("Gaussian family with identity link function is assumed in the response model.\n")        
-      resp.family = gaussian
-    }
-  }  
   
   #check whether the dimentions of grid are at least 2.
   if(!is.null(grid.dim) && (length(grid.dim) != 2)) {

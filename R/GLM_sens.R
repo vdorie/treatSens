@@ -9,10 +9,10 @@ source("pweight.R")
 #Main function call
 ###############
 GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st term on rhs
-                     resp.family = gaussian,	#family for GLM of model for response
+                     resp.family = gaussian,  #family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
                      theta = 0.5, 		#Pr(U=1) for binomial model
-                     grid.dim = c(20,20),	#final dimensions of output grid
+                     grid.dim = c(20,20),  #1st dimension specifies zeta.z, 2nd dimension specifies zeta.y.
                      standardize = TRUE,	#Logical: should variables be standardized?
                      nsim = 20,			#number of simulated Us to average over per cell in grid
                      zero.loc = 1/3,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
@@ -29,6 +29,8 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
                      jitter = FALSE,    	#add jitter to grids near the axis.
                      trim.wt = 10     	#the maximum size of weight is set at "trim.wt"% of sample size. type NULL to turn off.
 ){
+  #this code let R issue warnings as they occur.
+  options(warn=1)
   
   #return error if only either zetay.range or zetaz.range is specified.
   if((is.null(zetay.range) & !is.null(zetaz.range))|(!is.null(zetay.range) & is.null(zetaz.range))){
@@ -47,7 +49,6 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   set.seed(seed)
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
-  #undebug(warnings)
   out.warnings <- warnings(formula, resp.family, trt.family,	theta, grid.dim, 
                            standardize,	nsim,	zero.loc,	verbose, buffer, zetay.range, zetaz.range, weights, data)
   
@@ -176,7 +177,6 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
     extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
   }
   if(U.model == "binomial" & is.binary(Z)){ 
-    
     lp.quant = quantile(null.trt$linear.predictors, 0.25)
     zetaz.min = max(-(2-lp.quant), -3) 
     zetaz.max = min((2-lp.quant), 3)   
@@ -185,11 +185,11 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   
   if(!is.null(X)) {
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
-  Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
-  X.positive = t(t(X)*Xcoef.flg)
-  null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
-  null.trt.plot <- glm(Z~X.positive, family=trt.family)
-  Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
+    Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
+    X.positive = t(t(X)*Xcoef.flg)
+    null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
+    null.trt.plot <- glm(Z~X.positive, family=trt.family)
+    Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   }
   
   #register control.fit
@@ -200,84 +200,83 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   if(!is.null(zetay.range) & !is.null(zetaz.range)){ #custom grid range.
     if(sign(zetaz.range[1])==sign(zetaz.range[2])|any(zetaz.range==0)){ #one quadrant.
       #define the vector of sens.parm for treatment
-      zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[2])
+      zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[1])
       #add jitter if zetaz = 0
-      zetaZ[zetaZ == 0] <- zetaz.range[2]/(grid.dim[2]*3) 
+      zetaZ[zetaZ == 0] <- zetaz.range[2]/(grid.dim[1]*3) 
     }else{ #two quadrants.
       if(jitter){
         #change z-dimension to even number
-        grid.dim[2]=ifelse(grid.dim[2]%%2==1,grid.dim[2]+1,grid.dim[2])
+        grid.dim[1]=ifelse(grid.dim[1]%%2==1,grid.dim[1]+1,grid.dim[1])
         #create temporary seq to find border.
-        zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[2])
+        zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[1])
         #number of cells left and right of vertical axis.
         dim.left = which.min(abs(zetaZ[which(zetaZ<0)]))
-        dim.right = grid.dim[2] - (dim.left + which.min(zetaZ[which(zetaZ>=0)])) + 1
+        dim.right = grid.dim[1] - (dim.left + which.min(zetaZ[which(zetaZ>=0)])) + 1
         #define the vector of sens.parm for treatment
         zetaZ <- c(seq(zetaz.range[1], zetaz.range[1]/(dim.left*3), length.out=dim.left),
                    seq(zetaz.range[2]/(dim.right*3), zetaz.range[2], length.out=dim.right))
       }else{
-        zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[2])
+        zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[1])
       }
     }
     
     if(sign(zetay.range[1])==sign(zetay.range[2])|any(zetay.range==0)){ #one quadrant.
       #define vector of sens.parm for treatment
-      zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[1])
+      zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[2])
       #add a tiny value to show horizontal axes.
       zetaY[zetaY==0] = zetaY[zetaY==0]+.00001
     }else{#two quadrants in vertical direction.
       if(jitter){
         #change y-dimension to even number
-        grid.dim[1]=ifelse(grid.dim[1]%%2==1,grid.dim[1]+1,grid.dim[1])
+        grid.dim[2]=ifelse(grid.dim[2]%%2==1,grid.dim[2]+1,grid.dim[2])
         #create temporary seq to find border.
-        zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[1])
+        zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[2])
         #number of cells below and above horizontal axis.
         dim.down = which.min(abs(zetaY[which(zetaY<0)]))
-        dim.up = grid.dim[1] - (dim.down + which.min(zetaY[which(zetaY>=0)])) + 1
+        dim.up = grid.dim[2] - (dim.down + which.min(zetaY[which(zetaY>=0)])) + 1
         #define the vector of sens.parm for response
         zetaY <- c(seq(zetay.range[1], zetay.range[1]/(dim.down*3), length.out=dim.down),
                    seq(zetay.range[2]/(dim.up*3), zetay.range[2], length.out=dim.up))        
       }else{
-        zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[1])
+        zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[2])
       }
     }
     
     #if 0 in sequences, shift it a bit 
-    zetaY[zetaY == 0] <- zetay.range[2]/(grid.dim[1]*3)
-    zetaZ[zetaZ == 0] <- zetaz.range[2]/(grid.dim[2]*3)
+    zetaY[zetaY == 0] <- zetay.range[2]/(grid.dim[2]*3)
+    zetaZ[zetaZ == 0] <- zetaz.range[2]/(grid.dim[1]*3)
   }else if(zero.loc == "full"){
     #change z-dimension to even number
-    grid.dim[2]=ifelse(grid.dim[2]%%2==1,grid.dim[2]+1,grid.dim[2])
+    grid.dim[1]=ifelse(grid.dim[1]%%2==1,grid.dim[1]+1,grid.dim[1])
     #number of cells left and right of vertical axis.
-    dim.left = dim.right = grid.dim[2]/2
+    dim.left = dim.right = grid.dim[1]/2
     #define the vectors of sens.parms
     zetaZ <- c(seq(extreme.coef[2,1]*.95, extreme.coef[2,1]*.95/(dim.left*3), length.out=dim.left),
                seq(extreme.coef[2,2]*.95/(dim.right*3), extreme.coef[2,2]*.95, length.out=dim.right))
-    zetaY <- seq(0.00001, extreme.coef[1,2]*.95, length.out = grid.dim[1])
+    zetaY <- seq(0.00001, extreme.coef[1,2]*.95, length.out = grid.dim[2])
   }else{
     #find ranges for final grid
     cat("Finding grid range...\n")
-    
     grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
                              Y.res, Z.res, v_Y, v_Z, theta, sgnTau0 = sign(null.resp$coef[2]), 
                              control.fit = control.fit)
     
-    zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
-    zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
+    zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[2])
+    zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[1])
     
     #if 0 in sequences, shift it a bit 
-    zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[1]*3)
-    zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[2]*3)
+    zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[2]*3)
+    zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[1]*3)
   }
   
-  sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[1], grid.dim[2], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
+  sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[2], grid.dim[1], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
   cat("Computing final grid...\n")
   
   #fill in grid
   cell = 0
-  for(i in grid.dim[1]:1) {
-    for(j in grid.dim[2]:1) {
+  for(i in grid.dim[2]:1) {
+    for(j in grid.dim[1]:1) {
       cell = cell +1
       zY = zetaY[i]
       zZ = zetaZ[j]
