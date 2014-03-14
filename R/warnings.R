@@ -24,22 +24,17 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
     stop(paste("Data is not a data.frame object"))
   } 
   
-  #extract variables from formula
-  form.vars <- parse.formula(formula, data)
-  
-  Y = form.vars$resp
-  Z = form.vars$trt
-  X = form.vars$covars 
-  
   #Code for listwise deletion
   postdata=na.omit(data)
   nobs.deleted = dim(data)[1] - dim(postdata)[1]
-  if ((verbose) & nobs.deleted>0) warning(nobs.deleted, " observations were deleted listwise.\n")    
-  Y = postdata[,1]
-  Z = postdata[,2]
-  X = postdata[,-c(1:2)]
+  if ((verbose) & nobs.deleted>0) warning(nobs.deleted, " observations were deleted listwise.\n") 
   
-  
+  #extract variables from formula
+  form.vars <- parse.formula(formula, data)
+  Y = form.vars$resp
+  Z = form.vars$trt
+  X = form.vars$covars 
+   
   #check trt.family
   if(is.binary(Z)){ #binary treatment
     
