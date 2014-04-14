@@ -10,6 +10,7 @@ plotSA = function(x,
                   lty.insig = 1,
                   data.line = TRUE,
                   X.pch = NULL,
+			  part.cors = FALSE,
                   signif.level = 0.05,
                   labcex = 0.75,
                   limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
@@ -21,17 +22,30 @@ plotSA = function(x,
   ##Add row/column for zeta = 0 if not included in grid
   null.tau=x$tau0
   null.se=x$se.tau0
-  Zcors = as.numeric(dimnames(x$zeta.z)[[2]]) #horizontal grids of U
-  Ycors = as.numeric(dimnames(x$zeta.y)[[1]]) #vertical grids of U
+  if(part.cors){
+	Ycors<- as.numeric(dimnames(x$tau)[[2]])/sqrt(x$var_ztilde)
+	Zcors <- as.numeric(dimnames(x$tau)[[1]])/sqrt(x$var_ytilde) *(1-trt.coef^2)
+	print.text <- "Partial correlations with U"
+  }else {
+  	Zcors = as.numeric(dimnames(x$zeta.z)[[2]]) #horizontal grids of U
+  	Ycors = as.numeric(dimnames(x$zeta.y)[[1]]) #vertical grids of U
+	print.text <- "Coefficients on U" 
+  }
+
   addYdim = sum(Ycors==0)==0
   Zcors = sort(c(Zcors,0))	#Note don't need if stmt for Z because main code excludes zeta.z = 0
   if(addYdim==TRUE){
     Ycors = c(0,Ycors)
   }
   
-  Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
-  Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
-  Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
+  if(part.cors){
+	Xpart = x$XpartCor[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] 
+     	Xpart.plot2 = cbind(Xpart[,1],Xpart[,2], ifelse(Xpart[,2]>=0,1,0)) 
+  }else{
+  	Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
+  	Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
+  	Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
+  }
   #note that due to correlation among Xs, some may not appear on plot
   #because observed partial cors don't map directly to coefs in this case
   #forcing inclusion can lead to difficult to read plot.  
@@ -79,9 +93,14 @@ plotSA = function(x,
   }
   
   par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
-  xlab = expression(paste("Coef. on U in model for treatment, ", zeta^z))
-  ylab = expression(paste("Coef. on U in model for response, ", zeta^y))
-  
+  if(part.cors){
+  	xlab = expression(paste("Partial cor. with U in model for treatment, ", rho^zu))
+  	ylab = expression(paste("Partial cor. with U in model for response, ", rho^yu))
+  }else{
+  	xlab = expression(paste("Coef. on U in model for treatment, ", zeta^z))
+  	ylab = expression(paste("Coef. on U in model for response, ", zeta^y))
+  }
+
   if (limit.Xplot) {
     #old codes
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 

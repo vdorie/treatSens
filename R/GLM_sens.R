@@ -4,6 +4,7 @@ source("grid_range.R")
 source("housekeeping.R")
 source("warnings.R")
 source("pweight.R")
+source("X_partials.R")
 
 ###############
 #Main function call
@@ -162,10 +163,12 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   if(!is.null(X)) {
     v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
     Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
+    Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
   }else{
     v_Y <- var(Y.res)*(n.obs-1)/(n.obs-2)
+    Xpartials <- NULL
   }
-  
+
   # change buffer = 0 when v_Y or v_Z is small.
   if ((v_Y-buffer<=0)||(v_Z-buffer<=0)||(v_Z/(theta*(1-theta))-buffer<=0)) {
     buffer = 0
@@ -318,7 +321,7 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
                    Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
-                   varnames = all.vars(formula))
+                   varnames = all.vars(formula), var_ytilde = v_Y, var_ztilde = v_Z)
     class(result) <- "sensitivity"
   }else{
     result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
@@ -327,7 +330,7 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
                    Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
                    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]),
-                   varnames = all.vars(formula))
+                   varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z, XpartCor = Xpartials)
     class(result) <- "sensitivity"
   }
   
