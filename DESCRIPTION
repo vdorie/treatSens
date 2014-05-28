@@ -1,0 +1,14 @@
+Package: cibart
+Version: 1.0
+Date: $Date$
+Title: Conditional Inference Using Bayesian Additive Regression Trees
+Author: Vincent Dorie <vjd4@nyu.edu>
+Maintainer: Vincent Dorie <vjd4@nyu.edu>
+Description: Performs causal inference (CI) tasks using  Bayesian additive regression trees (BART) by Hugh Chipman <hugh.chipman@gmail.com> and Robert McCulloch.
+NeedsCompilation: yes
+Depends:
+  R (>= 2.15-3),
+  cbart (>= 0.8)
+LinkingTo:
+  cbart
+License: GPL (>= 2)
