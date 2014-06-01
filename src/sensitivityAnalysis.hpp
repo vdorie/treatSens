@@ -32,8 +32,8 @@ namespace cibart {
                          EstimandType estimand,
                          ConfounderModelType confounderModel,
                          std::size_t numSimsPerCell,
-                         std::size_t numChains,
-                         std::size_t numBurnIn,
+                         std::size_t numInitialBurnIn,
+                         std::size_t numCellSwitchBurnIn,
                          std::size_t numTreeSamplesToThin,
                          std::size_t numThreads,
                          double* estimates,      // numSimsPerCell x numZetaY x numZetaZ

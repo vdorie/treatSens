@@ -9,6 +9,7 @@
 #include <R_ext/Rdynload.h>
 
 #include "sensitivityAnalysis.hpp"
+#include "guessNumCores.hpp"
 
 #include <bart/bartFit.hpp>
 #include <bart/control.hpp>
@@ -25,7 +26,7 @@ extern "C" {
                                      SEXP z_testExpr, SEXP x_testExpr,
                                      SEXP zetaY, SEXP zetaZ, SEXP theta,
                                      SEXP estimandExpr, SEXP confounderModelExpr,
-                                     SEXP fitControl, SEXP verboseExpr)
+                                     SEXP sensControl, SEXP verboseExpr)
   {
     int* dims;
     
@@ -105,25 +106,25 @@ extern "C" {
     if (confounderModel == cibart::NORMAL)
       error("BART sensitivity analysis only implemented for binary confounders.");
     
-    SEXP fitParameterExpr = getListElement(fitControl, "nsim");
-    if (fitParameterExpr == R_NilValue) error("nsim must be specified in iteration control.");
-    size_t numSimsPerCell = INTEGER(fitParameterExpr)[0];
-
-    fitParameterExpr = getListElement(fitControl, "nchain");
-    if (fitParameterExpr == R_NilValue) error("nchain must be specified in iteration control.");
-    size_t numChains = INTEGER(fitParameterExpr)[0];
+    SEXP sensParameterExpr = getListElement(sensControl, "n.sim");
+    if (sensParameterExpr == R_NilValue) error("n.sim must be specified in iteration control.");
+    size_t numSimsPerCell = INTEGER(sensParameterExpr)[0];
     
-    fitParameterExpr = getListElement(fitControl, "nburn");
-    if (fitParameterExpr == R_NilValue) error("nburn must be specified in iteration control.");
-    size_t numBurnIn = INTEGER(fitParameterExpr)[0];
+    sensParameterExpr = getListElement(sensControl, "n.burn.init");
+    if (sensParameterExpr == R_NilValue) error("n.burn.init must be specified in iteration control.");
+    size_t numInitialBurnIn = INTEGER(sensParameterExpr)[0];
     
-    fitParameterExpr = getListElement(fitControl, "nthin");
-    if (fitParameterExpr == R_NilValue) error("nthin must be specified in iteration control.");
-    size_t numTreeSamplesToThin = INTEGER(fitParameterExpr)[0];
+    sensParameterExpr = getListElement(sensControl, "n.burn.cell");
+    if (sensParameterExpr == R_NilValue) error("n.burn.cell must be specified in iteration control.");
+    size_t numCellSwitchBurnIn = INTEGER(sensParameterExpr)[0];
     
-    fitParameterExpr = getListElement(fitControl, "nthread");
-    if (fitParameterExpr == R_NilValue) error("nthread must be specified in iteration control.");
-    size_t numThreads = INTEGER(fitParameterExpr)[0];
+    sensParameterExpr = getListElement(sensControl, "n.thin");
+    if (sensParameterExpr == R_NilValue) error("n.thin must be specified in iteration control.");
+    size_t numTreeSamplesToThin = INTEGER(sensParameterExpr)[0];
+    
+    sensParameterExpr = getListElement(sensControl, "n.thread");
+    if (sensParameterExpr == R_NilValue) error("n.thread must be specified in iteration control.");
+    size_t numThreads = INTEGER(sensParameterExpr)[0];
     
     if (!isLogical(verboseExpr)) error("verbose must be of type logical.");
     if (length(verboseExpr) == 0) error("verbose must be of length at least 1.");
@@ -161,20 +162,20 @@ extern "C" {
     GetRNGstate();
     
     cibart::fitSensitivityAnalysis(REAL(y), REAL(z), x,
-                                 numObservations, numPredictors,
-                                 z_test, x_test,
-                                 numTestObservations,
-                                 REAL(zetaY), REAL(zetaZ), numZetaY, numZetaZ,
-                                 REAL(theta)[0],
-                                 estimand, confounderModel,
-                                 numSimsPerCell,
-                                 numChains,
-                                 numBurnIn,
-                                 numTreeSamplesToThin,
-                                 numThreads,
-                                 REAL(fittedCoefficients),
-                                 REAL(standardErrors),
-                                 verbose);
+                                   numObservations, numPredictors,
+                                   z_test, x_test,
+                                   numTestObservations,
+                                   REAL(zetaY), REAL(zetaZ), numZetaY, numZetaZ,
+                                   REAL(theta)[0],
+                                   estimand, confounderModel,
+                                   numSimsPerCell,
+                                   numInitialBurnIn,
+                                   numCellSwitchBurnIn,
+                                   numTreeSamplesToThin,
+                                   numThreads,
+                                   REAL(fittedCoefficients),
+                                   REAL(standardErrors),
+                                   verbose);
     
     PutRNGstate();
     
@@ -196,10 +197,27 @@ extern "C" {
     return elmt;
   }
   
+  SEXP cibart_guessNumCores()
+  {
+    uint32_t numPhyiscalProcessors, numLogicalProcessors;
+    cibart::guessNumCores(&numPhyiscalProcessors, &numLogicalProcessors);
+    
+    SEXP resultExpr = allocVector(INTSXP, 2);
+    PROTECT(resultExpr);
+    int* result = INTEGER(resultExpr);
+    
+    result[0] = numPhyiscalProcessors == 0 ? NA_INTEGER : numPhyiscalProcessors;
+    result[1] = numLogicalProcessors  == 0 ? NA_INTEGER : numLogicalProcessors;
+    UNPROTECT(1);
+    
+    return resultExpr;
+  }
+  
 #define CALLDEF(name, n)  {#name, (DL_FUNC) &name, n}
   
   static R_CallMethodDef callMethods[] = {
     CALLDEF(cibart_fitSensitivityAnalysis, 12),
+    CALLDEF(cibart_guessNumCores, 0),
     {NULL, NULL, 0}
   };
   

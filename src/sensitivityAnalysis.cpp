@@ -27,8 +27,8 @@ namespace cibart {
     ConfounderModelType confounderModel;
     
     size_t numSimsPerCell;
-    size_t numChains;
-    size_t numBurnIn;
+    size_t numInitialBurnIn;
+    size_t numCellSwitchBurnIn;
     size_t numTreeSamplesToThin;
     size_t numThreads;
     
@@ -94,7 +94,7 @@ namespace cibart {
                                      const double* yMinusZetaUHat, double sigma);
   void estimateTreatmentEffect(const Control& control, const Data& data,
                                const double* trainingSamples, const double* testSamples, double* estimates);
-  void retrieveBARTFunctions(Control& control);
+  void lookupBARTFunctions(Control& control);
   
   void
   fitSensitivityAnalysis(const double* y,     // numObs x 1
@@ -113,16 +113,17 @@ namespace cibart {
                          EstimandType estimand,
                          ConfounderModelType confounderModel,
                          size_t numSimsPerCell,
-                         size_t numChains,
-                         size_t numBurnIn,
+                         size_t numInitialBurnIn,
+                         size_t numCellSwitchBurnIn,
                          size_t numTreeSamplesToThin,
                          size_t numThreads,
                          double* estimates,      // numZetaY x numZetaZ x numSimsPerCell
                          double* standardErrors, // numZetaY x numZetaZ
                          bool verbose)
   {
-    Control control = { estimand, confounderModel, numSimsPerCell, numChains, numBurnIn, numTreeSamplesToThin, numThreads, theta, verbose };
-    retrieveBARTFunctions(control);
+    Control control = { estimand, confounderModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
+                        numTreeSamplesToThin, numThreads, theta, verbose };
+    lookupBARTFunctions(control);
     
     Data data(y, z, x, numObservations, numPredictors,
               z_test, x_test, numTestObservations);
@@ -130,6 +131,7 @@ namespace cibart {
     Scratch scratch(control, data);
     
     size_t estimateOffset = 0;
+    size_t cellCount = 1;
     double zetaY, zetaZ;
     for (size_t i = 0; i < numZetaY; ++i) {
       zetaY = zetaYs[i];
@@ -143,7 +145,7 @@ namespace cibart {
         
         standardErrors[i + numZetaY * j] = std::sqrt(ext_computeVariance(estimates + estimateOffset, numSimsPerCell, NULL));
         
-        if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", i + numZetaY * j + 1, numZetaY * numZetaZ);
+        if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", cellCount++, numZetaY * numZetaZ);
       }
     }
   }
@@ -195,7 +197,7 @@ namespace cibart {
     bart::Control bartControl; // use defaults
     bartControl.verbose = false; // otherwise, waaaay too much
     bartControl.numSamples = control.numSimsPerCell;
-    bartControl.numBurnIn = control.numBurnIn;
+    bartControl.numBurnIn = control.numInitialBurnIn;
     bartControl.numThreads = control.numThreads;
     bartControl.treeThinningRate = control.numTreeSamplesToThin;
     
@@ -422,7 +424,7 @@ namespace cibart {
     delete [] temp_numObs_1; temp_numObs_1 = NULL;
   }
   
-  void retrieveBARTFunctions(Control& control)
+  void lookupBARTFunctions(Control& control)
   {
     control.initializeFit = (void (*)(bart::BARTFit*, bart::Control*, bart::Model*, bart::Data*)) R_GetCCallable("cbart", "bart_initializeFit");
     control.invalidateFit = (void (*)(bart::BARTFit*)) R_GetCCallable("cbart", "bart_invalidateFit");

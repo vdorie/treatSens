@@ -41,6 +41,7 @@ AC_SUBST(PTHREAD_LDFLAGS)
 AC_SUBST(PTHREAD_LIBS)
 
 # Checks for header files.
+AC_CHECK_HEADERS([sys/sysctl.h])
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([cstdint])
 AC_LANG_POP(C++)
