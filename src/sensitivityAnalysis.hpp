@@ -41,4 +41,4 @@ namespace cibart {
                          bool verbose);
 } // namespace cibart
 
-#endif // BSNS_SENSITIVITY_ANALYSIS_HPP
+#endif // CIBART_SENSITIVITY_ANALYSIS_HPP

@@ -4,6 +4,14 @@
 #include <cstring>
 #include <cmath>
 #include <bart/cstdint>
+#if !defined(HAVE_SYS_TIME_H) && defined(HAVE_GETTIMEOFDAY)
+#undef HAVE_GETTIMEOFDAY
+#endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h> // gettimeofday
+#else
+#include <time.h>
+#endif
 
 #include <bart/bartFit.hpp>
 #include <bart/results.hpp>
@@ -21,7 +29,11 @@
 
 #define DEFAULT_BART_MAX_NUM_CUTS 100u
 
-namespace cibart {
+using std::size_t;
+using std::uint32_t;
+
+namespace {
+  using namespace cibart;
   struct Control {
     EstimandType estimand;
     ConfounderModelType confounderModel;
@@ -39,6 +51,7 @@ namespace cibart {
     void (*initializeFit)(bart::BARTFit* fit, bart::Control* control, bart::Model* model, bart::Data* data);
     void (*invalidateFit)(bart::BARTFit* fit);
     bart::Results* (*runSampler)(bart::BARTFit* fit);
+    bart::Results* (*runSamplerForIterations)(bart::BARTFit* fit, size_t numBurnIn, size_t numSamples);
     void (*setResponse)(bart::BARTFit* fit, const double* newResponse);
     void (*initializeCGMPrior)(bart::CGMPrior* prior, const bart::Control* control);
     void (*invalidateCGMPrior)(bart::CGMPrior* prior);
@@ -85,8 +98,8 @@ namespace cibart {
   };
   
   // forward declarations
-  void getEstimatesForGridPoint(const Control& control, const Data& data, Scratch& scratch, double zetaY, double zetaZ,
-                                double* estimates);
+  //void getEstimatesForGridPoint(const Control& control, const Data& data, Scratch& scratch, double zetaY, double zetaZ,
+  //                              double* estimates);
   void sampleConfounders(const Data& data, Scratch& scratch);
   void subtractConfounderFromResponse(const Data& data, Scratch& scratch, double zetaY);
   double estimateSigma(const Data& data, Scratch& scratch);
@@ -95,7 +108,36 @@ namespace cibart {
   void estimateTreatmentEffect(const Control& control, const Data& data,
                                const double* trainingSamples, const double* testSamples, double* estimates);
   void lookupBARTFunctions(Control& control);
+  void sensitivityAnalysisTask(void* v_data);
   
+#ifdef HAVE_GETTIMEOFDAY
+  double subtractTimes(struct timeval end, struct timeval start);
+#else
+  double subtractTimes(time_t end, time_t start);
+#endif
+  
+  struct GridCell {
+    double zetaY;
+    double zetaZ;
+    size_t offset;
+    size_t cellNumber;
+  };
+  
+  struct ThreadData {
+    const GridCell* gridCells;
+    size_t numGridCells;
+    size_t totalNumGridCells;
+    
+    Control* control;
+    Data* data;
+    Scratch* scratch;
+    
+    double* estimates;
+    double* standardErrors;
+  };
+}
+
+namespace cibart {
   void
   fitSensitivityAnalysis(const double* y,     // numObs x 1
                          const double* z,     // numObs x 1
@@ -128,27 +170,108 @@ namespace cibart {
     Data data(y, z, x, numObservations, numPredictors,
               z_test, x_test, numTestObservations);
     
-    Scratch scratch(control, data);
     
-    size_t estimateOffset = 0;
-    size_t cellCount = 1;
-    double zetaY, zetaZ;
+    size_t numCells = numZetaY * numZetaZ;
+    GridCell* gridCells = new GridCell[numCells];
+    
+    size_t cellNumber = 0;
     for (size_t i = 0; i < numZetaY; ++i) {
-      zetaY = zetaYs[i];
       for (size_t j = 0; j < numZetaZ; ++j) {
-        zetaZ = zetaZs[j];
         
-        estimateOffset = numSimsPerCell * (i + numZetaY * j);
-        
-        getEstimatesForGridPoint(control, data, scratch, zetaY, zetaZ,
-                                 estimates + estimateOffset);
-        
-        standardErrors[i + numZetaY * j] = std::sqrt(ext_computeVariance(estimates + estimateOffset, numSimsPerCell, NULL));
-        
-        if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", cellCount++, numZetaY * numZetaZ);
+        gridCells[cellNumber].zetaY = zetaYs[i];
+        gridCells[cellNumber].zetaZ = zetaZs[j];
+        gridCells[cellNumber].offset = i + numZetaY * j;
+        gridCells[cellNumber].cellNumber = cellNumber;
+        ++cellNumber;
       }
     }
+    
+#ifdef HAVE_GETTIMEOFDAY
+    struct timeval startTime;
+    struct timeval endTime;
+#else
+    time_t startTime;
+    time_t endTime;
+#endif
+    
+    
+    if (control.numThreads <= 1) {
+      Scratch scratch(control, data);
+      
+      ThreadData threadData = { gridCells, numCells, numCells, &control, &data, &scratch, estimates, standardErrors };
+      
+#ifdef HAVE_GETTIMEOFDAY
+      gettimeofday(&startTime, NULL);
+#else
+      startTime = time(NULL);
+#endif
+      
+      sensitivityAnalysisTask(&threadData);
+    
+#ifdef HAVE_GETTIMEOFDAY
+      gettimeofday(&endTime, NULL);
+#else
+      endTime = time(NULL);
+#endif
+    } else {
+      ext_mt_manager_t threadManager;
+      ext_mt_create(&threadManager, control.numThreads);
+      
+      size_t numCellsPerThread;
+      
+      ext_printf("");
+      ext_mt_getNumThreadsForJob(threadManager, numCells, 0, NULL, &numCellsPerThread);
+      
+      
+      ThreadData* threadData = ext_stackAllocate(control.numThreads, ThreadData);
+      void** threadDataPtrs  = ext_stackAllocate(control.numThreads, void*);
+      for (size_t i = 0; i < control.numThreads; ++i) {
+        threadData[i].gridCells         = gridCells + i * numCellsPerThread;
+        threadData[i].numGridCells      = numCellsPerThread;
+        threadData[i].totalNumGridCells = numCells;
+        threadData[i].control = &control;
+        threadData[i].data    = &data;
+        threadData[i].scratch = new Scratch(control, data);
+        threadData[i].estimates = estimates;
+        threadData[i].standardErrors = standardErrors;
+        threadDataPtrs[i] = threadData + i;
+        
+        if (i == control.numThreads) threadData[i].numGridCells = numCells - i * numCellsPerThread;
+      }
+      
+#ifdef HAVE_GETTIMEOFDAY
+      gettimeofday(&startTime, NULL);
+#else
+      startTime = time(NULL);
+#endif
+      
+      ext_mt_runTasks(threadManager, sensitivityAnalysisTask, threadDataPtrs, control.numThreads);
+      
+#ifdef HAVE_GETTIMEOFDAY
+      gettimeofday(&endTime, NULL);
+#else
+      endTime = time(NULL);
+#endif
+      
+      for (size_t i = 0; i < control.numThreads; ++i) delete threadData[i].scratch;
+      
+      ext_stackFree(threadDataPtrs);
+      ext_stackFree(threadData);
+      
+      ext_mt_destroy(threadManager);
+    }
+    
+    if (control.verbose) ext_printf("running time (seconds): %f\n", subtractTimes(endTime, startTime));
+    
+    delete [] gridCells;
   }
+}
+
+namespace {
+  using namespace cibart;
+  
+  void bartCallbackFunction(void* v_callbackData, bart::BARTFit& fit, bool,
+                            const double* trainingSamples, const double*, double sigma);
   
   struct CallbackData {
     const Control& control;
@@ -156,6 +279,101 @@ namespace cibart {
     Scratch& scratch;
     double zetaY, zetaZ;
   };
+  
+  void sensitivityAnalysisTask(void* v_data)
+  {
+    ThreadData& threadData(*static_cast<ThreadData*>(v_data));
+    
+    double* estimates      = threadData.estimates;
+    double* standardErrors = threadData.standardErrors;
+    const GridCell* gridCells = threadData.gridCells;
+    
+    Control& control(*threadData.control);
+    Data& data(*threadData.data);
+    Scratch& scratch(*threadData.scratch);
+    
+    
+    
+    sampleConfounders(data, scratch);
+    subtractConfounderFromResponse(data, scratch, gridCells[0].zetaY);
+    double sigmaEstimate = estimateSigma(data, scratch);
+    
+    uint32_t* maxNumCuts = new uint32_t[data.numBartPredictors];
+    for (size_t i = 0; i < data.numBartPredictors; ++i) maxNumCuts[i] = DEFAULT_BART_MAX_NUM_CUTS;
+    
+    
+    
+    
+    bart::Data bartData(scratch.yMinusZetaU, data.bart_x_train, data.x_test,
+                        data.numObservations, data.numBartPredictors, data.numTestObservations,
+                        sigmaEstimate, maxNumCuts);
+    
+    bart::Control bartControl; // use defaults
+    bartControl.verbose = false; // otherwise, waaaay too much
+    bartControl.numSamples = control.numSimsPerCell;
+    bartControl.numBurnIn = control.numInitialBurnIn;
+    bartControl.numThreads = 1;
+    bartControl.treeThinningRate = control.numTreeSamplesToThin;
+    
+    bart::Model bartModel;
+    
+    bart::CGMPrior* treePrior = ext_stackAllocate(1, bart::CGMPrior);
+    control.initializeCGMPrior(treePrior, &bartControl);
+    
+    bart::NormalPrior* muPrior = ext_stackAllocate(1, bart::NormalPrior);
+    control.initializeNormalPrior(muPrior, &bartControl);
+    
+    bart::ChiSquaredPrior* sigmaSqPrior = ext_stackAllocate(1, bart::ChiSquaredPrior);
+    control.initializeChiSquaredPrior(sigmaSqPrior, &bartControl);
+    
+    bartModel.treePrior = treePrior;
+    bartModel.muPrior = muPrior;
+    bartModel.sigmaSqPrior = sigmaSqPrior;
+    
+    CallbackData callbackData = { control, data, scratch, gridCells[0].zetaY, gridCells[0].zetaZ };
+    bartControl.callback = &bartCallbackFunction;
+    bartControl.callbackData = (void*) &callbackData;
+    
+    bart::BARTFit* fit = ext_stackAllocate(1, bart::BARTFit);
+    control.initializeFit(fit, &bartControl, &bartModel, &bartData);
+    
+    size_t estimateOffset = gridCells[0].offset * control.numSimsPerCell;
+    
+    bart::Results* bartResults = control.runSampler(fit);
+    estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
+    delete bartResults;
+    if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
+    
+    for (size_t i = 1; i < threadData.numGridCells; ++i) {
+      // simply change the input BART uses, and make sure our call back function knows
+      // what's up
+      callbackData.zetaY = gridCells[i].zetaY;
+      callbackData.zetaZ = gridCells[i].zetaZ;
+      
+      subtractConfounderFromResponse(data, scratch, threadData.gridCells[i].zetaY);
+      control.setResponse(fit, scratch.yMinusZetaU);
+      
+      bartResults = control.runSamplerForIterations(fit, control.numCellSwitchBurnIn, control.numSimsPerCell);
+      
+      estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
+      standardErrors[gridCells[i].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
+      
+      delete bartResults;
+      if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[i].cellNumber + 1, threadData.totalNumGridCells);
+    }
+    
+    control.invalidateFit(fit);
+    ext_stackFree(fit);
+    
+    control.invalidateChiSquaredPrior(sigmaSqPrior);
+    ext_stackFree(sigmaSqPrior);
+    control.invalidateNormalPrior(muPrior);
+    ext_stackFree(muPrior);
+    control.invalidateCGMPrior(treePrior);
+    ext_stackFree(treePrior);
+    
+    delete [] maxNumCuts;
+  }
   
   // this gets called after BART has new samples for us
   void bartCallbackFunction(void* v_callbackData, bart::BARTFit& fit, bool,
@@ -174,74 +392,6 @@ namespace cibart {
 
     control.setResponse(&fit, scratch.yMinusZetaU);
   }
-  
-  void
-  getEstimatesForGridPoint(const Control& control, const Data& data, Scratch& scratch, double zetaY, double zetaZ,
-                           double* estimates)
-  {
-    sampleConfounders(data, scratch);
-    subtractConfounderFromResponse(data, scratch, zetaY);
-    
-    double sigmaEstimate = estimateSigma(data, scratch);
-
-    uint32_t* maxNumCuts = new uint32_t[data.numBartPredictors];
-    for (size_t i = 0; i < data.numBartPredictors; ++i) maxNumCuts[i] = DEFAULT_BART_MAX_NUM_CUTS;
-    
-    
-    
-    
-    bart::Data bartData(scratch.yMinusZetaU, data.bart_x_train, data.x_test,
-                        data.numObservations, data.numBartPredictors, data.numTestObservations,
-                        sigmaEstimate, maxNumCuts);
-    
-    bart::Control bartControl; // use defaults
-    bartControl.verbose = false; // otherwise, waaaay too much
-    bartControl.numSamples = control.numSimsPerCell;
-    bartControl.numBurnIn = control.numInitialBurnIn;
-    bartControl.numThreads = control.numThreads;
-    bartControl.treeThinningRate = control.numTreeSamplesToThin;
-    
-    bart::Model bartModel;
-    
-    bart::CGMPrior* treePrior = ext_stackAllocate(1, bart::CGMPrior);
-    control.initializeCGMPrior(treePrior, &bartControl);
-    
-    bart::NormalPrior* muPrior = ext_stackAllocate(1, bart::NormalPrior);
-    control.initializeNormalPrior(muPrior, &bartControl);
-    
-    bart::ChiSquaredPrior* sigmaSqPrior = ext_stackAllocate(1, bart::ChiSquaredPrior);
-    control.initializeChiSquaredPrior(sigmaSqPrior, &bartControl);
-    
-    bartModel.treePrior = treePrior;
-    bartModel.muPrior = muPrior;
-    bartModel.sigmaSqPrior = sigmaSqPrior;
-    
-    CallbackData callbackData = { control, data, scratch, zetaY, zetaZ };
-    bartControl.callback = &bartCallbackFunction;
-    bartControl.callbackData = (void*) &callbackData;
-    
-    bart::BARTFit* fit = ext_stackAllocate(1, bart::BARTFit);
-    control.initializeFit(fit, &bartControl, &bartModel, &bartData);
-
-    bart::Results* bartResults = control.runSampler(fit);
-    
-    estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates);
-    
-    control.invalidateFit(fit);
-    ext_stackFree(fit);
-    
-    control.invalidateChiSquaredPrior(sigmaSqPrior);
-    ext_stackFree(sigmaSqPrior);
-    control.invalidateNormalPrior(muPrior);
-    ext_stackFree(muPrior);
-    control.invalidateCGMPrior(treePrior);
-    ext_stackFree(treePrior);
-    
-    delete bartResults;
-    
-    delete [] maxNumCuts;
-  }
-  
   
   void sampleConfounders(const Data& data, Scratch& scratch)
   {
@@ -426,10 +576,11 @@ namespace cibart {
   
   void lookupBARTFunctions(Control& control)
   {
-    control.initializeFit = (void (*)(bart::BARTFit*, bart::Control*, bart::Model*, bart::Data*)) R_GetCCallable("cbart", "bart_initializeFit");
-    control.invalidateFit = (void (*)(bart::BARTFit*)) R_GetCCallable("cbart", "bart_invalidateFit");
-    control.runSampler    = (bart::Results* (*)(bart::BARTFit*)) R_GetCCallable("cbart", "bart_runSampler");
-    control.setResponse   = (void (*)(bart::BARTFit*, const double*)) R_GetCCallable("cbart", "bart_setResponse");
+    control.initializeFit             = (void (*)(bart::BARTFit*, bart::Control*, bart::Model*, bart::Data*)) R_GetCCallable("cbart", "bart_initializeFit");
+    control.invalidateFit             = (void (*)(bart::BARTFit*)) R_GetCCallable("cbart", "bart_invalidateFit");
+    control.runSampler                = (bart::Results* (*)(bart::BARTFit*)) R_GetCCallable("cbart", "bart_runSampler");
+    control.runSamplerForIterations   = (bart::Results* (*)(bart::BARTFit*, size_t, size_t)) R_GetCCallable("cbart", "bart_runSamplerForIterations");
+    control.setResponse               = (void (*)(bart::BARTFit*, const double*)) R_GetCCallable("cbart", "bart_setResponse");
     control.initializeCGMPrior        = (void (*)(bart::CGMPrior*, const bart::Control*)) R_GetCCallable("cbart", "bart_initializeCGMPriorFromControl");
     control.invalidateCGMPrior        = (void (*)(bart::CGMPrior*)) R_GetCCallable("cbart", "bart_invalidateCGMPrior");
     control.initializeNormalPrior     = (void (*)(bart::NormalPrior*, const bart::Control*)) R_GetCCallable("cbart", "bart_initializeNormalPriorFromControl");
@@ -437,4 +588,12 @@ namespace cibart {
     control.initializeChiSquaredPrior = (void (*)(bart::ChiSquaredPrior*, const bart::Control*)) R_GetCCallable("cbart", "bart_initializeChiSquaredPriorFromControl");
     control.invalidateChiSquaredPrior = (void (*)(bart::ChiSquaredPrior*)) R_GetCCallable("cbart", "bart_invalidateChiSquaredPrior");
   }
+  
+#ifdef HAVE_GETTIMEOFDAY
+  double subtractTimes(struct timeval end, struct timeval start) {
+    return (1.0e6 * ((double) (end.tv_sec - start.tv_sec)) + (double) (end.tv_usec - start.tv_usec)) / 1.0e6;
+  }
+#else
+  double subtractTimes(time_t end, time_t start) { return (double) (end - start); }
+#endif
 }
