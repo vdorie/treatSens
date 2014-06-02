@@ -30,7 +30,7 @@ namespace cibart {
     
     glpiFunction getLogicalProcessorInformation = (glpiFunction) GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
     if (NULL == glpi) {
-      issueWarning("GetLogicalProcessorInformation is not supported on this OS.");
+      ext_issueWarning("GetLogicalProcessorInformation is not supported on this OS.");
       return;
     }
     
@@ -40,14 +40,14 @@ namespace cibart {
     // retrieve appropriate buffer length
     getLogicalProcessorInformation(buffer, &bufferLength);
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-      issueWarning("Unable to determine buffer length for GetLogicalProcessorInformation: %d", GetLastError());
+      ext_issueWarning("Unable to determine buffer length for GetLogicalProcessorInformation: %d", GetLastError());
       return;
     }
     
     buffer = new SYSTEM_LOGICAL_PROCESSOR_INFORMATION[bufferLength];
     if (getLogicalProcessorInformation(buffer, &bufferLength) == false) {
       delete [] buffer;
-      issueWarning("Unable to allocate buffer length for GetLogicalProcessorInformation");
+      ext_issueWarning("Unable to allocate buffer length for GetLogicalProcessorInformation");
       return;
     }
     
@@ -122,14 +122,17 @@ namespace cibart {
 #  include <fcntl.h>    // open
 #  include <unistd.h>   // close, lseek
 #  include <sys/mman.h> // mmap
-#  include <string.h>   // srtncmp
+#  include <cstring>   // srtncmp
 #  include <errno.h>
+#  include <sys/stat.h> // stat
 
 #  include <external/alloca.h>
 
 #  include <map>
 #  include <vector>
 #  include <utility>
+
+#include <stdio.h>
 
 namespace {
   typedef std::map<uint32_t, uint32_t> CoreMap;
@@ -166,7 +169,7 @@ namespace {
         
         processorIdMap.insert(CPUPair(currentProcessorId, currentProcessor));
       } else {
-        // this should never happen
+        // the following line should never happen
         if (currentCoreId == INVALID_ID) currentCoreId = 0;
         
         CPUMap::iterator processorLookup = processorIdMap.find(currentPhysicalId);
@@ -201,31 +204,48 @@ namespace {
   {
     char errorBuffer[ERROR_BUFFER_LENGTH];
     
+    size_t bufferLength = sysconf(_SC_PAGESIZE);
+    char* cpuInfo = new char[bufferLength];
+    
     int fd = open("/proc/cpuinfo", O_RDONLY);
     if (fd == -1) {
       strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
-      issueWarning("unable to open /proc/cpuinfo: %s\n", errorBuffer);
+      ext_issueWarning("unable to open /proc/cpuinfo: %s (%d)\n", errorBuffer, errno);
       return false;
     }
     
-    off_t fileLength = lseek(fd, 0, SEEK_END);
-    if (fileLength == ((off_t) - 1)) {
+    // Ideally, this would simply read as it goes but I wrote it on a system w/o
+    // procfs and didn't know that I can't mmap the sucker.
+    
+    ssize_t numBytesRead = 0;
+    size_t fileLength = 0, numBytesInBuffer = 0;
+    bool firstReallocation = true;
+    while (true) {
+      numBytesRead = read(fd, cpuInfo + fileLength, bufferLength - numBytesInBuffer);
+      if (numBytesRead <= 0) break;
+      fileLength += numBytesRead;
+      numBytesInBuffer += numBytesRead;
+      
+      if (numBytesInBuffer == bufferLength) {
+        char* temp = new char[2 * fileLength];
+        std::memcpy(temp, (const char*) cpuInfo, fileLength * sizeof(char));
+        
+        if (!firstReallocation) bufferLength *= 2;
+        else firstReallocation = false;
+        
+        numBytesInBuffer = 0;
+        delete cpuInfo;
+        cpuInfo = temp;
+      }
+    }
+    close(fd);
+    if (numBytesRead == -1) {
       strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
-      issueWarning("unable to seek in /proc/cpuinfo: %s\n", errorBuffer);
-      close(fd);
-      return false;
-    }
-    lseek(fd, 0, SEEK_SET);
-    
-    void* v_cpuInfo = mmap(0, fileLength, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (v_cpuInfo == MAP_FAILED) {
-      strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
-      issueWarning("unable to map /proc/cpuinfo: %s\n", errorBuffer);
-      close(fd);
+      ext_issueWarning("error reading /proc/cpuinfo: %s (%d)\n", errorBuffer, errno);
       return false;
     }
     
-    char* cpuInfo = (char*) v_cpuInfo;
+    
     
     off_t offset = 0;
     
@@ -239,15 +259,15 @@ namespace {
       lineType = NA;
       
       if ((cpuInfo[offset] == 'p' || cpuInfo[offset] == 'P') && fileLength - offset >= 9 &&
-          strncmp(cpuInfo + offset + 1, "rocessor", 8) == 0) {
+          std::strncmp(cpuInfo + offset + 1, "rocessor", 8) == 0) {
         lineType = PROCESSOR;
         offset += 9;
       } else if ((cpuInfo[offset] == 'p' || cpuInfo[offset] == 'P') && fileLength - offset >= 11 &&
-                  strncmp(cpuInfo + offset + 1, "hysical id", 10) == 0) {
+                 std::strncmp(cpuInfo + offset + 1, "hysical id", 10) == 0) {
         lineType = PHYSICAL_ID;
         offset += 11;
       } else if ((cpuInfo[offset] == 'c' || cpuInfo[offset] == 'C') && fileLength - offset >= 7 &&
-                  strncmp(cpuInfo + offset + 1, "ore id", 6) == 0) {
+                 std::strncmp(cpuInfo + offset + 1, "ore id", 6) == 0) {
         lineType = CORE_ID;
         offset += 7;
       }
@@ -310,8 +330,7 @@ namespace {
       result.push_back(it->second);
     }
     
-    munmap(v_cpuInfo, fileLength);
-    close(fd);
+    delete [] cpuInfo;
     
     return true;
   }
@@ -334,6 +353,7 @@ namespace cibart {
     }
 #  if defined(_SC_NPROCESSORS_ONLN)
     else {
+      ext_printf("  cpuinfo falling back\n");
       *numLogicalProcessorsPtr = sysconf(_SC_NPROCESSORS_ONLN);
       if (*numLogicalProcessorsPtr < 1) *numLogicalProcessorsPtr = sysconf(_SC_NPROCESSORS_CONF);
     }

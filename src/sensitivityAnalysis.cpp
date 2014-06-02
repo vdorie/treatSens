@@ -219,7 +219,6 @@ namespace cibart {
       
       size_t numCellsPerThread;
       
-      ext_printf("");
       ext_mt_getNumThreadsForJob(threadManager, numCells, 0, NULL, &numCellsPerThread);
       
       
