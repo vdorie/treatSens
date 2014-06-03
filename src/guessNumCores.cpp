@@ -29,7 +29,7 @@ namespace cibart {
     *numLogicalProcessorsPtr  = 0;
     
     glpiFunction getLogicalProcessorInformation = (glpiFunction) GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
-    if (NULL == glpi) {
+    if (getLogicalProcessorInformation == NULL) {
       ext_issueWarning("GetLogicalProcessorInformation is not supported on this OS.");
       return;
     }
@@ -56,13 +56,13 @@ namespace cibart {
     for (size_t i = 0; i < numElements; ++i) {
       if (buffer[i].Relationship != RelationProcessorCore) continue;
       
-      *numPhyiscalProcessors += 1;
+      *numPhyiscalProcessorsPtr += 1;
       
       if (buffer[i].ProcessorCore.Flags == 1) {
-        int mask = 0x1;
-        size_t numBitsInInt = 8 * sizeof(ULONG_PTR);
-        for (size_t j = 0; j < numBitsInInt; ++j) {
-          if (buffer[i].ProcessorMask & mask == true) *numLogicalProcessors += 1;
+        ULONG mask = 0x1;
+        size_t numBitsInLong = 8 * sizeof(ULONG);
+        for (size_t j = 0; j < numBitsInLong; ++j) {
+          if ((buffer[i].ProcessorMask & mask) != 0) *numLogicalProcessorsPtr += 1;
           mask <<= 1;
         }
       }
