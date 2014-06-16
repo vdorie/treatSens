@@ -14,6 +14,7 @@
 #endif
 
 #include <bart/bartFit.hpp>
+#include <bart/types.hpp>
 #include <bart/results.hpp>
 #include <bart/R_C_interface.hpp>
 
@@ -53,11 +54,11 @@ namespace {
     bart::Results* (*runSampler)(bart::BARTFit* fit);
     bart::Results* (*runSamplerForIterations)(bart::BARTFit* fit, size_t numBurnIn, size_t numSamples);
     void (*setResponse)(bart::BARTFit* fit, const double* newResponse);
-    void (*initializeCGMPrior)(bart::CGMPrior* prior, const bart::Control* control);
+    void (*initializeCGMPrior)(bart::CGMPrior* prior, double, double);
     void (*invalidateCGMPrior)(bart::CGMPrior* prior);
-    void (*initializeNormalPrior)(bart::NormalPrior* prior, const bart::Control* control);
+    void (*initializeNormalPrior)(bart::NormalPrior* prior, const bart::Control* control, double);
     void (*invalidateNormalPrior)(bart::NormalPrior* prior);
-    void (*initializeChiSquaredPrior)(bart::ChiSquaredPrior* prior, const bart::Control* control);
+    void (*initializeChiSquaredPrior)(bart::ChiSquaredPrior* prior, double, double);
     void (*invalidateChiSquaredPrior)(bart::ChiSquaredPrior* prior);
   };
   
@@ -300,12 +301,13 @@ namespace {
     uint32_t* maxNumCuts = new uint32_t[data.numBartPredictors];
     for (size_t i = 0; i < data.numBartPredictors; ++i) maxNumCuts[i] = DEFAULT_BART_MAX_NUM_CUTS;
     
+    bart::VariableType* variableTypes = new bart::VariableType[data.numBartPredictors];
+    for (size_t i = 0; i < data.numBartPredictors; ++i) variableTypes[i] = bart::ORDINAL;
     
     
-    
-    bart::Data bartData(scratch.yMinusZetaU, data.bart_x_train, data.x_test,
+    bart::Data bartData(scratch.yMinusZetaU, data.bart_x_train, data.x_test, NULL, NULL,
                         data.numObservations, data.numBartPredictors, data.numTestObservations,
-                        sigmaEstimate, maxNumCuts);
+                        sigmaEstimate, variableTypes, maxNumCuts);
     
     bart::Control bartControl; // use defaults
     bartControl.verbose = false; // otherwise, waaaay too much
@@ -317,13 +319,13 @@ namespace {
     bart::Model bartModel;
     
     bart::CGMPrior* treePrior = ext_stackAllocate(1, bart::CGMPrior);
-    control.initializeCGMPrior(treePrior, &bartControl);
+    control.initializeCGMPrior(treePrior, BART_DEFAULT_TREE_PRIOR_BASE, BART_DEFAULT_TREE_PRIOR_POWER);
     
     bart::NormalPrior* muPrior = ext_stackAllocate(1, bart::NormalPrior);
-    control.initializeNormalPrior(muPrior, &bartControl);
+    control.initializeNormalPrior(muPrior, &bartControl, BART_DEFAULT_NORMAL_PRIOR_K);
     
     bart::ChiSquaredPrior* sigmaSqPrior = ext_stackAllocate(1, bart::ChiSquaredPrior);
-    control.initializeChiSquaredPrior(sigmaSqPrior, &bartControl);
+    control.initializeChiSquaredPrior(sigmaSqPrior, BART_DEFAULT_CHISQ_PRIOR_DF, BART_DEFAULT_CHISQ_PRIOR_QUANTILE);
     
     bartModel.treePrior = treePrior;
     bartModel.muPrior = muPrior;
@@ -372,6 +374,7 @@ namespace {
     ext_stackFree(treePrior);
     
     delete [] maxNumCuts;
+    delete [] variableTypes;
   }
   
   // this gets called after BART has new samples for us
@@ -580,11 +583,11 @@ namespace {
     control.runSampler                = (bart::Results* (*)(bart::BARTFit*)) R_GetCCallable("cbart", "bart_runSampler");
     control.runSamplerForIterations   = (bart::Results* (*)(bart::BARTFit*, size_t, size_t)) R_GetCCallable("cbart", "bart_runSamplerForIterations");
     control.setResponse               = (void (*)(bart::BARTFit*, const double*)) R_GetCCallable("cbart", "bart_setResponse");
-    control.initializeCGMPrior        = (void (*)(bart::CGMPrior*, const bart::Control*)) R_GetCCallable("cbart", "bart_initializeCGMPriorFromControl");
+    control.initializeCGMPrior        = (void (*)(bart::CGMPrior*, double, double)) R_GetCCallable("cbart", "bart_initializeCGMPriorFromOptions");
     control.invalidateCGMPrior        = (void (*)(bart::CGMPrior*)) R_GetCCallable("cbart", "bart_invalidateCGMPrior");
-    control.initializeNormalPrior     = (void (*)(bart::NormalPrior*, const bart::Control*)) R_GetCCallable("cbart", "bart_initializeNormalPriorFromControl");
+    control.initializeNormalPrior     = (void (*)(bart::NormalPrior*, const bart::Control*, double)) R_GetCCallable("cbart", "bart_initializeNormalPriorFromOptions");
     control.invalidateNormalPrior     = (void (*)(bart::NormalPrior*)) R_GetCCallable("cbart", "bart_invalidateNormalPrior");
-    control.initializeChiSquaredPrior = (void (*)(bart::ChiSquaredPrior*, const bart::Control*)) R_GetCCallable("cbart", "bart_initializeChiSquaredPriorFromControl");
+    control.initializeChiSquaredPrior = (void (*)(bart::ChiSquaredPrior*, double, double)) R_GetCCallable("cbart", "bart_initializeChiSquaredPriorFromOptions");
     control.invalidateChiSquaredPrior = (void (*)(bart::ChiSquaredPrior*)) R_GetCCallable("cbart", "bart_invalidateChiSquaredPrior");
   }
   
