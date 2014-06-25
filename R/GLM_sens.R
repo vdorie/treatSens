@@ -1,3 +1,4 @@
+
 source("genU_contY.R")
 source("object_def.R")
 source("grid_range.R")
@@ -50,7 +51,7 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   set.seed(seed)
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
-  out.warnings <- warnings(formula, resp.family, trt.family,	theta, grid.dim, 
+  out.warnings <- warnings(formula, resp.family, trt.family, theta, grid.dim, 
                            standardize,	nsim,	zero.loc,	verbose, buffer, zetay.range, zetaz.range, weights, data)
   
   formula=out.warnings$formula
@@ -198,7 +199,7 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
-                     offset = offset)
+                     offset = offset, p = NULL)
   
   if(!is.null(zetay.range) & !is.null(zetaz.range)){ #custom grid range.
     if(sign(zetaz.range[1])==sign(zetaz.range[2])|any(zetaz.range==0)){ #one quadrant.
@@ -278,41 +279,90 @@ GLM.sens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st 
   
   #fill in grid
   cell = 0
-  for(i in grid.dim[2]:1) {
-    for(j in grid.dim[1]:1) {
+  
+  if(!is.null(core) & U.model=="binomial"){
+    ngrid = grid.dim[2]*grid.dim[1]
+    out.foreach <- foreach(h=ngrid:1,.combine=cbind,.verbose=F)%dopar%{
+      source("GLM_sens.R")
+      j=grid.dim[1]-(h-1)%%grid.dim[1]
+      i=grid.dim[2]-((h-1)-(h-1)%%grid.dim[1])/grid.dim[1]
       cell = cell +1
       zY = zetaY[i]
       zZ = zetaZ[j]
-      
-      if(is.null(core)){
-        for(k in 1:nsim){
-          fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
-          
-          sens.coef[i,j,k] <- fit.sens$sens.coef
-          sens.se[i,j,k] <- fit.sens$sens.se
-          zeta.y[i,j,k] <- fit.sens$zeta.y
-          zeta.z[i,j,k] <- fit.sens$zeta.z
-          zy.se[i,j,k] <- fit.sens$zy.se
-          zz.se[i,j,k] <- fit.sens$zz.se
-          resp.s2[i,j,k] <- fit.sens$resp.sigma2
-          trt.s2[i,j,k] <- fit.sens$trt.sigma2
-        }        
-      }else{ #code for multicore below. For debug change %dopar% to %do%.
-        fit.sens <- foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
-          source("GLM_sens.R")
-          fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
-        }
-        sens.coef[i,j,] <- unlist(fit.sens[,1])
-        sens.se[i,j,] <- unlist(fit.sens[,2])
-        zeta.y[i,j,] <- unlist(fit.sens[,3])
-        zeta.z[i,j,] <- unlist(fit.sens[,4])
-        zy.se[i,j,] <- unlist(fit.sens[,5])
-        zz.se[i,j,] <- unlist(fit.sens[,6])
-        resp.s2[i,j,] <- unlist(fit.sens[,7])
-        trt.s2[i,j,] <- unlist(fit.sens[,8])
+      control.fit$p = NULL
+      out <- matrix(NA,8,nsim)
+      for(k in 1:nsim){
+        fit.sens <- fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+        control.fit$p = fit.sens$p
+        out[1,k] <- fit.sens$sens.coef
+        out[2,k] <- fit.sens$sens.se
+        out[3,k] <- fit.sens$zeta.y
+        out[4,k] <- fit.sens$zeta.z
+        out[5,k] <- fit.sens$zy.se
+        out[6,k] <- fit.sens$zz.se
+        out[7,k] <- fit.sens$resp.sigma2
+        out[8,k] <- fit.sens$trt.sigma2
       }
-      if(verbose) cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")	
-    }}
+      return(out)
+    }
+    out1 <- out2 <- out3 <- out4 <- out5 <- out6 <- out7 <- out8 <- numeric(ngrid*nsim)
+    out1 <- out.foreach[1,]
+    out2 <- out.foreach[2,]
+    out3 <- out.foreach[3,]
+    out4 <- out.foreach[4,]
+    out5 <- out.foreach[5,]
+    out6 <- out.foreach[6,]
+    out7 <- out.foreach[7,]
+    out8 <- out.foreach[8,]
+    dim(out1)<-dim(out2)<-dim(out3)<-dim(out4)<-dim(out5)<-dim(out6)<-dim(out7)<-dim(out8)<-c(nsim,grid.dim[1],grid.dim[2])
+    sens.coef[,,] <- aperm(out1,c(3,2,1))[,,]
+    sens.se[,,] <- aperm(out2,c(3,2,1))[,,]
+    zeta.y[,,] <- aperm(out3,c(3,2,1))[,,]
+    zeta.z[,,] <- aperm(out4,c(3,2,1))[,,]
+    zy.se[,,] <- aperm(out5,c(3,2,1))[,,]
+    zz.se[,,] <- aperm(out6,c(3,2,1))[,,]
+    resp.s2[,,] <- aperm(out7,c(3,2,1))[,,]
+    trt.s2[,,] <- aperm(out8,c(3,2,1))[,,]
+  } else {
+    for(i in grid.dim[2]:1) {
+      for(j in grid.dim[1]:1) {
+        cell = cell +1
+        zY = zetaY[i]
+        zZ = zetaZ[j]
+        control.fit$p = NULL
+        
+        if(is.null(core)){
+          for(k in 1:nsim){
+            #debug(fit.GLM.sens)
+            fit.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+            control.fit$p = fit.sens$p
+            sens.coef[i,j,k] <- fit.sens$sens.coef
+            sens.se[i,j,k] <- fit.sens$sens.se
+            zeta.y[i,j,k] <- fit.sens$zeta.y
+            zeta.z[i,j,k] <- fit.sens$zeta.z
+            zy.se[i,j,k] <- fit.sens$zy.se
+            zz.se[i,j,k] <- fit.sens$zz.se
+            resp.s2[i,j,k] <- fit.sens$resp.sigma2
+            trt.s2[i,j,k] <- fit.sens$trt.sigma2
+          }        
+        }else{ #code for multicore below. For debug change %dopar% to %do%.
+          fit.sens <- foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
+            source("GLM_sens.R")
+            fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+          }
+          sens.coef[i,j,] <- unlist(fit.sens[,1])
+          sens.se[i,j,] <- unlist(fit.sens[,2])
+          zeta.y[i,j,] <- unlist(fit.sens[,3])
+          zeta.z[i,j,] <- unlist(fit.sens[,4])
+          zy.se[i,j,] <- unlist(fit.sens[,5])
+          zz.se[i,j,] <- unlist(fit.sens[,6])
+          resp.s2[i,j,] <- unlist(fit.sens[,7])
+          trt.s2[i,j,] <- unlist(fit.sens[,8])
+        }
+        if(verbose) cat("Completed ", cell, " of ", grid.dim[1]*grid.dim[2], " cells.\n")  
+      }
+    }
+  }
   
   if(!is.null(X)) {
     result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
@@ -351,6 +401,7 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
   weights = control.fit$weights
   iter.j = control.fit$iter.j
   offset = control.fit$offset
+  p = control.fit$p
   
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
@@ -360,14 +411,18 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
   if(U.model == "binomial"){
     if(identical(trt.family$link,"probit")){
       if(!is.null(X)) {
-        U <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset))
+        #debug(contYbinaryZU)
+        out.contYbinaryZU <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p))
       } else {
-        U <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset))
+        out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
       }
     }else{
-      U <- try(contYZbinaryU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, theta))
+      stop(paste("Only probit link is allowed."))
     }
-  }  
+  }
+  
+  U = out.contYbinaryZU$U
+  p = out.contYbinaryZU$p
   
   if(!(class(U) == "try-error")){
     #try keeps loop from failing 
@@ -397,11 +452,12 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
       sens.coef = fit.glm$coef[2],
       sens.se = sens.se, 	#SE of Z coef
       zeta.y = ifelse(offset==1,zetaY,fit.glm$coef[3]),     		#estimated coefficient of U in response model
-      zeta.z = fit.trt$coef[2],				    	#estimated coef of U in trt model
+      zeta.z = fit.trt$coef[2],                                 #estimated coef of U in trt model
       zy.se = ifelse(offset==1,NA,summary(fit.glm)$coefficients[3,2]),   #SE of U coef in response model
-      zz.se = summary(fit.trt)$coefficients[2,2], 	#SE of U coef in trt model
+      zz.se = summary(fit.trt)$coefficients[2,2], 	            #SE of U coef in trt model
       resp.sigma2 = sum(fit.glm$resid^2)/fit.glm$df.residual,
-      trt.sigma2 = sum(fit.trt$resid^2)/fit.trt$df.residual
+      trt.sigma2 = sum(fit.trt$resid^2)/fit.trt$df.residual,
+      p = p
     ))
   }else{
     return(list(
@@ -412,7 +468,8 @@ fit.GLM.sens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, co
       zy.se = NA, 
       zz.se = NA,
       resp.sigma2 = NA,
-      trt.sigma2 = NA
+      trt.sigma2 = NA,
+      p = p
     ))
   }
 }

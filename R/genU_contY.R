@@ -14,7 +14,7 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z) {
   var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
   eps.u = rnorm(n, 0, sqrt(var.U))
   U = Y*gamma + Z*delta + eps.u
-
+  
   return(U)
 }
 
@@ -46,7 +46,7 @@ contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offset) { 
+contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offset, p) { 
   n = length(y)
   nx = dim(x)[2]
   null.resp = lm(y~z+x, weights=weights)
@@ -54,11 +54,16 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offse
   v_Y = var(null.resp$resid)*(n-1)/(n-nx-2)
   v_Z = var(null.trt$resid)*(n-1)/(n-nx-1)
   
-  p = 0.5
+  if(is.null(p)) {
+    j2 = iter.j
+    p = 0.5
+  } else {
+    j2 = 1
+  }
   
-  for(j in 1:iter.j) {
+  for(j in 1:j2) {
     U = rbinom(n,1,p)
-
+    
     if (!offset) { 
       U.fit = lm(y~z+x+U, weights=weights)
       y.coef = U.fit$coef
@@ -72,7 +77,7 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offse
       z.coef = c(glm(z~x, family=binomial(link="probit"), offset=cz*U)$coef, cz)
       v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
     }
-
+    
     pyzu = dnorm(y-cbind(1,z,x,1)%*%matrix(y.coef, ncol = 1), 0, sqrt(v_Y))* 
       (1-pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1)))^(1-z)*
       pnorm(cbind(1,x,1)%*%matrix(z.coef, ncol = 1))^z*theta
@@ -88,7 +93,11 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offse
     p[pyz==0] = 0
   }
   U = rbinom(n,1,p)
-  return(U)
+  
+  return(list(
+    U = U,
+    p = p
+  ))
 }
 
 ###############
@@ -98,7 +107,7 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offse
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU.noX <- function(y, z, cy, cz, theta, iter.j=10, weights=NULL, offset) { 
+contYbinaryZU.noX <- function(y, z, cy, cz, theta, iter.j=10, weights=NULL, offset, p) { 
   n = length(y)
   null.resp = lm(y~z, weights=weights)
   null.trt = glm(z~1, family = binomial(link ="probit"))
@@ -106,9 +115,15 @@ contYbinaryZU.noX <- function(y, z, cy, cz, theta, iter.j=10, weights=NULL, offs
   v_Z = var(null.trt$resid)*(n-1)/(n-1)
   mat.1.0 = matrix(rep(c(1,0),each=length(y)),length(y),2)
   mat.1.1 = matrix(1,length(y),2)              
-  p = 0.5
   
-  for(j in 1:iter.j) {
+  if(is.null(p)) {
+    j2 = iter.j
+    p = 0.5
+  } else {
+    j2 = 1
+  }
+  
+  for(j in 1:j2) {
     U = rbinom(n,1,p)
     
     if (!offset) { 
@@ -140,6 +155,9 @@ contYbinaryZU.noX <- function(y, z, cy, cz, theta, iter.j=10, weights=NULL, offs
     p[pyz==0] = 0
   }
   U = rbinom(n,1,p)
-  return(U)
+  
+  return(list(
+    U = U,
+    p = p
+  ))
 }
-
