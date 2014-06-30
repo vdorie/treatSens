@@ -127,12 +127,7 @@ print.sensitivity = function(x, digits=3, part.cors = F ){
 #setMethod("plot", c("sensitivity", "missing"),
 #  definition = function(x,y,...){
 plot.sensitivity = function(x,y,...){
-  if(x$model.type == "BART.cont") {
-    plotSA.cont(x,...)
-  }	else {
-    #debug(plotSA)
-    plotSA(x,...)
-    #undebug(plotSA)
+    sensPlot(x,...)
   }
   
 }
