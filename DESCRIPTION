@@ -1,4 +1,4 @@
-Package: causalSA
+Package: treatSens
 Type: Package
 Title: Sensitivity analysis for causal inference
 Version: 0.1
