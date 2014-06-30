@@ -3,7 +3,7 @@
 
 #include <cstring>
 #include <cmath>
-#include <bart/cstdint>
+#include <dbarts/cstdint>
 #if !defined(HAVE_SYS_TIME_H) && defined(HAVE_GETTIMEOFDAY)
 #undef HAVE_GETTIMEOFDAY
 #endif
@@ -13,10 +13,10 @@
 #include <time.h>
 #endif
 
-#include <bart/bartFit.hpp>
-#include <bart/types.hpp>
-#include <bart/results.hpp>
-#include <bart/R_C_interface.hpp>
+#include <dbarts/bartFit.hpp>
+#include <dbarts/types.hpp>
+#include <dbarts/results.hpp>
+#include <dbarts/R_C_interface.hpp>
 
 #include <external/io.h>
 #include <external/stats.h>
@@ -49,17 +49,17 @@ namespace {
     
     bool verbose;
     
-    void (*initializeFit)(bart::BARTFit* fit, bart::Control* control, bart::Model* model, bart::Data* data);
-    void (*invalidateFit)(bart::BARTFit* fit);
-    bart::Results* (*runSampler)(bart::BARTFit* fit);
-    bart::Results* (*runSamplerForIterations)(bart::BARTFit* fit, size_t numBurnIn, size_t numSamples);
-    void (*setResponse)(bart::BARTFit* fit, const double* newResponse);
-    void (*initializeCGMPrior)(bart::CGMPrior* prior, double, double);
-    void (*invalidateCGMPrior)(bart::CGMPrior* prior);
-    void (*initializeNormalPrior)(bart::NormalPrior* prior, const bart::Control* control, double);
-    void (*invalidateNormalPrior)(bart::NormalPrior* prior);
-    void (*initializeChiSquaredPrior)(bart::ChiSquaredPrior* prior, double, double);
-    void (*invalidateChiSquaredPrior)(bart::ChiSquaredPrior* prior);
+    void (*initializeFit)(dbarts::BARTFit* fit, dbarts::Control* control, dbarts::Model* model, dbarts::Data* data);
+    void (*invalidateFit)(dbarts::BARTFit* fit);
+    dbarts::Results* (*runSampler)(dbarts::BARTFit* fit);
+    dbarts::Results* (*runSamplerForIterations)(dbarts::BARTFit* fit, size_t numBurnIn, size_t numSamples);
+    void (*setResponse)(dbarts::BARTFit* fit, const double* newResponse);
+    void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double);
+    void (*invalidateCGMPrior)(dbarts::CGMPrior* prior);
+    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, double);
+    void (*invalidateNormalPrior)(dbarts::NormalPrior* prior);
+    void (*initializeChiSquaredPrior)(dbarts::ChiSquaredPrior* prior, double, double);
+    void (*invalidateChiSquaredPrior)(dbarts::ChiSquaredPrior* prior);
   };
   
   struct Data {
@@ -270,7 +270,7 @@ namespace cibart {
 namespace {
   using namespace cibart;
   
-  void bartCallbackFunction(void* v_callbackData, bart::BARTFit& fit, bool,
+  void bartCallbackFunction(void* v_callbackData, dbarts::BARTFit& fit, bool,
                             const double* trainingSamples, const double*, double sigma);
   
   struct CallbackData {
@@ -301,31 +301,31 @@ namespace {
     uint32_t* maxNumCuts = new uint32_t[data.numBartPredictors];
     for (size_t i = 0; i < data.numBartPredictors; ++i) maxNumCuts[i] = DEFAULT_BART_MAX_NUM_CUTS;
     
-    bart::VariableType* variableTypes = new bart::VariableType[data.numBartPredictors];
-    for (size_t i = 0; i < data.numBartPredictors; ++i) variableTypes[i] = bart::ORDINAL;
+    dbarts::VariableType* variableTypes = new dbarts::VariableType[data.numBartPredictors];
+    for (size_t i = 0; i < data.numBartPredictors; ++i) variableTypes[i] = dbarts::ORDINAL;
     
     
-    bart::Data bartData(scratch.yMinusZetaU, data.bart_x_train, data.x_test, NULL, NULL,
+    dbarts::Data bartData(scratch.yMinusZetaU, data.bart_x_train, data.x_test, NULL, NULL,
                         data.numObservations, data.numBartPredictors, data.numTestObservations,
                         sigmaEstimate, variableTypes, maxNumCuts);
     
-    bart::Control bartControl; // use defaults
+    dbarts::Control bartControl; // use defaults
     bartControl.verbose = false; // otherwise, waaaay too much
     bartControl.numSamples = control.numSimsPerCell;
     bartControl.numBurnIn = control.numInitialBurnIn;
     bartControl.numThreads = 1;
     bartControl.treeThinningRate = control.numTreeSamplesToThin;
     
-    bart::Model bartModel;
+    dbarts::Model bartModel;
     
-    bart::CGMPrior* treePrior = ext_stackAllocate(1, bart::CGMPrior);
-    control.initializeCGMPrior(treePrior, BART_DEFAULT_TREE_PRIOR_BASE, BART_DEFAULT_TREE_PRIOR_POWER);
+    dbarts::CGMPrior* treePrior = ext_stackAllocate(1, dbarts::CGMPrior);
+    control.initializeCGMPrior(treePrior, DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
     
-    bart::NormalPrior* muPrior = ext_stackAllocate(1, bart::NormalPrior);
-    control.initializeNormalPrior(muPrior, &bartControl, BART_DEFAULT_NORMAL_PRIOR_K);
+    dbarts::NormalPrior* muPrior = ext_stackAllocate(1, dbarts::NormalPrior);
+    control.initializeNormalPrior(muPrior, &bartControl, DBARTS_DEFAULT_NORMAL_PRIOR_K);
     
-    bart::ChiSquaredPrior* sigmaSqPrior = ext_stackAllocate(1, bart::ChiSquaredPrior);
-    control.initializeChiSquaredPrior(sigmaSqPrior, BART_DEFAULT_CHISQ_PRIOR_DF, BART_DEFAULT_CHISQ_PRIOR_QUANTILE);
+    dbarts::ChiSquaredPrior* sigmaSqPrior = ext_stackAllocate(1, dbarts::ChiSquaredPrior);
+    control.initializeChiSquaredPrior(sigmaSqPrior, DBARTS_DEFAULT_CHISQ_PRIOR_DF, DBARTS_DEFAULT_CHISQ_PRIOR_QUANTILE);
     
     bartModel.treePrior = treePrior;
     bartModel.muPrior = muPrior;
@@ -335,12 +335,12 @@ namespace {
     bartControl.callback = &bartCallbackFunction;
     bartControl.callbackData = (void*) &callbackData;
     
-    bart::BARTFit* fit = ext_stackAllocate(1, bart::BARTFit);
+    dbarts::BARTFit* fit = ext_stackAllocate(1, dbarts::BARTFit);
     control.initializeFit(fit, &bartControl, &bartModel, &bartData);
     
     size_t estimateOffset = gridCells[0].offset * control.numSimsPerCell;
     
-    bart::Results* bartResults = control.runSampler(fit);
+    dbarts::Results* bartResults = control.runSampler(fit);
     estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
     delete bartResults;
     if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
@@ -378,7 +378,7 @@ namespace {
   }
   
   // this gets called after BART has new samples for us
-  void bartCallbackFunction(void* v_callbackData, bart::BARTFit& fit, bool,
+  void bartCallbackFunction(void* v_callbackData, dbarts::BARTFit& fit, bool,
                             const double* trainingSamples, const double*, double sigma)
   {
     CallbackData* callbackData = (CallbackData*) v_callbackData;
@@ -578,17 +578,17 @@ namespace {
   
   void lookupBARTFunctions(Control& control)
   {
-    control.initializeFit             = (void (*)(bart::BARTFit*, bart::Control*, bart::Model*, bart::Data*)) R_GetCCallable("cbart", "bart_initializeFit");
-    control.invalidateFit             = (void (*)(bart::BARTFit*)) R_GetCCallable("cbart", "bart_invalidateFit");
-    control.runSampler                = (bart::Results* (*)(bart::BARTFit*)) R_GetCCallable("cbart", "bart_runSampler");
-    control.runSamplerForIterations   = (bart::Results* (*)(bart::BARTFit*, size_t, size_t)) R_GetCCallable("cbart", "bart_runSamplerForIterations");
-    control.setResponse               = (void (*)(bart::BARTFit*, const double*)) R_GetCCallable("cbart", "bart_setResponse");
-    control.initializeCGMPrior        = (void (*)(bart::CGMPrior*, double, double)) R_GetCCallable("cbart", "bart_initializeCGMPriorFromOptions");
-    control.invalidateCGMPrior        = (void (*)(bart::CGMPrior*)) R_GetCCallable("cbart", "bart_invalidateCGMPrior");
-    control.initializeNormalPrior     = (void (*)(bart::NormalPrior*, const bart::Control*, double)) R_GetCCallable("cbart", "bart_initializeNormalPriorFromOptions");
-    control.invalidateNormalPrior     = (void (*)(bart::NormalPrior*)) R_GetCCallable("cbart", "bart_invalidateNormalPrior");
-    control.initializeChiSquaredPrior = (void (*)(bart::ChiSquaredPrior*, double, double)) R_GetCCallable("cbart", "bart_initializeChiSquaredPriorFromOptions");
-    control.invalidateChiSquaredPrior = (void (*)(bart::ChiSquaredPrior*)) R_GetCCallable("cbart", "bart_invalidateChiSquaredPrior");
+    control.initializeFit             = (void (*)(dbarts::BARTFit*, dbarts::Control*, dbarts::Model*, dbarts::Data*)) R_GetCCallable("dbarts", "dbarts_initializeFit");
+    control.invalidateFit             = (void (*)(dbarts::BARTFit*)) R_GetCCallable("dbarts", "dbarts_invalidateFit");
+    control.runSampler                = (dbarts::Results* (*)(dbarts::BARTFit*)) R_GetCCallable("dbarts", "dbarts_runSampler");
+    control.runSamplerForIterations   = (dbarts::Results* (*)(dbarts::BARTFit*, size_t, size_t)) R_GetCCallable("dbarts", "dbarts_runSamplerForIterations");
+    control.setResponse               = (void (*)(dbarts::BARTFit*, const double*)) R_GetCCallable("dbarts", "dbarts_setResponse");
+    control.initializeCGMPrior        = (void (*)(dbarts::CGMPrior*, double, double)) R_GetCCallable("dbarts", "dbarts_initializeCGMPriorFromOptions");
+    control.invalidateCGMPrior        = (void (*)(dbarts::CGMPrior*)) R_GetCCallable("dbarts", "dbarts_invalidateCGMPrior");
+    control.initializeNormalPrior     = (void (*)(dbarts::NormalPrior*, const dbarts::Control*, double)) R_GetCCallable("dbarts", "dbarts_initializeNormalPriorFromOptions");
+    control.invalidateNormalPrior     = (void (*)(dbarts::NormalPrior*)) R_GetCCallable("dbarts", "dbarts_invalidateNormalPrior");
+    control.initializeChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*, double, double)) R_GetCCallable("dbarts", "dbarts_initializeChiSquaredPriorFromOptions");
+    control.invalidateChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*)) R_GetCCallable("dbarts", "dbarts_invalidateChiSquaredPrior");
   }
   
 #ifdef HAVE_GETTIMEOFDAY

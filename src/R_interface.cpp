@@ -2,7 +2,7 @@
 
 #include <cstring>
 #include <cstddef>
-#include <bart/cstdint>
+#include <dbarts/cstdint>
 
 #include <R.h>
 #include <Rdefines.h>
@@ -11,13 +11,8 @@
 #include "sensitivityAnalysis.hpp"
 #include "guessNumCores.hpp"
 
-#include <bart/bartFit.hpp>
-#include <bart/control.hpp>
-#include <bart/data.hpp>
-#include <bart/model.hpp>
-#include <bart/results.hpp>
-
 using std::size_t;
+using std::uint32_t;
 
 extern "C" {
   static SEXP getListElement(SEXP list, const char *str);
