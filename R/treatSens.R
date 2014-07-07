@@ -27,7 +27,7 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
   options(warn=1)
   
   #return error if sensitivity parameter type is illegal
-  if(!(sensParam == "coef" || sensParam = "cor")){
+  if(!(sensParam == "coef" | sensParam == "cor")){
 	stop(cat("Illegal value for sensParam.  Use 'coef' for model coefficients or 'cor' for partial correlations"))
   }
 
@@ -95,6 +95,9 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
     Y = as.numeric(Y)
     Z = as.numeric(Z)
   }
+
+  if(sensParam == "cor" && is.binary(Z))
+	stop("Partial correlations are not available for binary treatment")
   
   n.obs = length(Y)
   
@@ -155,7 +158,8 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
   }else{
     null.resp <- glm(Y~Z, resp.family)
   }
-  
+  sgnTau0 = sign(null.resp$coef[2])
+
   n = length(null.resp$coef)
   Y.res <- Y-null.resp$fitted.values
   if(!is.null(X)) {
@@ -172,19 +176,9 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
     buffer = 0
     warning("Buffer is set to 0 because some of residual variances are too small.")
   }
+   
   
-  extreme.coef = matrix(c(-sqrt((v_Y-buffer)/(1-buffer)), -sqrt(v_Z-buffer), sqrt((v_Y-buffer)/(1-buffer)), sqrt(v_Z-buffer)), nrow = 2) 
-  if(U.model == "binomial" & !is.binary(Z)){ 
-    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
-  }
-  if(U.model == "binomial" & is.binary(Z)){ 
-    lp.quant = quantile(null.trt$linear.predictors, 0.25)
-    zetaz.min = max(-(2-lp.quant), -3) 
-    zetaz.max = min((2-lp.quant), 3)   
-    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), zetaz.min, sqrt(4*v_Y-buffer), zetaz.max), nrow = 2)
-  }
-  
-  if(!is.null(X)) {
+  if(!is.null(X) & sensParam == "coef") {
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
@@ -192,83 +186,22 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
     null.trt.plot <- glm(Z~X.positive, family=trt.family)
     Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   }
+  if(!is.null(X) & sensParam == "cor") {
+    #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
+    Xcoef.flg =  as.vector(ifelse(Xpartials[,2]>=0,1,-1))
+    X.positive = t(t(X)*Xcoef.flg)
+    Xcoef.plot <- X.partials(Y, Z, X.positive, resp.family, trt.family)
+    Xcoef <- Xpartials
+  }
   
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
                      offset = offset, p = NULL)
   
-  if(!is.null(zetay.range) & !is.null(zetaz.range)){ #custom grid range.
-    if(sign(zetaz.range[1])==sign(zetaz.range[2])|any(zetaz.range==0)){ #one quadrant.
-      #define the vector of sens.parm for treatment
-      zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[1])
-      #add jitter if zetaz = 0
-      zetaZ[zetaZ == 0] <- zetaz.range[2]/(grid.dim[1]*3) 
-    }else{ #two quadrants.
-      if(jitter){
-        #change z-dimension to even number
-        grid.dim[1]=ifelse(grid.dim[1]%%2==1,grid.dim[1]+1,grid.dim[1])
-        #create temporary seq to find border.
-        zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[1])
-        #number of cells left and right of vertical axis.
-        dim.left = which.min(abs(zetaZ[which(zetaZ<0)]))
-        dim.right = grid.dim[1] - (dim.left + which.min(zetaZ[which(zetaZ>=0)])) + 1
-        #define the vector of sens.parm for treatment
-        zetaZ <- c(seq(zetaz.range[1], zetaz.range[1]/(dim.left*3), length.out=dim.left),
-                   seq(zetaz.range[2]/(dim.right*3), zetaz.range[2], length.out=dim.right))
-      }else{
-        zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[1])
-      }
-    }
-    
-    if(sign(zetay.range[1])==sign(zetay.range[2])|any(zetay.range==0)){ #one quadrant.
-      #define vector of sens.parm for treatment
-      zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[2])
-      #add a tiny value to show horizontal axes.
-      zetaY[zetaY==0] = zetaY[zetaY==0]+.00001
-    }else{#two quadrants in vertical direction.
-      if(jitter){
-        #change y-dimension to even number
-        grid.dim[2]=ifelse(grid.dim[2]%%2==1,grid.dim[2]+1,grid.dim[2])
-        #create temporary seq to find border.
-        zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[2])
-        #number of cells below and above horizontal axis.
-        dim.down = which.min(abs(zetaY[which(zetaY<0)]))
-        dim.up = grid.dim[2] - (dim.down + which.min(zetaY[which(zetaY>=0)])) + 1
-        #define the vector of sens.parm for response
-        zetaY <- c(seq(zetay.range[1], zetay.range[1]/(dim.down*3), length.out=dim.down),
-                   seq(zetay.range[2]/(dim.up*3), zetay.range[2], length.out=dim.up))        
-      }else{
-        zetaY <- seq(zetay.range[1], zetay.range[2], length.out = grid.dim[2])
-      }
-    }
-    
-    #if 0 in sequences, shift it a bit 
-    zetaY[zetaY == 0] <- zetay.range[2]/(grid.dim[2]*3)
-    zetaZ[zetaZ == 0] <- zetaz.range[2]/(grid.dim[1]*3)
-  }else if(zero.loc == "full"){
-    #change z-dimension to even number
-    grid.dim[1]=ifelse(grid.dim[1]%%2==1,grid.dim[1]+1,grid.dim[1])
-    #number of cells left and right of vertical axis.
-    dim.left = dim.right = grid.dim[1]/2
-    #define the vectors of sens.parms
-    zetaZ <- c(seq(extreme.coef[2,1]*.95, extreme.coef[2,1]*.95/(dim.left*3), length.out=dim.left),
-               seq(extreme.coef[2,2]*.95/(dim.right*3), extreme.coef[2,2]*.95, length.out=dim.right))
-    zetaY <- seq(0.00001, extreme.coef[1,2]*.95, length.out = grid.dim[2])
-  }else{
-    #find ranges for final grid
-    cat("Finding grid range...\n")
-    grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Xcoef.plot, Y, Z, X, 
-                             Y.res, Z.res, v_Y, v_Z, theta, sgnTau0 = sign(null.resp$coef[2]), 
-                             control.fit = control.fit)
-    
-    zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[2])
-    zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[1])
-    
-    #if 0 in sequences, shift it a bit 
-    zetaY[zetaY == 0] <- grid.range[1,2]/(grid.dim[2]*3)
-    zetaZ[zetaZ == 0] <- grid.range[2,2]/(grid.dim[1]*3)
-  }
+  range = calc.range(sensParam, grid.dim, zetaz.range, zetay.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
+  zetaZ = range$zetaZ
+  zetaY = range$zetaY
   
   sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[2], grid.dim[1], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
@@ -289,7 +222,7 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
       control.fit$p = NULL
       out <- matrix(NA,8,nsim)
       for(k in 1:nsim){
-        fit.sens <- fit.GLM.sens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+        fit.sens <- fit.treatSens(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
         control.fit$p = fit.sens$p
         out[1,k] <- fit.sens$sens.coef
         out[2,k] <- fit.sens$sens.se
@@ -330,7 +263,7 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
         
         if(is.null(core)){
           for(k in 1:nsim){
-            fit.sens = fit.treatSens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+            fit.sens = fit.treatSens(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
             control.fit$p = fit.sens$p
             sens.coef[i,j,k] <- fit.sens$sens.coef
             sens.se[i,j,k] <- fit.sens$sens.se
@@ -343,7 +276,7 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
           }        
         }else{ #code for multicore below. For debug change %dopar% to %do%.
           fit.sens <- foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
-            fit.treatSens(Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+            fit.treatSens(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
           }
           sens.coef[i,j,] <- unlist(fit.sens[,1])
           sens.se[i,j,] <- unlist(fit.sens[,2])
@@ -360,7 +293,7 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
   }
   
   if(!is.null(X)) {
-    result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
+    result <- list(model.type = "GLM", sensParam = sensParam, tau = sens.coef, se.tau = sens.se, 
                    zeta.z = zeta.z, zeta.y = zeta.y, 
                    se.zz = zz.se, se.zy = zy.se, 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
@@ -369,7 +302,7 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
                    varnames = all.vars(formula), var_ytilde = v_Y, var_ztilde = v_Z)
     class(result) <- "sensitivity"
   }else{
-    result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
+    result <- list(model.type = "GLM", sensParam = sensParam, tau = sens.coef, se.tau = sens.se, 
                    zeta.z = zeta.z, zeta.y = zeta.y, 
                    se.zz = zz.se, se.zy = zy.se, 
                    Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
@@ -388,7 +321,7 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
 #fit.treatSens
 ###########
 
-fit.treatSens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
+fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
   U.model = control.fit$U.model
@@ -400,7 +333,7 @@ fit.treatSens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, c
   
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
-    U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z))      
+    U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, sensParam))      
   }
   
   if(U.model == "binomial"){
@@ -414,10 +347,10 @@ fit.treatSens <- function(Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, c
     }else{
       stop(paste("Only probit link is allowed."))
     }
+    
+    U = out.contYbinaryZU$U
+    p = out.contYbinaryZU$p
   }
-  
-  U = out.contYbinaryZU$U
-  p = out.contYbinaryZU$p
   
   if(!(class(U) == "try-error")){
     #try keeps loop from failing 

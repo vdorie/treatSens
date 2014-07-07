@@ -10,7 +10,6 @@ sensPlot = function(x,
                   lty.insig = 1,
                   data.line = TRUE,
                   X.pch = NULL,
-			  part.cors = FALSE,
                   signif.level = 0.05,
                   labcex = 0.75,
                   limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
@@ -22,13 +21,12 @@ sensPlot = function(x,
   ##Add row/column for zeta = 0 if not included in grid
   null.tau=x$tau0
   null.se=x$se.tau0
-  if(part.cors){
-	Ycors<- as.numeric(dimnames(x$tau)[[2]])/sqrt(x$var_ztilde)
-	Zcors <- as.numeric(dimnames(x$tau)[[1]])/sqrt(x$var_ytilde) *(1-trt.coef^2)
+  part.cors = x$sensParam == "cor"
+ Zcors = as.numeric(dimnames(x$zeta.z)[[2]]) #horizontal grids of U
+ Ycors = as.numeric(dimnames(x$zeta.y)[[1]]) #vertical grids of U
+ if(part.cors){
 	print.text <- "Partial correlations with U"
   }else {
-  	Zcors = as.numeric(dimnames(x$zeta.z)[[2]]) #horizontal grids of U
-  	Ycors = as.numeric(dimnames(x$zeta.y)[[1]]) #vertical grids of U
 	print.text <- "Coefficients on U" 
   }
 
@@ -38,14 +36,10 @@ sensPlot = function(x,
     Ycors = c(0,Ycors)
   }
   
-  if(part.cors){
-	Xpart = x$XpartCor[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] 
-     	Xpart.plot2 = cbind(Xpart[,1],Xpart[,2], ifelse(Xpart[,2]>=0,1,0)) 
-  }else{
-  	Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
-  	Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
-  	Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
-  }
+  Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
+  Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
+  Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
+  
   #note that due to correlation among Xs, some may not appear on plot
   #because observed partial cors don't map directly to coefs in this case
   #forcing inclusion can lead to difficult to read plot.  

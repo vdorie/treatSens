@@ -1,3 +1,23 @@
+#find positive rYU for which the determinant of the covariance matrix is 0
+#given rYZ and rZU.  If positive root does not exist, return NA
+rootGivenRZ <- function(rYZ, rZU) {
+	rY = sqrt(1-rZU^2)
+	rY[rY < 0] = NA
+	return(rY)
+}
+
+###############
+#Calculate minimum and maximum possible correlations
+###############
+
+#Note this creates a rectangle with corners as close as possible to (-1,1) and (1,1) 
+#some feasible values are excluded as the border between feasible & infeasible is parabolic
+maxCor <- function(Y,Z) {
+	theo.extr <- matrix(c(rep(2^(-1/2),2), -2^(-1/2), 2^(-1/2)), nrow = 2, byrow = T)
+	return(trunc(100*theo.extr)/100)
+}
+
+
 ###############
 #Generate continuous U 
 #Y: continuous response variable
@@ -5,13 +25,19 @@
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z) {
+contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam) {
   
   n <- length(Y)
   
-  delta = zeta_z/v_Z
-  gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) 
-  var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z
+  if(sensParam == "coef"){
+  	delta = zeta_z/v_Z
+  	gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) 
+  	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z	
+  }else{
+   	delta = zeta_z/sqrt(v_Z)
+	gamma = zeta_y/sqrt(v_Y)
+	var.U = 1-zeta_z^2-zeta_y^2
+  }	
   eps.u = rnorm(n, 0, sqrt(var.U))
   U = Y*gamma + Z*delta + eps.u
   

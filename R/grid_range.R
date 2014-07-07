@@ -14,8 +14,8 @@
 
 DandCsearch <- function(x1, x2, y1, y2, tau1, tau2, fn.call) {
   #change coefficients in function call
-  fn.call[7] = (y1+y2)/2
-  fn.call[8] = (x1+x2)/2
+  fn.call[8] = (y1+y2)/2
+  fn.call[9] = (x1+x2)/2
   
   aaa = eval(fn.call)
   tauM = aaa$sens.coef
@@ -34,7 +34,7 @@ DandCsearch <- function(x1, x2, y1, y2, tau1, tau2, fn.call) {
 #Find range for grid search
 #arguments:
 #extreme.cors: matrix of extreme possible correlations
-#Xpart: partial correlations of covariates
+#Xcoef.plot: plotting coordinates for X values
 #Y: response
 #Z: treatment
 #X: matrix of covariates
@@ -44,14 +44,14 @@ DandCsearch <- function(x1, x2, y1, y2, tau1, tau2, fn.call) {
 #sgnTau0: the sign of the estimated treatment effect in the null model
 ###
 
-grid.search <- function(extreme.cors, zero.loc, Xpart, Xcoef.plot, Y, Z, X, 
-                        Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit) {
+grid.search <- function(extreme.cors, zero.loc, Xcoef.plot, Y, Z, X, 
+                        Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, sensParam) {
   if(!is.null(control.fit$resp.family)){
-    fname <- "fit.GLM.sens"
+    fname <- "fit.treatSens"
   }else{
     fname <- ifelse(is.null(control.fit$g), "fit.BART.sens", "fit.LMER.sens")
   }
-  fn.call <- call(fname, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, zetaY=NA, zetaZ=NA, v_Y = v_Y, v_Z = v_Z,
+  fn.call <- call(fname, sensParam = sensParam, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, zetaY=NA, zetaZ=NA, v_Y = v_Y, v_Z = v_Z,
                   control.fit = control.fit, theta = theta)
   
   tau = rep(NA, 3)
@@ -75,8 +75,8 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Xcoef.plot, Y, Z, X,
            extreme.cors[2,2]*.95) #extreme Z
   }
   for(i in 1:3) {
-    fn.call[7] = rY[i]
-    fn.call[8] = rZ[i]
+    fn.call[8] = rY[i]
+    fn.call[9] = rZ[i]
     aaa = eval(fn.call)
     tau[i] =aaa$sens.coef	
   }
@@ -118,8 +118,8 @@ grid.search <- function(extreme.cors, zero.loc, Xpart, Xcoef.plot, Y, Z, X,
            extreme.cors[2,2]*.95) #extreme Z
   }
   for(i in 1:3) {
-    fn.call[7] = rY[i]
-    fn.call[8] = rZ[i]
+    fn.call[8] = rY[i]
+    fn.call[9] = rZ[i]
     aaa = eval(fn.call)
     tau[i] =aaa$sens.coef
     
