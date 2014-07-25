@@ -3,7 +3,7 @@
 
 #include <cstring>
 #include <cmath>
-#include <dbarts/cstdint>
+#include <dbarts/cstdint.hpp>
 #if !defined(HAVE_SYS_TIME_H) && defined(HAVE_GETTIMEOFDAY)
 #undef HAVE_GETTIMEOFDAY
 #endif
@@ -165,7 +165,7 @@ namespace cibart {
                          bool verbose)
   {
     Control control = { estimand, confounderModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
-                        numTreeSamplesToThin, numThreads, theta, verbose };
+                        numTreeSamplesToThin, numThreads, theta, verbose, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     lookupBARTFunctions(control);
     
     Data data(y, z, x, numObservations, numPredictors,
@@ -177,13 +177,24 @@ namespace cibart {
     
     size_t cellNumber = 0;
     for (size_t i = 0; i < numZetaY; ++i) {
-      for (size_t j = 0; j < numZetaZ; ++j) {
-        
-        gridCells[cellNumber].zetaY = zetaYs[i];
-        gridCells[cellNumber].zetaZ = zetaZs[j];
-        gridCells[cellNumber].offset = i + numZetaY * j;
-        gridCells[cellNumber].cellNumber = cellNumber;
-        ++cellNumber;
+      // snake our way through
+      if (i % 2 == 0) {
+        for (size_t j = 0; j < numZetaZ; ++j) {
+          gridCells[cellNumber].zetaY = zetaYs[i];
+          gridCells[cellNumber].zetaZ = zetaZs[j];
+          gridCells[cellNumber].offset = i + numZetaY * j;
+          gridCells[cellNumber].cellNumber = cellNumber;
+          ++cellNumber;
+        }
+      } else {
+        // will wrap around
+        for (size_t j = numZetaZ; j <= numZetaZ; --j) {
+          gridCells[cellNumber].zetaY = zetaYs[i];
+          gridCells[cellNumber].zetaZ = zetaZs[j];
+          gridCells[cellNumber].offset = i + numZetaY * j;
+          gridCells[cellNumber].cellNumber = cellNumber;
+          ++cellNumber;
+        }
       }
     }
     
@@ -219,13 +230,14 @@ namespace cibart {
       ext_mt_create(&threadManager, control.numThreads);
       
       size_t numCellsPerThread;
+      size_t offByOneIndex;
       
-      ext_mt_getNumThreadsForJob(threadManager, numCells, 0, NULL, &numCellsPerThread);
+      ext_mt_getNumThreadsForJob(threadManager, numCells, 0, NULL, &numCellsPerThread, &offByOneIndex);
       
       
       ThreadData* threadData = ext_stackAllocate(control.numThreads, ThreadData);
       void** threadDataPtrs  = ext_stackAllocate(control.numThreads, void*);
-      for (size_t i = 0; i < control.numThreads; ++i) {
+      for (size_t i = 0; i < offByOneIndex; ++i) {
         threadData[i].gridCells         = gridCells + i * numCellsPerThread;
         threadData[i].numGridCells      = numCellsPerThread;
         threadData[i].totalNumGridCells = numCells;
@@ -235,8 +247,17 @@ namespace cibart {
         threadData[i].estimates = estimates;
         threadData[i].standardErrors = standardErrors;
         threadDataPtrs[i] = threadData + i;
-        
-        if (i == control.numThreads) threadData[i].numGridCells = numCells - i * numCellsPerThread;
+      }
+      for (size_t i = offByOneIndex; i < numThreads; ++i) {
+        threadData[i].gridCells         = gridCells + offByOneIndex * numCellsPerThread + (i - offByOneIndex) * (numCellsPerThread - 1);
+        threadData[i].numGridCells      = numCellsPerThread - 1;
+        threadData[i].totalNumGridCells = numCells;
+        threadData[i].control = &control;
+        threadData[i].data    = &data;
+        threadData[i].scratch = new Scratch(control, data);
+        threadData[i].estimates = estimates;
+        threadData[i].standardErrors = standardErrors;
+        threadDataPtrs[i] = threadData + i;
       }
       
 #ifdef HAVE_GETTIMEOFDAY
@@ -578,17 +599,17 @@ namespace {
   
   void lookupBARTFunctions(Control& control)
   {
-    control.initializeFit             = (void (*)(dbarts::BARTFit*, dbarts::Control*, dbarts::Model*, dbarts::Data*)) R_GetCCallable("dbarts", "dbarts_initializeFit");
-    control.invalidateFit             = (void (*)(dbarts::BARTFit*)) R_GetCCallable("dbarts", "dbarts_invalidateFit");
-    control.runSampler                = (dbarts::Results* (*)(dbarts::BARTFit*)) R_GetCCallable("dbarts", "dbarts_runSampler");
-    control.runSamplerForIterations   = (dbarts::Results* (*)(dbarts::BARTFit*, size_t, size_t)) R_GetCCallable("dbarts", "dbarts_runSamplerForIterations");
-    control.setResponse               = (void (*)(dbarts::BARTFit*, const double*)) R_GetCCallable("dbarts", "dbarts_setResponse");
-    control.initializeCGMPrior        = (void (*)(dbarts::CGMPrior*, double, double)) R_GetCCallable("dbarts", "dbarts_initializeCGMPriorFromOptions");
-    control.invalidateCGMPrior        = (void (*)(dbarts::CGMPrior*)) R_GetCCallable("dbarts", "dbarts_invalidateCGMPrior");
-    control.initializeNormalPrior     = (void (*)(dbarts::NormalPrior*, const dbarts::Control*, double)) R_GetCCallable("dbarts", "dbarts_initializeNormalPriorFromOptions");
-    control.invalidateNormalPrior     = (void (*)(dbarts::NormalPrior*)) R_GetCCallable("dbarts", "dbarts_invalidateNormalPrior");
-    control.initializeChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*, double, double)) R_GetCCallable("dbarts", "dbarts_initializeChiSquaredPriorFromOptions");
-    control.invalidateChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*)) R_GetCCallable("dbarts", "dbarts_invalidateChiSquaredPrior");
+    control.initializeFit             = (void (*)(dbarts::BARTFit*, dbarts::Control*, dbarts::Model*, dbarts::Data*)) R_GetCCallable("dbarts", "initializeFit");
+    control.invalidateFit             = (void (*)(dbarts::BARTFit*)) R_GetCCallable("dbarts", "invalidateFit");
+    control.runSampler                = (dbarts::Results* (*)(dbarts::BARTFit*)) R_GetCCallable("dbarts", "runSampler");
+    control.runSamplerForIterations   = (dbarts::Results* (*)(dbarts::BARTFit*, size_t, size_t)) R_GetCCallable("dbarts", "runSamplerForIterations");
+    control.setResponse               = (void (*)(dbarts::BARTFit*, const double*)) R_GetCCallable("dbarts", "setResponse");
+    control.initializeCGMPrior        = (void (*)(dbarts::CGMPrior*, double, double)) R_GetCCallable("dbarts", "initializeCGMPriorFromOptions");
+    control.invalidateCGMPrior        = (void (*)(dbarts::CGMPrior*)) R_GetCCallable("dbarts", "invalidateCGMPrior");
+    control.initializeNormalPrior     = (void (*)(dbarts::NormalPrior*, const dbarts::Control*, double)) R_GetCCallable("dbarts", "initializeNormalPriorFromOptions");
+    control.invalidateNormalPrior     = (void (*)(dbarts::NormalPrior*)) R_GetCCallable("dbarts", "invalidateNormalPrior");
+    control.initializeChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*, double, double)) R_GetCCallable("dbarts", "initializeChiSquaredPriorFromOptions");
+    control.invalidateChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*)) R_GetCCallable("dbarts", "invalidateChiSquaredPrior");
   }
   
 #ifdef HAVE_GETTIMEOFDAY

@@ -5,7 +5,7 @@
 #include <R.h>
 
 #define MAX_BUFFER_LENGTH 8192
-void ext_throwError(const char* format, ...)
+NORETURN void ext_throwError(const char* format, ...)
 {
   char buffer[MAX_BUFFER_LENGTH];
   
@@ -50,7 +50,6 @@ void ext_issueWarning(const char* format, ...)
   va_start(argsPointer, format);
   vsnprintf(buffer, MAX_BUFFER_LENGTH, format, argsPointer);
   va_end(argsPointer);
-  
   
   for (size_t i = 0; i < MAX_BUFFER_LENGTH; ++i) {
     if (buffer[i] == '\0' && i < MAX_BUFFER_LENGTH - 1) {

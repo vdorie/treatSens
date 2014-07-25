@@ -51,6 +51,37 @@ uint64_t ext_simulateUnsignedIntegerUniformInRange(uint64_t min_inclusive, uint6
   return actualMin + (uint64_t) (u * range);
 }
 
+double ext_simulateLowerTruncatedStandardNormal(double lowerBound)
+{
+  double x;
+  if (lowerBound < 0.0) {
+    x = ext_simulateStandardNormal();
+    while (x < lowerBound) x = ext_simulateStandardNormal();
+  } else {
+    double a = 0.5 * (lowerBound + sqrt(lowerBound * lowerBound + 4.0));
+    double u, r;
+    
+    do {
+      x = ext_simulateExponential(1.0 / a) + lowerBound;
+      u = ext_simulateContinuousUniform();
+      double diff = x - a;
+      r = exp(-0.5 * diff * diff);
+    } while (u > r);
+  }
+  return x;
+}
+
+double ext_simulateLowerTruncatedNormalScale1(double mean, double bound) {
+  return mean + ext_simulateLowerTruncatedStandardNormal(bound - mean);
+}
+
+double ext_simulateUpperTruncatedNormalScale1(double mean, double bound) {
+  // return -ext_simulateLowerTruncatedNormalScale1(-mean, -bound);
+  return mean - ext_simulateLowerTruncatedStandardNormal(mean - bound);
+  // return -mean - ext_simulateLowerTruncatedStandardNormal(mean - bound);
+}
+
+/*
 double ext_computeAndSumSquaresOfResiduals(const double* x, size_t length, double x_hat)
 {
   if (length == 0) return 0.0;
@@ -71,26 +102,4 @@ double ext_computeAndSumSquaresOfResiduals(const double* x, size_t length, doubl
               (x[i + 4] - x_hat) * (x[i + 4] - x_hat);
   }
   return result;
-}
-
-double ext_computeAndSumSquaresOfResidualsForVector(const double* restrict y, size_t length, const double* restrict y_hat)
-{
-  if (length == 0) return 0.0;
-  
-  double result = 0.0;
-  size_t lengthMod5 = length % 5;
-  
-  if (lengthMod5 != 0) {
-    for (size_t i = 0; i < lengthMod5; ++i) result += (y[i] - y_hat[i]) * (y[i] - y_hat[i]);
-    if (length < 5) return result;
-  }
-  
-  for (size_t i = lengthMod5; i < length; i += 5) {
-    result += (y[i] - y_hat[i]) * (y[i] - y_hat[i]) + 
-              (y[i + 1] - y_hat[i + 1]) * (y[i + 1] - y_hat[i + 1]) + 
-              (y[i + 2] - y_hat[i + 2]) * (y[i + 2] - y_hat[i + 2]) +
-              (y[i + 3] - y_hat[i + 3]) * (y[i + 3] - y_hat[i + 3]) +
-              (y[i + 4] - y_hat[i + 4]) * (y[i + 4] - y_hat[i + 4]);
-  }
-  return result;
-}
+} */
