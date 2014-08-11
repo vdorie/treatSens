@@ -2,7 +2,7 @@
 
 #include <cstring>
 #include <cstddef>
-#include <dbarts/cstdint>
+#include <dbarts/cstdint.hpp>
 
 #include <R.h>
 #include <Rdefines.h>
