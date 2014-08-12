@@ -1,10 +1,3 @@
-source("genU_contY.R")
-source("object_def.R")
-source("grid_range.R")
-source("housekeeping.R")
-source("warnings.R")
-source("GLM_sens.R")
-
 ###############
 #Main function call
 ###############

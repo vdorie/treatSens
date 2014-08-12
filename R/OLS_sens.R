@@ -1,8 +1,3 @@
-source("object_def.R")
-source("grid_range.R")
-source("housekeeping.R")
-source("GLM_sens.R")
-
 ###############
 #Main function call
 ###############
