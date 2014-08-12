@@ -1,8 +1,8 @@
 #include "config.hpp"
 
-#include <cstring>
 #include <cstddef>
 #include <dbarts/cstdint.hpp>
+#include <cstring>
 
 #include <R.h>
 #include <Rdefines.h>
