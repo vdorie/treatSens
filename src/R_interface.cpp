@@ -14,7 +14,7 @@
 using std::size_t;
 using std::uint32_t;
 
-extern "C" {
+namespace {
   static SEXP getListElement(SEXP list, const char *str);
   
   SEXP cibart_fitSensitivityAnalysis(SEXP y, SEXP z, SEXP xExpr,
@@ -185,7 +185,7 @@ extern "C" {
   {
     SEXP elmt = R_NilValue, names = getAttrib(list, R_NamesSymbol);
     for (int i = 0; i < length(list); i++)
-      if (strcmp(CHAR(STRING_ELT(names, i)), str) == 0) {
+      if (std::strcmp(CHAR(STRING_ELT(names, i)), str) == 0) {
         elmt = VECTOR_ELT(list, i);
         break;
       }
@@ -215,7 +215,9 @@ extern "C" {
     CALLDEF(cibart_guessNumCores, 0),
     {NULL, NULL, 0}
   };
-  
+}
+
+extern "C" { 
   void R_init_SensBART(DllInfo* info)
   {
     R_registerRoutines(info, NULL, callMethods, NULL, NULL);
