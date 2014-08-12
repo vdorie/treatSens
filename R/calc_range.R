@@ -1,12 +1,12 @@
 ############
 #Generic function splits on sensitivity parameter type
 ############
-calc.range = function(sensParam, grid.dim, zetaz.range, zetay.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt) {
+calc.range = function(sensParam, grid.dim, zetaz.range, zetay.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, jitter) {
 	if(sensParam == "coef") 
-		result = calc.range.coef(grid.dim, zetaz.range, zetay.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
+		result = calc.range.coef(grid.dim, zetaz.range, zetay.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, jitter)
 
 	if(sensParam == "cor") 
-		result = calc.range.cor(grid.dim, zetaz.range, zetay.range, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit)
+		result = calc.range.cor(grid.dim, zetaz.range, zetay.range, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, jitter)
 
 	return(result)
 }
@@ -16,7 +16,7 @@ calc.range = function(sensParam, grid.dim, zetaz.range, zetay.range, buffer, U.m
 #function to calculate vector of sensitivity paramters 
 #using coefficients as SPs
 ##############
-calc.range.coef = function(grid.dim, zetaz.range, zetay.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit,null.trt) {
+calc.range.coef = function(grid.dim, zetaz.range, zetay.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit,null.trt, jitter) {
 	extreme.coef = matrix(c(-sqrt((v_Y-buffer)/(1-buffer)), -sqrt(v_Z-buffer), sqrt((v_Y-buffer)/(1-buffer)), sqrt(v_Z-buffer)), nrow = 2) 
 	  if(U.model == "binomial" & !is.binary(Z)){ 
 	    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
@@ -28,8 +28,20 @@ calc.range.coef = function(grid.dim, zetaz.range, zetay.range, buffer, U.model, 
 	    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), zetaz.min, sqrt(4*v_Y-buffer), zetaz.max), nrow = 2)
 	  }
 
-	  if(!is.null(zetay.range) & !is.null(zetaz.range)){ #custom grid range.
-	    if(sign(zetaz.range[1])==sign(zetaz.range[2])|any(zetaz.range==0)){ #one quadrant.
+
+  if(!is.null(zetay.range) & !is.null(zetaz.range)){ #custom grid range.
+    if(zetay.range[1] < extreme.coef[1,1] | zetay.range[2] > extreme.coef[1,2]){
+      zetay.range[1] = max(zetay.range[1], extreme.coef[1,1])
+      zetay.range[2] = min(zetay.range[2], extreme.coef[1,2])
+      warning("Sensitivity parameter range for Y inconsistent with possible values given data.  Range restricted.")
+    }
+    if(zetaz.range[1] < extreme.coef[2,1] | zetaz.range[2] > extreme.coef[2,2]){
+      zetaz.range[1] = max(zetaz.range[1], extreme.coef[2,1])
+      zetaz.range[2] = min(zetaz.range[2], extreme.coef[2,2])
+      warning("Sensitivity parameter range for Z inconsistent with possible values given data.  Range restricted.")
+    }
+    
+    if(sign(zetaz.range[1])==sign(zetaz.range[2])|any(zetaz.range==0)){ #one quadrant.
 	      #define the vector of sens.parm for treatment
 	      zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[1])
 	      #add jitter if zetaz = 0
@@ -110,15 +122,25 @@ calc.range.coef = function(grid.dim, zetaz.range, zetay.range, buffer, U.model, 
 ##############
 calc.range.cor = function(grid.dim, zetaz.range, zetay.range, U.model, zero.loc, Xcoef.plot, Y, Z, X, 
 	                             Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, 
-	                             control.fit) {
+	                             control.fit, jitter) {
   
 	extreme.cors = maxCor(Y.res, Z.res)
 	if(U.model == "binomial") {
  		extreme.cors = 2*dnorm(0)*extreme.cors
 	}
 
-
 	  if(!is.null(zetay.range) & !is.null(zetaz.range)){ #custom grid range.
+	    if(zetay.range[1] < -extreme.cors[1,1] | zetay.range[2] > extreme.cors[1,2]){
+	      zetay.range[1] = max(zetay.range[1], -extreme.cors[1,1])
+	      zetay.range[2] = min(zetay.range[2], extreme.cors[1,2])
+	      warning("Sensitivity parameter range for Y inconsistent with possible values given data.  Range restricted.")
+	    }
+	    if(zetaz.range[1] < extreme.cors[2,1] | zetaz.range[2] > extreme.cors[2,2]){
+	      zetaz.range[1] = max(zetaz.range[1], extreme.cors[2,1])
+	      zetaz.range[2] = min(zetaz.range[2], extreme.cors[2,2])
+	      warning("Sensitivity parameter range for Z inconsistent with possible values given data.  Range restricted.")
+	    }
+	    
 	    if(sign(zetaz.range[1])==sign(zetaz.range[2])|any(zetaz.range==0)){ #one quadrant.
 	      #define the vector of sens.parm for treatment
 	      zetaZ <- seq(zetaz.range[1], zetaz.range[2], length.out = grid.dim[1])
@@ -172,9 +194,9 @@ calc.range.cor = function(grid.dim, zetaz.range, zetay.range, U.model, zero.loc,
 	    #number of cells left and right of vertical axis.
 	    dim.left = dim.right = grid.dim[1]/2
 	    #define the vectors of sens.parms
-	    zetaZ <- c(seq(extreme.coef[2,1]*.95, extreme.coef[2,1]*.95/(dim.left*3),	length.out=dim.left),
-	               seq(extreme.coef[2,2]*.95/(dim.right*3), extreme.coef[2,2]*.95, length.out=dim.right))
-	    zetaY <- seq(0.00001, extreme.coef[1,2]*.95, length.out = grid.dim[2])
+	    zetaZ <- c(seq(extreme.cors[2,1]*.95, extreme.cors[2,1]*.95/(dim.left*3),	length.out=dim.left),
+	               seq(extreme.cors[2,2]*.95/(dim.right*3), extreme.cors[2,2]*.95, length.out=dim.right))
+	    zetaY <- seq(0.00001, extreme.cors[1,2]*.95, length.out = grid.dim[2])
 	  }else{
 	    #find ranges for final grid
 	    cat("Finding grid range...\n")

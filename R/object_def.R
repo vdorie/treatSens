@@ -21,7 +21,7 @@ summary.sensitivity <- function(object, digits = 3, signif.level = 0.05, part.co
   
   zeroCoords = contourLines(resp.coef, trt.coef, taus, levels = 0)
   if(class(unlist(zeroCoords))=="NULL") {
-    cat("Coefficients on U where tau = 0 could not be calculated.\n\n")
+    cat("Sensitivity parameters where tau = 0 could not be calculated.\n\n")
   } else {    
     zeroCors = round(cbind(zeroCoords[[1]]$y, zeroCoords[[1]]$x),digits)
     colnames(zeroCors) <- c("Y", "Z")
@@ -33,7 +33,7 @@ summary.sensitivity <- function(object, digits = 3, signif.level = 0.05, part.co
   
   noSigCoords = contourLines(resp.coef, trt.coef, taus/apply(object$se.tau, c(1,2), mean), levels = -sign(object$tau0)*qnorm(signif.level/2))
   if(class(unlist(noSigCoords))=="NULL") {
-    cat("Coefficients on U where significance level", signif.level, "is lost could not be calculated.\n\n")
+    cat("Sensitivity parameters where significance level", signif.level, "is lost could not be calculated.\n\n")
   } else {
     noSigCors = round(cbind(noSigCoords[[1]]$y, noSigCoords[[1]]$x),digits)
     colnames(noSigCors) <- c("Y", "Z")
@@ -84,15 +84,15 @@ print.sensitivity = function(x, digits=3, part.cors = F ){
   print(table)
   
   if(!part.cors){
-  	table <- round(apply(x$zeta.y, c(1,2), mean),digits)
+  	table <- round(apply(x$sp.y, c(1,2), mean),digits)
   	colnames(table) <- trt.coef
   	rownames(table) <- resp.coef
   	cat("Estimated zeta.y - coefficient of U in response model\n")
   	print(table)
   
-  	K = dim(x$se.zy)[3]
-  	W = apply(x$se.zy^2, c(1,2), mean)
-  	B = apply(x$zeta.y, c(1,2), sd)^2
+  	K = dim(x$se.spy)[3]
+  	W = apply(x$se.spy^2, c(1,2), mean)
+  	B = apply(x$sp.y, c(1,2), sd)^2
   	table <- round(sqrt(W+(1+1/K)*B),digits)
   	#table <- round(apply(x$se.zy, c(1,2), mean),digits)
   	colnames(table) <- trt.coef
@@ -100,15 +100,15 @@ print.sensitivity = function(x, digits=3, part.cors = F ){
   	cat("Standard error of zeta.y\n")
   	print(table)
   
-  	table <- round(apply(x$zeta.z, c(1,2), mean),digits)
+  	table <- round(apply(x$sp.z, c(1,2), mean),digits)
   	colnames(table) <- trt.coef
   	rownames(table) <- resp.coef
   	cat("Estimated zeta.z - coefficient of U in treatment model\n")
   	print(table)
   
-  	K = dim(x$se.zz)[3]
-  	W = apply(x$se.zz^2, c(1,2), mean)
-  	B = apply(x$zeta.z, c(1,2), sd)^2
+  	K = dim(x$se.spz)[3]
+  	W = apply(x$se.spz^2, c(1,2), mean)
+  	B = apply(x$sp.z, c(1,2), sd)^2
   	table <- round(sqrt(W+(1+1/K)*B),digits)
   	#table <- round(apply(x$se.zz, c(1,2), mean),digits)
   	colnames(table) <- trt.coef

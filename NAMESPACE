@@ -1,1 +1,1 @@
-exportPattern("^[^\\.]")
+export(treatSens, sensPlot)

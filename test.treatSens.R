@@ -9,5 +9,7 @@ Y <- with(lalonde,re78/1000)
 test.norm <- treatSens(Y~Z+X, sensParam = "cor", grid.dim = c(10,10), standardize = T,
                       trt.family = gaussian,
                       resp.family = gaussian,
+                      spz.range = c(-1,1.2),
+                      spy.range = c(0, 0.5),
                       verbose = T, 
-                      nsim = 5, data = lalonde)
+                      nsim = 5)

@@ -3,7 +3,7 @@
 ###############
 treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st term on rhs
                      sensParam = "coef",	    #type of sensitivity parameter: accepts "coef" for model coefficients and "cor" for partial correlations
-				resp.family = gaussian,  #family for GLM of model for response
+				             resp.family = gaussian,  #family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
                      theta = 0.5, 		#Pr(U=1) for binomial model
                      grid.dim = c(20,20),  #1st dimension specifies zeta.z, 2nd dimension specifies zeta.y.
@@ -18,8 +18,8 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
                      iter.j = 10,     	#number of iteration in trt.family=binomial(link="probit")
                      offset = TRUE, 		#Logical: fit models with zeta*U fixed at target value, or with zeta fitted
                      core = NULL, 		#number of CPU cores used (Max=8). Compatibility with Mac is unknown.
-                     zetay.range = NULL,  	#custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
-                     zetaz.range = NULL,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
+                     spy.range = NULL,  	#custom range for sensitivity parameter on Y, e.g.(0,10), zero.loc will be overridden.
+                     spz.range = NULL,  	#custom range for sensitivity parameter on Z, e.g.(-2,2), zero.loc will be overridden.
                      jitter = FALSE,    	#add jitter to grids near the axis.
                      trim.wt = 10     	#the maximum size of weight is set at "trim.wt"% of sample size. type NULL to turn off.
 ){
@@ -31,15 +31,14 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
 	stop(cat("Illegal value for sensParam.  Use 'coef' for model coefficients or 'cor' for partial correlations"))
   }
 
-  #return error if only either zetay.range or zetaz.range is specified.
-  if((is.null(zetay.range) & !is.null(zetaz.range))|(!is.null(zetay.range) & is.null(zetaz.range))){
-    stop(paste("Either zetay.range or zetaz.range is missing."))
+  #return error if only either spy.range or spz.range is specified.
+  if((is.null(spy.range) & !is.null(spz.range))|(!is.null(spy.range) & is.null(spz.range))){
+    stop(paste("Either spy.range or spz.range is missing."))
   }
   
   #calling necessary packages for multicore processing.
   if(!is.null(core)){
     require(doSNOW)
-    require(foreach)
     cl<-makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
     registerDoSNOW(cl)
   }
@@ -47,9 +46,20 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
   # set seed
   set.seed(seed)
   
+  #extract variables from formula
+  form.vars <- parse.formula(formula, data)
+  
+  Y = form.vars$resp
+  Z = form.vars$trt
+  X = form.vars$covars
+  
+  Z = as.numeric(Z)  	#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
+
+  if(is.null(data))   data = data.frame(Y,Z,X)
+  
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warnings(formula, resp.family, trt.family, theta, grid.dim, 
-                           standardize,	nsim,	zero.loc,	verbose, buffer, zetay.range, zetaz.range, weights, data)
+                           standardize,	nsim,	zero.loc,	verbose, buffer, spy.range, spz.range, weights, data)
   
   formula=out.warnings$formula
   resp.family=out.warnings$resp.family
@@ -63,8 +73,8 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
   buffer=out.warnings$buffer
   weights=out.warnings$weights
   data=out.warnings$data
-  zetay.range=out.warnings$zetay.range
-  zetaz.range=out.warnings$zetaz.range
+  spy.range=out.warnings$zetay.range
+  spz.range=out.warnings$zetaz.range
   
   #check and change U.model
   
@@ -76,14 +86,6 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
     U.model = "binomial"    
   }
   
-  #extract variables from formula
-  form.vars <- parse.formula(formula, data)
-  
-  Y = form.vars$resp
-  Z = form.vars$trt
-  X = form.vars$covars
-  
-  Z = as.numeric(Z)		#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
   
   #standardize variables
   if(standardize) {
@@ -199,7 +201,7 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
                      standardize=standardize, weights=weights, iter.j=iter.j, 
                      offset = offset, p = NULL)
   
-  range = calc.range(sensParam, grid.dim, zetaz.range, zetay.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
+  range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, jitter)
   zetaZ = range$zetaZ
   zetaY = range$zetaY
   
@@ -294,8 +296,8 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
   
   if(!is.null(X)) {
     result <- list(model.type = "GLM", sensParam = sensParam, tau = sens.coef, se.tau = sens.se, 
-                   zeta.z = zeta.z, zeta.y = zeta.y, 
-                   se.zz = zz.se, se.zy = zy.se, 
+                   sp.z = zeta.z, sp.y = zeta.y, 
+                   se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
                    Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
@@ -303,8 +305,8 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
     class(result) <- "sensitivity"
   }else{
     result <- list(model.type = "GLM", sensParam = sensParam, tau = sens.coef, se.tau = sens.se, 
-                   zeta.z = zeta.z, zeta.y = zeta.y, 
-                   se.zz = zz.se, se.zy = zy.se, 
+                   sp.z = zeta.z, sp.y = zeta.y, 
+                   se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
                    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]),

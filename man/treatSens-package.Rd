@@ -3,33 +3,34 @@
 \alias{treatSens}
 \docType{package}
 \title{
-Sensitivity analysis for causal inference}
+Sensitivity analysis for causal inference
+}
 \description{
-Utilities to investigate sensitivity to unmeasured confounding in causal models of several types.}
+Utilities to investigate sensitivity to unmeasured confounding in causal models of several types.
+}
 \details{
 \tabular{ll}{
 Package: \tab treatSens\cr
 Type: \tab Package\cr
-Version: \tab 1.0\cr
-Date: \tab 2013-10-30\cr
+Version: \tab 0.1\cr
+Date: \tab 2014-07-07\cr
+Depends: \tab R (>= 2.13.0), lme4\cr
+Suggests: \tab doSNOW\cr
 License: \tab GPL-2\cr
 LazyLoad: \tab yes\cr
+LazyData: \tab yes\cr
+Built: \tab R 3.1.1; ; 2014-08-12 16:49:37 UTC; windows\cr
 }
-~~ An overview of how to use the package, including the most important ~~
-~~ functions ~~
+~~ An overview of how to use the package, including the most important functions ~~
 }
 \author{
-Nicole Bohme Carnegie <carnegie@hsph.harvard.edu>
-Masataka Harada <mh166@nyu.edu>
-Jennifer Hill <jennifer.hill@nyu.edu>
+c(person("Nicole Bohme", "Carnegie", email = "carnegin@uwm.edu"), person("Jennifer", "Hill", email = jennifer.hill@nyu.edu), person("Masataka", "Harada", email = mh166@nyu.edu))
 
-Maintainer: Nicole Bohme Carnegie <carnegie@hsph.harvard.edu>
+Maintainer: "Nicole Bohme Carnegie" <carnegin@uwm.edu>
 }
 \references{
 ~~ Literature or other references for background information ~~
 }
-~~ Optionally other standard keywords, one per line, from file KEYWORDS in ~~
-~~ the R documentation directory ~~
 \keyword{ package }
 \seealso{
 ~~ Optional links to other man pages, e.g. ~~

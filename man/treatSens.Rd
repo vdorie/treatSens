@@ -19,6 +19,8 @@ zetaz.range = NULL, jitter = FALSE, trim.wt = 10)
 \arguments{
   \item{formula}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a symbolic description of the model to be fitted.
 }
+  \item{sensParam}{a string giving the choice of sensitivity parameter.  Supports "coef" for model coefficient and "cor" for partial correlations (with continuous treatment only)
+}
   \item{resp.family}{an assumed family for GLM of the response model. The default is \code{gaussian}. 
 }
   \item{trt.family}{an assumed family for GLM of the treatment model. The default is \code{gaussian}. \code{binomial(link="probit")} can be also specified.
@@ -49,19 +51,17 @@ zetaz.range = NULL, jitter = FALSE, trim.wt = 10)
 }
   \item{core}{number of CPU cores used for parallel processing (Max=8). The default is \code{NULL}. 
 }
-  \item{zetay.range}{custom range for zeta^y(the coefficient on U in the outcome model), e.g. \code{c(0,2)}. When this option is specified, \code{zetaz.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
+  \item{spy.range}{custom range for the sensitiviy parameter associated with Y (the coefficient on U in the outcome model or partial correlation of U with Y given X), e.g. \code{c(0,2)}. When this option is specified, \code{zetaz.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
 }
-  \item{zetaz.range}{custom range for zeta^z(the coefficient on U in the treatment model), e.g. \code{c(-2,2)}. When this option is specified, \code{zetay.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
+  \item{spz.range}{custom range for the sensitivity parameter associated with Z (the coefficient on U in the treatment model or partial correlation of U with Z given X), e.g. \code{c(-2,2)}. When this option is specified, \code{zetay.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
 }
   \item{jitter}{logical. If \code{TRUE}, this option adds jitter to grids near the axis. The default is \code{FALSE}.
 }
   \item{trim.wt}{the maximum size of weight relative to the sample size. This option is used only when \code{weights} option is specified. The default is \code{10}. For example, \code{trim.wt=10} in the dataset with 300 observations means the maximum size of weight is 30. 
 }
 }
-
 \details{TBW
 }
-
 \value{
 \code{treatSens} returns an object of class "\code{sensitivity}".
 
@@ -88,18 +88,15 @@ An object of class "\code{sensitivity}" is a list containing the following compo
 \item{Xcoef}{the coefficients on the covariates in the treatment model (1st column) and the outcome model (2nd column) without unobserved confounding (i.e. naive model).}
 \item{Xcoef.plot}{the coefficients on the covariates in the treatment model (1st column) and the outcome model (2nd column) without unobserved confounding (i.e. naive model) for plotting purpose.}
 }
-
 \note{
-When \code{weights} are specified, \code{GLM.sens} returns the clustered robust standard errors.
+When \code{weights} are specified, \code{treatSens} returns the clustered robust standard errors.
 
 Matrices and data frames should include only complete cases.
 }
-
 \references{TBW
 }
 \author{Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
 }
-
 \seealso{
 \code{\link{glm}}
 }
@@ -164,4 +161,4 @@ print(out.bin) #prints average values for each cell in grid of: tau, SE of tau, 
 
 plotSA(out.bin) # draw contour plot
 
-
+}

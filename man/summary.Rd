@@ -1,14 +1,14 @@
-\name{summary}
+\name{summary.sensitivity}
 \alias{summary}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-%%  ~~function to do ... ~~
+ Summarizing sensitivity analysis results
 }
 \description{
-%%  ~~ A concise (1-5 lines) description of what the function does. ~~
+ Summary method for objects of class "sensitivity".
 }
 \usage{
-summary(object, ...)
+ summary(object, ...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -29,21 +29,16 @@ summary(object, ...)
 %%  \item{comp2 }{Description of 'comp2'}
 %% ...
 }
-\references{
-%% ~put references to the literature/web site here ~
+\references{TBW
 }
-\author{
-%%  ~~who you are~~
+\author{Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
 }
-\note{
-%%  ~~further notes~~
-}
-
-%% ~Make other sections like Warning with \section{Warning }{....} ~
 
 \seealso{
-%% ~~objects to See Also as \code{\link{help}}, ~~~
+\code{\link{treatSens}} \code{\link{glm}}
 }
+
+
 \examples{
 ##---- Should be DIRECTLY executable !! ----
 ##-- ==>  Define data, use random,

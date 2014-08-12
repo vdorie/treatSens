@@ -22,8 +22,8 @@ sensPlot = function(x,
   null.tau=x$tau0
   null.se=x$se.tau0
   part.cors = x$sensParam == "cor"
- Zcors = as.numeric(dimnames(x$zeta.z)[[2]]) #horizontal grids of U
- Ycors = as.numeric(dimnames(x$zeta.y)[[1]]) #vertical grids of U
+ Zcors = as.numeric(dimnames(x$sp.z)[[2]]) #horizontal grids of U
+ Ycors = as.numeric(dimnames(x$sp.y)[[1]]) #vertical grids of U
  if(part.cors){
 	print.text <- "Partial correlations with U"
   }else {
