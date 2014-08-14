@@ -218,7 +218,7 @@ namespace {
 }
 
 extern "C" { 
-  void R_init_SensBART(DllInfo* info)
+  void R_init_cibart(DllInfo* info)
   {
     R_registerRoutines(info, NULL, callMethods, NULL, NULL);
   }
