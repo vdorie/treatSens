@@ -188,7 +188,7 @@ namespace cibart {
         }
       } else {
         // will wrap around
-        for (size_t j = numZetaZ; j <= numZetaZ; --j) {
+        for (size_t j = numZetaZ - 1; j < numZetaZ; --j) {
           gridCells[cellNumber].zetaY = zetaYs[i];
           gridCells[cellNumber].zetaZ = zetaZs[j];
           gridCells[cellNumber].offset = i + numZetaY * j;
