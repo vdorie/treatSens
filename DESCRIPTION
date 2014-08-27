@@ -11,4 +11,6 @@ Depends:
   dbarts (>= 0.8)
 LinkingTo:
   dbarts
+Suggests:
+  testthat
 License: GPL (>= 2)

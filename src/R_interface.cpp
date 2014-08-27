@@ -11,11 +11,71 @@
 #include "sensitivityAnalysis.hpp"
 #include "guessNumCores.hpp"
 
+#include <glm/glm.h>
+
 using std::size_t;
 using std::uint32_t;
 
 namespace {
   static SEXP getListElement(SEXP list, const char *str);
+  
+  SEXP cibart_glmFit(SEXP y, SEXP n, SEXP x, SEXP w, SEXP offset)
+  {
+    double* yPtr = NULL;
+    size_t numObs = LENGTH(y);
+    if (!isReal(y)) {
+      if (!isInteger(y)) error("y must be of type real or integer");
+      yPtr = new double[numObs];
+      int* yInt = INTEGER(y);
+      
+      for (size_t i = 0; i < numObs; ++i) 
+        yPtr[i] = (yInt[i] != 0.0 ? 1.0 : 0.0);
+    }
+      
+    if (!isReal(x)) error("x must be of type real");
+    
+    int* dims;
+    
+    SEXP dimsExpr = GET_DIM(x);
+    if (length(dimsExpr) != 2) error("x must be a matrix");
+    dims = INTEGER(dimsExpr);
+    if ((size_t) dims[0] != numObs) error("num rows in x must match length of y");
+    
+    size_t numCoefs = (size_t) dims[1];
+    
+    double* nPtr = NULL;
+    if (!isNull(n)) {
+      if ((size_t) LENGTH(n) != numObs) error("length of n must match that of y");
+      nPtr = REAL(n);
+    }
+    
+    double* wPtr = NULL;
+    if (!isNull(w)) {
+      if ((size_t) LENGTH(w) != numObs) error("length of w must match that of y");
+      wPtr = REAL(w);
+    }
+    
+    double* offsetPtr = NULL;
+    if (!isNull(offset)) {
+      if ((size_t) LENGTH(offset) != numObs) error("length of offset must match that of y");
+      offsetPtr = REAL(offset);
+    }
+    
+    size_t scratchSize = glm_getDoubleScratchSize(numObs, numCoefs);
+    double* scratch = new double[scratchSize];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, numCoefs));
+    
+    glm_fitGeneralizedLinearModel(yPtr == NULL ? REAL(y) : yPtr, nPtr, numObs, REAL(x), numCoefs, wPtr, offsetPtr,
+                                  REAL(result), GLM_FAMILY_BINOMIAL, GLM_LINK_PROBIT, 30, scratch);
+    
+    delete [] scratch;
+    if (yPtr != NULL) delete [] yPtr;
+    
+    UNPROTECT(1);
+    
+    return(result);
+  }
   
   SEXP cibart_fitSensitivityAnalysis(SEXP y, SEXP z, SEXP xExpr,
                                      SEXP z_testExpr, SEXP x_testExpr,
@@ -213,6 +273,7 @@ namespace {
   static R_CallMethodDef callMethods[] = {
     CALLDEF(cibart_fitSensitivityAnalysis, 12),
     CALLDEF(cibart_guessNumCores, 0),
+    CALLDEF(cibart_glmFit, 5),
     {NULL, NULL, 0}
   };
 }

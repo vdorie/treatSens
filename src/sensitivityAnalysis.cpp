@@ -171,7 +171,6 @@ namespace cibart {
     Data data(y, z, x, numObservations, numPredictors,
               z_test, x_test, numTestObservations);
     
-    
     size_t numCells = numZetaY * numZetaZ;
     GridCell* gridCells = new GridCell[numCells];
     
@@ -326,9 +325,9 @@ namespace {
     for (size_t i = 0; i < data.numBartPredictors; ++i) variableTypes[i] = dbarts::ORDINAL;
     
     
-    dbarts::Data bartData(scratch.yMinusZetaU, data.bart_x_train, data.x_test, NULL, NULL,
-                        data.numObservations, data.numBartPredictors, data.numTestObservations,
-                        sigmaEstimate, variableTypes, maxNumCuts);
+    dbarts::Data bartData(scratch.yMinusZetaU, data.bart_x_train, data.x_test, NULL, NULL, NULL,
+                          data.numObservations, data.numBartPredictors, data.numTestObservations,
+                          sigmaEstimate, variableTypes, maxNumCuts);
     
     dbarts::Control bartControl; // use defaults
     bartControl.verbose = false; // otherwise, waaaay too much
@@ -363,6 +362,8 @@ namespace {
     
     dbarts::Results* bartResults = control.runSampler(fit);
     estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
+    standardErrors[gridCells[0].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
+    
     delete bartResults;
     if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
     
@@ -376,6 +377,8 @@ namespace {
       control.setResponse(fit, scratch.yMinusZetaU);
       
       bartResults = control.runSamplerForIterations(fit, control.numCellSwitchBurnIn, control.numSimsPerCell);
+      
+      estimateOffset = gridCells[i].offset * control.numSimsPerCell;
       
       estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
       standardErrors[gridCells[i].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
@@ -522,8 +525,8 @@ namespace {
     
     double*& linearPredictor(scratch.temp_numObs_1);
     double zHatForU0, zHatForU1;
-    double residForU0, residForU1;
-    double pyzu, pyz;
+    double bartDensityForU0, bartDensityForU1;
+    double probU1, probU0;
     
     ext_leftMultiplyMatrixAndVector(data.glm_x, data.numObservations, data.numGLMPredictors, coefficients, linearPredictor);
     
@@ -531,14 +534,13 @@ namespace {
       zHatForU0 = ext_cumulativeProbabilityOfNormal(linearPredictor[i],         0.0, 1.0);
       zHatForU1 = ext_cumulativeProbabilityOfNormal(linearPredictor[i] + zetaZ, 0.0, 1.0);
       
-      residForU0 = data.y[i] - yMinusZetaUHat[i];
-      residForU1 = residForU0 - zetaY;
+      bartDensityForU0 = ext_densityOfNormal(data.y[i] - yMinusZetaUHat[i], 0.0, sigma);
+      bartDensityForU1 = ext_densityOfNormal(data.y[i] - yMinusZetaUHat[i] - zetaY, 0.0, sigma);
       
-      pyzu = ext_densityOfNormal(residForU1, 0.0, sigma) * (data.z[i] == 1.0 ? zHatForU1 : 1.0 - zHatForU1) * control.theta;
-      pyz  = ext_densityOfNormal(residForU0, 0.0, sigma) * (data.z[i] == 1.0 ? zHatForU0 : 1.0 - zHatForU0) * (1.0 - control.theta) +
-             ext_densityOfNormal(residForU1, 0.0, sigma) * (data.z[i] == 1.0 ? zHatForU1 : 1.0 - zHatForU1) * control.theta;
+      probU0 = bartDensityForU0 * (data.z[i] == 1.0 ? zHatForU0 : 1.0 - zHatForU0) * (1.0 - control.theta);
+      probU1 = bartDensityForU1 * (data.z[i] == 1.0 ? zHatForU1 : 1.0 - zHatForU1) * control.theta;
 
-      scratch.p[i] = pyzu / pyz;
+      scratch.p[i] = probU1 / (probU0 + probU1);
     }
     
     ext_stackFree(coefficients);
