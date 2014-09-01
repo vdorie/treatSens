@@ -57,7 +57,8 @@ zetaz.range = NULL, jitter = FALSE, trim.wt = 10)
 }
   \item{jitter}{logical. If \code{TRUE}, this option adds jitter to grids near the axis. The default is \code{FALSE}.
 }
-  \item{trim.wt}{the maximum size of weight relative to the sample size. This option is used only when \code{weights} option is specified. The default is \code{10}. For example, \code{trim.wt=10} in the dataset with 300 observations means the maximum size of weight is 30. 
+  \item{trim.wt}{the maximum size of weight relative to the sample size. This option is used only when "ATE", "ATT" or "ATC"
+option is selected as weights. The default is \code{10}. For example, \code{trim.wt=10} in the dataset with 300 observations means the maximum size of weight is 30. 
 }
 }
 \details{TBW
