@@ -1,16 +1,16 @@
 ###############
 #Main function call
 ###############
-treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st term on rhs
+treatSens <- function(formula,         #formula: assume treatment is 1st term on rhs
                      sensParam = "coef",	    #type of sensitivity parameter: accepts "coef" for model coefficients and "cor" for partial correlations
 				             resp.family = gaussian,  #family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
                      theta = 0.5, 		#Pr(U=1) for binomial model
-                     grid.dim = c(20,20),  #1st dimension specifies zeta.z, 2nd dimension specifies zeta.y.
+                     grid.dim = c(8,4),  #1st dimension specifies zeta.z, 2nd dimension specifies zeta.y.
                      standardize = TRUE,	#Logical: should variables be standardized?
                      nsim = 20,			#number of simulated Us to average over per cell in grid
                      zero.loc = 1/3,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
-                     verbose = F,
+                     verbose = FALSE,
                      buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
                      weights = NULL, 		#some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
                      data = NULL,
@@ -29,6 +29,12 @@ treatSens <- function(formula = Y~Z+X,         #formula: assume treatment is 1st
   #return error if sensitivity parameter type is illegal
   if(!(sensParam == "coef" | sensParam == "cor")){
 	stop(cat("Illegal value for sensParam.  Use 'coef' for model coefficients or 'cor' for partial correlations"))
+  }
+
+  #change offset to FALSE and print warning if sensParam = "cor"
+  if(sensParam == "cor" & offset){
+	offset = FALSE
+	warning("Changed to offset = FALSE. Cannot use offset method with partial correlations.")
   }
 
   #return error if only either spy.range or spz.range is specified.

@@ -4,16 +4,16 @@
 
 sensPlot = function(x, 
                   contour.levels = NULL,
-                  zero.col = "red",
+                  col.zero = "red",
                   lty.zero = 1,
-                  insig.col = "blue",
+                  col.insig = "blue",
                   lty.insig = 1,
                   data.line = TRUE,
                   X.pch = NULL,
                   signif.level = 0.05,
                   labcex = 0.75,
-                  limit.Xplot = F, #MH: limit plotting covariates to enlarge contour
-                  txtlab = F,  #add text label to the plots of covariates.
+                  limit.Xplot = FALSE, #MH: limit plotting covariates to enlarge contour
+                  txtlab = FALSE,  #add text label to the plots of covariates.
                   which.txtlab = NULL, #enter numeric vector to specify which label to show. e.g. c(1:3) shows first 3 covariates.
                   ...) {
   #note in help: if contours are too rough, up nsim in sens fn
@@ -45,6 +45,8 @@ sensPlot = function(x,
   #forcing inclusion can lead to difficult to read plot.  
   if(is.null(X.pch)){
     X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
+  }else{
+    X.pch = ifelse(Xpart[,2]>=0,X.pch[1],X.pch[2])	
   }
   
   nr = length(Zcors); nc = length(Ycors)
@@ -98,14 +100,14 @@ sensPlot = function(x,
   if (limit.Xplot) {
     #old codes
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
-         ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)), pch = X.pch, xlab = xlab, ylab = ylab,...)    
+         ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)), pch = X.pch, xlab = xlab, ylab = ylab)    
   } else {
     #MH: define max, min of plots
     xplot.min = ifelse(min(Zcors, na.rm = T)<min(Xpart.plot[,1]),min(Zcors, na.rm = T),min(Xpart.plot[,1]))
     xplot.max = ifelse(max(Zcors, na.rm = T)>max(Xpart.plot[,1]),max(Zcors, na.rm = T),max(Xpart.plot[,1]))
     yplot.max = ifelse(max(Ycors, na.rm = T)>max(Xpart.plot[,2]),max(Ycors, na.rm = T),max(Xpart.plot[,2]))  
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(xplot.min,xplot.max),
-         ylim = c(0,yplot.max), pch = X.pch, xlab = xlab, ylab = ylab,...)
+         ylim = c(0,yplot.max), pch = X.pch, xlab = xlab, ylab = ylab)
   }
   
   #codes for txtlab
@@ -134,10 +136,10 @@ sensPlot = function(x,
           add = T, labcex = labcex, ...)
   
   contour(Zcors, Ycors, taus, levels = 0, lwd = 2,
-          add = T, col = zero.col,lty = lty.zero,labcex = labcex,...)
+          add = T, col = col.zero,lty = lty.zero,labcex = labcex,...)
   
   contour(Zcors, Ycors, taus/se.taus, labels = "N.S.",
-          levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = insig.col,
+          levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = col.insig,
           lty = lty.insig, labcex = labcex, lwd = 2,...)
   
   

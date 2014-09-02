@@ -1,6 +1,6 @@
-\name{summary.sensitivity}
-\alias{summary}
-%- Also NEED an '\alias' for EACH other topic documented here.
+\name{summary.sensitivity.default}
+\alias{summary.sensitivity}
+\alias{summary.sensitivity.default}
 \title{
  Summarizing sensitivity analysis results
 }
@@ -8,26 +8,23 @@
  Summary method for objects of class "sensitivity".
 }
 \usage{
- summary(object, ...)
+ \method{summary}{sensitivity}(object, \dots)
+ \method{summary.sensitivity}{default}(object, digits = 3, signif.level = 0.05, \dots)
 }
-%- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{object}{
-%%     ~~Describe \code{object} here~~
+An object of class "sensitivity".
 }
-  \item{\dots}{
-%%     ~~Describe \code{\dots} here~~
+  \item{digits}{The number of digits used for rounding.
+}
+  \item{signif.level}{Function returns a table of combinations
+of sensitivity parameters where this significance level is lost.
+}
+  \item{\dots}{Included for consistency with \code{summary} generic.
 }
 }
 \details{
-%%  ~~ If necessary, more details than the description above ~~
-}
-\value{
-%%  ~Describe the value returned
-%%  If it is a LIST, use
-%%  \item{comp1 }{Description of 'comp1'}
-%%  \item{comp2 }{Description of 'comp2'}
-%% ...
+  Prints a summary of main features of sensitivity analysis distribution.
 }
 \references{TBW
 }
@@ -35,25 +32,10 @@
 }
 
 \seealso{
-\code{\link{treatSens}} \code{\link{glm}}
+\code{\link{treatSens}} 
 }
 
 
 \examples{
-##---- Should be DIRECTLY executable !! ----
-##-- ==>  Define data, use random,
-##--	or do  help(data=index)  for the standard data sets.
-
-## The function is currently defined as
-structure(function (object, ...) 
-standardGeneric("summary"), generic = structure("summary", package = "base"), package = "base", group = list(), valueClass = character(0), signature = "object", default = structure(function (object, 
-    ...) 
-UseMethod("summary"), target = structure(character(0), .Names = character(0), class = structure("signature", package = "methods")), defined = structure(character(0), .Names = character(0), class = structure("signature", package = "methods")), generic = structure("summary", package = "base"), class = structure("derivedDefaultMethod", package = "methods")), skeleton = structure(function (object, 
-    ...) 
-UseMethod("summary"), target = structure(character(0), .Names = character(0), class = structure("signature", package = "methods")), defined = structure(character(0), .Names = character(0), class = structure("signature", package = "methods")), generic = structure("summary", package = "base"), class = structure("derivedDefaultMethod", package = "methods"))(object, 
-    ...), class = structure("standardGeneric", package = "methods"))
+#See treatSens documentation
 }
-% Add one or more standard keywords, see file 'KEYWORDS' in the
-% R documentation directory.
-\keyword{ ~kwd1 }
-\keyword{ ~kwd2 }% __ONLY ONE__ keyword per line

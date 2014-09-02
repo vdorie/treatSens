@@ -1,6 +1,5 @@
 \name{treatSens-package}
 \alias{treatSens-package}
-\alias{treatSens}
 \docType{package}
 \title{
 Sensitivity analysis for causal inference
@@ -21,21 +20,15 @@ LazyLoad: \tab yes\cr
 LazyData: \tab yes\cr
 Built: \tab R 3.1.1; ; 2014-08-12 16:49:37 UTC; windows\cr
 }
-~~ An overview of how to use the package, including the most important functions ~~
+Run dual-parameter sensitivity analysis for continuous response modeled with linear model using \code{treatSens}.  
+Results are available in either tabular form using \code{summary.sensitivity} or graphical form using \code{sensPlot}.
 }
 \author{
-c(person("Nicole Bohme", "Carnegie", email = "carnegin@uwm.edu"), person("Jennifer", "Hill", email = jennifer.hill@nyu.edu), person("Masataka", "Harada", email = mh166@nyu.edu))
+Authors: Nicole Bohme Carnegie, Masataka Harada, Jennifer Hill
 
-Maintainer: "Nicole Bohme Carnegie" <carnegin@uwm.edu>
+Maintainer: Nicole Bohme Carnegie <carnegin@uwm.edu>
 }
 \references{
-~~ Literature or other references for background information ~~
+TBW
 }
 \keyword{ package }
-\seealso{
-~~ Optional links to other man pages, e.g. ~~
-~~ \code{\link[<pkg>:<pkg>-package]{<pkg>}} ~~
-}
-\examples{
-~~ simple examples of the most important functions ~~
-}

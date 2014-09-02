@@ -4,10 +4,15 @@
 #Default to dimensions labeled with target sensitivity parameters
 #commented lines will relabel with average realized s.p.
 ############
-summary.sensitivity <- function(object, digits = 3, signif.level = 0.05, part.cors = FALSE, ...){
+summary.sensitivity <- function(object, ...){
+  summary.sensitivity.default(object, ...)
+}
+
+summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,...){
   Tau <- object$tau
-  table <- round(apply(Tau, c(1,2), mean),digits  )
+  table <- round(apply(Tau, c(1,2), mean),digits)
   taus <- apply(object$tau, c(1,2), mean)
+  part.cors = object$sensParam == "cor"
   
   if(part.cors){
 	trt.coef <- as.numeric(dimnames(taus)[[2]])/sqrt(object$var_ztilde)
