@@ -55,7 +55,7 @@ spz.range = NULL, jitter = FALSE, trim.wt = 10)
 }
   \item{jitter}{logical. If \code{TRUE}, this option adds jitter to grids near the axis. The default is \code{FALSE}.
 }
-  \item{trim.wt}{the maximum size of weight as a percentage of the sample size of the inferential group for the causal estimand. This option is used only when \code{weights} option is specified. The default is \code{10}. For example, \code{trim.wt=10} in a dataset with 300 treated observations when the estimand has been set to "ATT" gives a maximum weight of 30. 
+  \item{trim.wt}{the maximum size of weight as a percentage of the sample size of the inferential group for the causal estimand. This option is used only when \code{weights} option is specified as  "ATE", "ATT" or "ATC". The default is \code{10}. For example, \code{trim.wt=10} in a dataset with 300 treated observations when the estimand has been set to "ATT" gives a maximum weight of 30. 
 }
 }
 \details{TBW
