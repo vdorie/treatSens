@@ -42,14 +42,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     stop(paste("Either spy.range or spz.range is missing."))
   }
   
-  #calling necessary packages for multicore processing.
-  if(!is.null(core)){
-    require(doSNOW)
-    cl<-makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
-    registerDoSNOW(cl)
-  }
-  
-  # set seed
+   # set seed
   set.seed(seed)
   
   #extract variables from formula
@@ -231,6 +224,14 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
   #fill in grid
   cell = 0
+  
+  #calling necessary packages for multicore processing.
+  if(!is.null(core)){
+    require(doParallel)
+    require(foreach)
+    cl<-makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
+    registerDoParallel(cl)
+  }
   
   if(!is.null(core) & U.model=="binomial"){
     ngrid = grid.dim[2]*grid.dim[1]

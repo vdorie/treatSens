@@ -58,7 +58,7 @@ spz.range = NULL, jitter = FALSE, trim.wt = 10)
   \item{trim.wt}{the maximum size of weight as a percentage of the sample size of the inferential group for the causal estimand. This option is used only when \code{weights} option is specified as  "ATE", "ATT" or "ATC". The default is \code{10}. For example, \code{trim.wt=10} in a dataset with 300 treated observations when the estimand has been set to "ATT" gives a maximum weight of 30. 
 }
 }
-\details{TBW
+\details{This function performs a dual-parameter sensitivity analysis for unobserved confounding by drawing simulated potential confounders U from the conditional distribution of U given observed response, treatment and covariates.
 }
 \value{
 \code{treatSens} returns an object of class "\code{sensitivity}".
@@ -101,10 +101,7 @@ Matrices and data frames should include only complete cases.
 \code{\link{glm}}
 }
 \examples{
-###################################
-# Example with continuous treatment
-
-N = 1000          #number of observation
+N = 500          #number of observations
 
 zetay = .5             #coefficient on U in the outcome model
 zetaz = .5             #coefficient on U in the treatment model
@@ -112,13 +109,17 @@ betaz = c(.75,-.5,.25) #coefficients of X in the treatment model
 betay = c(.5,1,-1.5)   #coefficients of X in the outcome model
 tau = .25              #treatment effect
 
-X = matrix(rnorm(3*N),N,3) #covariates
+X = matrix(rnorm(3*N),N,3)           #covariates
+
+###################################
+# Example with continuous treatment
+
 U = rnorm(N, 0, 1)         #unmeasured confounder
 Z = rnorm(N,X \%*\% betaz + zetaz*U,1)         #treatment variable
 Y = rnorm(N,X \%*\% betay + zetay*U + tau*Z,2) #outcome variable
 
 # sensitivity analysis
-out.cont <- treatSens(Y~Z+X, grid.dim = c(10,10), nsim = 10,
+out.cont <- treatSens(Y~Z+X, grid.dim = c(10,5), nsim = 5,
                      standardize = FALSE, verbose = TRUE, zero.loc = "full")
 
 summary(out.cont) #Prints average value of tau (trt effect) for each cell in grid.
@@ -129,15 +130,6 @@ sensPlot(out.cont) # draw contour plot
 ###############################
 # Example with binary treatment
 
-N = 1000          #number of observation
-
-zetay = .5             #coefficient on U in the outcome model
-zetaz = .5             #coefficient on U in the treatment model
-betaz = c(.75,-.5,.25) #coefficients of X in the treatment model
-betay = c(.5,1,-1.5)   #coefficients of X in the outcome model
-tau = .25              #treatment effect
-
-X = matrix(rnorm(3*N),N,3)           #covariates
 U = rbinom(N,1,.5)                   #unmeasured confounder
 ps = pnorm(X\%*\%betaz + zetaz*(U-.5)) #propensity score
 Z = rbinom(N,1,ps)                   #treatment variable
@@ -145,11 +137,11 @@ epsilon = rnorm(N,0,2)               #error term
 Y0 = X\%*\%betay + zetay*(U-.5) + epsilon       #potential outcome(Z=0)
 Y1 = X\%*\%betay + zetay*(U-.5) + tau + epsilon #potential outcome(Z=1)
 Y = Y0*(1-Z) + Y1*Z                  #realization of potential outcome
-dat = cbind(Y,Z,X)         #create data matrix (or data.frame)
 
 # sensitivity analysis
-out.bin <- treatSens(Y~Z+X, trt.family = binomial(link="probit"), 
-                    grid.dim = c(5,5), standardize = FALSE, verbose = TRUE)
+out.bin <- treatSens(Y~Z+X, trt.family = binomial(link="probit"), nsim = 3, 
+                      spy.range = c(0,4), spz.range = c(-2,2),grid.dim = c(5,3),
+                      standardize = FALSE, verbose = TRUE)
 
 summary(out.bin) #Prints average value of tau (trt effect) for each cell in grid.
 
