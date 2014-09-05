@@ -63,8 +63,6 @@ spz.range = NULL, jitter = FALSE, trim.wt = 10)
 \value{
 \code{treatSens} returns an object of class "\code{sensitivity}".
 
-The function \code{summary.sensitivity} is used to obtain the sets of the coefficients on U where tau = 0 and where significance level 0.05 is lost, and the estimated treatment effects for each grid points.
-
 An object of class "\code{sensitivity}" is a list containing the following components:
 \item{model.type}{estimation methods used (i.e. "\code{GLM}"").  Currently only GLM methods are available, but in future other types of models may be added. 
 }
@@ -98,7 +96,7 @@ Matrices and data frames should include only complete cases.
 \author{Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
 }
 \seealso{
-\code{\link{glm}}
+\code{\link{sensPlot}} \code{\link{summary.sensitivity}} \code{\link{glm}}
 }
 \examples{
 N = 500          #number of observations
