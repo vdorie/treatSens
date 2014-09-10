@@ -1,1 +1,3 @@
+importFrom("lme4", lmer)
+
 export(treatSens, sensPlot, summary.sensitivity)
