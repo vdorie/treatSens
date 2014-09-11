@@ -26,7 +26,7 @@ of sensitivity parameters where this significance level is lost.
 \details{
   Prints a summary of main features of sensitivity analysis distribution.
 }
-\references{TBW
+\references{Carnegie NB, Hill JH and Harada M. Assessing sensitivity to unmeasured confounding using simulated potential confounders (under review)
 }
 \author{Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
 }

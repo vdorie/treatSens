@@ -48,7 +48,7 @@ covariates for benchmarking.  Options allow highlighting of sensitivity paramete
 or with treatment effect consistent with most extreme covariate.
 }
 \references{
-  TBW
+  Carnegie NB, Hill JH and Harada M. Assessing sensitivity to unmeasured confounding using simulated potential confounders (under review)
 }
 \author{
 Nicole Bohme Carnegie, Masataka Harada, Jennifer Hill

@@ -59,6 +59,8 @@ spz.range = NULL, jitter = FALSE, trim.wt = 10)
 }
 }
 \details{This function performs a dual-parameter sensitivity analysis for unobserved confounding by drawing simulated potential confounders U from the conditional distribution of U given observed response, treatment and covariates.
+
+Weights are calculated for any of three different estimands.  The weights for the ATE are calculated as \eqn{1/\hat{e}(x)}{1/e(x)} for the treatment group observations and \eqn{1/(1-\hat{e}(x))}{1/(1-e(x))} for the control group observations, where \eqn{\hat{e}(x)}{e(x)} denotes the estimated modification score (that is, the estimate of the probability of being treated conditional on observed covariates, \eqn{x}.  The weights for the ATT are 1 for the treatment group observations and \eqn{\hat{e}(x)/(1-\hat{e}(x))}{e(x)/(1-e(x))} for the control group observations.  The weights for the ATC are \eqn{(1-\hat{e}(x))/\hat{e}(x)}{(1-e(x))/e(x)} for the treatment group observations and 1 for the control group observations.  These weights are discussed in Carnegie et al (2014) and similar versions using the propensity score are discussed in a variety of places including Gelman and Hill, 2007.
 }
 \value{
 \code{treatSens} returns an object of class "\code{sensitivity}".
@@ -91,7 +93,7 @@ When \code{weights} are specified, \code{treatSens} returns clustered robust sta
 
 Matrices and data frames should include only complete cases.
 }
-\references{TBW
+\references{Carnegie NB, Hill JH and Harada M. Assessing sensitivity to unmeasured confounding using simulated potential confounders (under review)
 }
 \author{Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
 }

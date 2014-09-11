@@ -29,6 +29,6 @@ Authors: Nicole Bohme Carnegie, Masataka Harada, Jennifer Hill
 Maintainer: Nicole Bohme Carnegie <carnegin@uwm.edu>
 }
 \references{
-TBW
+Carnegie NB, Hill JH and Harada M. Assessing sensitivity to unmeasured confounding using simulated potential confounders (under review)
 }
 \keyword{ package }

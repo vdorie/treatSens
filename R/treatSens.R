@@ -232,6 +232,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     if(dp & fe){
       cl<-parallel::makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
       doParallel::registerDoParallel(cl)
+      h = NULL #included for R CMD check
     }else{
       core = NULL
     } 
@@ -239,7 +240,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
 
   if(!is.null(core) & U.model=="binomial"){
     ngrid = grid.dim[2]*grid.dim[1]
-    out.foreach <- foreach::foreach(h=ngrid:1,.combine=cbind,.verbose=F)%dopar%{
+    out.foreach <- foreach::"%dopar%"(foreach::foreach(h=ngrid:1,.combine=cbind,.verbose=F),{
       source("GLM_sens.R")
       j=grid.dim[1]-(h-1)%%grid.dim[1]
       i=grid.dim[2]-((h-1)-(h-1)%%grid.dim[1])/grid.dim[1]
@@ -261,7 +262,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
         out[8,k] <- fit.sens$trt.sigma2
       }
       return(out)
-    }
+    })
     out1 <- out2 <- out3 <- out4 <- out5 <- out6 <- out7 <- out8 <- numeric(ngrid*nsim)
     out1 <- out.foreach[1,]
     out2 <- out.foreach[2,]
@@ -302,9 +303,9 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
             trt.s2[i,j,k] <- fit.sens$trt.sigma2
           }        
         }else{ #code for multicore below. For debug change %dopar% to %do%.
-          fit.sens <- foreach::foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
+          fit.sens <- foreach::"%dopar%"(foreach::foreach(k=1:nsim,.combine=rbind,.verbose=F),{
             fit.treatSens(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
-          }
+          })
           sens.coef[i,j,] <- unlist(fit.sens[,1])
           sens.se[i,j,] <- unlist(fit.sens[,2])
           zeta.y[i,j,] <- unlist(fit.sens[,3])
