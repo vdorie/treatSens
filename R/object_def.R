@@ -15,8 +15,8 @@ summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,
   part.cors = object$sensParam == "cor"
   
   if(part.cors){
-	trt.coef <- as.numeric(dimnames(taus)[[2]])/sqrt(object$var_ztilde)
-	resp.coef <- as.numeric(dimnames(taus)[[1]])/sqrt(object$var_ytilde) *(1-trt.coef^2)
+	trt.coef <- as.numeric(dimnames(taus)[[2]])
+	resp.coef <- as.numeric(dimnames(taus)[[1]])
 	print.text <- "Partial correlations with U"
   }else {
   	resp.coef <- as.numeric(dimnames(taus)[[1]])

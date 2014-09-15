@@ -42,14 +42,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     stop(paste("Either spy.range or spz.range is missing."))
   }
   
-  #calling necessary packages for multicore processing.
-  if(!is.null(core)){
-    require(doSNOW)
-    cl<-makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
-    registerDoSNOW(cl)
-  }
-  
-  # set seed
+   # set seed
   set.seed(seed)
   
   #extract variables from formula
@@ -232,9 +225,22 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   #fill in grid
   cell = 0
   
+  #calling necessary packages for multicore processing.
+  if(!is.null(core)){
+    dp = requireNamespace("doParallel", quietly = TRUE)
+    fe = requireNamespace("foreach", quietly = TRUE)
+    if(dp & fe){
+      cl<-parallel::makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
+      doParallel::registerDoParallel(cl)
+      h = NULL #included for R CMD check
+    }else{
+      core = NULL
+    } 
+  }
+
   if(!is.null(core) & U.model=="binomial"){
     ngrid = grid.dim[2]*grid.dim[1]
-    out.foreach <- foreach(h=ngrid:1,.combine=cbind,.verbose=F)%dopar%{
+    out.foreach <- foreach::"%dopar%"(foreach::foreach(h=ngrid:1,.combine=cbind,.verbose=F),{
       source("GLM_sens.R")
       j=grid.dim[1]-(h-1)%%grid.dim[1]
       i=grid.dim[2]-((h-1)-(h-1)%%grid.dim[1])/grid.dim[1]
@@ -256,7 +262,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
         out[8,k] <- fit.sens$trt.sigma2
       }
       return(out)
-    }
+    })
     out1 <- out2 <- out3 <- out4 <- out5 <- out6 <- out7 <- out8 <- numeric(ngrid*nsim)
     out1 <- out.foreach[1,]
     out2 <- out.foreach[2,]
@@ -297,9 +303,9 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
             trt.s2[i,j,k] <- fit.sens$trt.sigma2
           }        
         }else{ #code for multicore below. For debug change %dopar% to %do%.
-          fit.sens <- foreach(k=1:nsim,.combine=rbind,.verbose=F)%dopar%{
+          fit.sens <- foreach::"%dopar%"(foreach::foreach(k=1:nsim,.combine=rbind,.verbose=F),{
             fit.treatSens(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
-          }
+          })
           sens.coef[i,j,] <- unlist(fit.sens[,1])
           sens.se[i,j,] <- unlist(fit.sens[,2])
           zeta.y[i,j,] <- unlist(fit.sens[,3])
@@ -334,7 +340,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     class(result) <- "sensitivity"
   }
   
-  if(!is.null(core)) stopCluster(cl)   # Stop using multicore.
+  if(!is.null(core)) parallel::stopCluster(cl)   # Stop using multicore.
   
   return(result)
 }
