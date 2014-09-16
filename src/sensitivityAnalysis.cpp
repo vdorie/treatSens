@@ -166,12 +166,18 @@ namespace cibart {
   {
     Control control = { estimand, confounderModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
                         numTreeSamplesToThin, numThreads, theta, verbose, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+      
     lookupBARTFunctions(control);
     
     Data data(y, z, x, numObservations, numPredictors,
               z_test, x_test, numTestObservations);
     
     size_t numCells = numZetaY * numZetaZ;
+    if (numCells < numThreads) {
+      numThreads = numCells;
+      control.numThreads = numCells;
+    }
+    
     GridCell* gridCells = new GridCell[numCells];
     
     size_t cellNumber = 0;
@@ -205,7 +211,6 @@ namespace cibart {
     time_t endTime;
 #endif
     
-    
     if (control.numThreads <= 1) {
       Scratch scratch(control, data);
       
@@ -233,7 +238,6 @@ namespace cibart {
       
       ext_mt_getNumThreadsForJob(threadManager, numCells, 0, NULL, &numCellsPerThread, &offByOneIndex);
       
-      
       ThreadData* threadData = ext_stackAllocate(control.numThreads, ThreadData);
       void** threadDataPtrs  = ext_stackAllocate(control.numThreads, void*);
       for (size_t i = 0; i < offByOneIndex; ++i) {
@@ -247,6 +251,7 @@ namespace cibart {
         threadData[i].standardErrors = standardErrors;
         threadDataPtrs[i] = threadData + i;
       }
+      
       for (size_t i = offByOneIndex; i < numThreads; ++i) {
         threadData[i].gridCells         = gridCells + offByOneIndex * numCellsPerThread + (i - offByOneIndex) * (numCellsPerThread - 1);
         threadData[i].numGridCells      = numCellsPerThread - 1;

@@ -29,7 +29,7 @@ fitSensitivityAnalysis <- function(Y, Z, X,
                                    control = sensControl(), verbose = FALSE)
 {
   if (!is(control, "sensControl")) stop("control must be of class sensControl; call sensControl() to create");
-  
+
   .Call("cibart_fitSensitivityAnalysis",
         Y, Z,
         X, Z.test,
