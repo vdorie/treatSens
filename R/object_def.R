@@ -24,7 +24,7 @@ summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,
 	print.text <- "Coefficients on U" 
   }
   
-  zeroCoords = contourLines(resp.coef, trt.coef, taus, levels = 0)
+  zeroCoords = contourLines(trt.coef, resp.coef, taus, levels = 0)
   if(class(unlist(zeroCoords))=="NULL") {
     cat("Sensitivity parameters where tau = 0 could not be calculated.\n\n")
   } else {    
@@ -36,7 +36,7 @@ summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,
     cat("\n\n")
   } 
   
-  noSigCoords = contourLines(resp.coef, trt.coef, taus/apply(object$se.tau, c(1,2), mean), levels = -sign(object$tau0)*qnorm(signif.level/2))
+  noSigCoords = contourLines(trt.coef, resp.coef, taus/apply(object$se.tau, c(1,2), mean), levels = -sign(object$tau0)*qnorm(signif.level/2))
   if(class(unlist(noSigCoords))=="NULL") {
     cat("Sensitivity parameters where significance level", signif.level, "is lost could not be calculated.\n\n")
   } else {
