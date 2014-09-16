@@ -35,20 +35,31 @@ sensPlot = function(x,
   if(addYdim==TRUE){
     Ycors = c(0,Ycors)
   }
+ 
+##############  
+#######Only inclue X on the plot for GLM-style
+############
+  if(x$model.type == "GLM"){
+    Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
+    Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
+    Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
   
-  Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
-  Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
-  Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
   
-  #note that due to correlation among Xs, some may not appear on plot
-  #because observed partial cors don't map directly to coefs in this case
-  #forcing inclusion can lead to difficult to read plot.  
-  if(is.null(X.pch)){
-    X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
+    #note that due to correlation among Xs, some may not appear on plot
+    #because observed partial cors don't map directly to coefs in this case
+    #forcing inclusion can lead to difficult to read plot.  
+    if(is.null(X.pch)){
+      X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
+    }else{
+      X.pch = ifelse(Xpart[,2]>=0,X.pch[1],X.pch[2])	
+    }
+    if (any(Xpart[,2]<0)) {
+      cat("Note: Predictors with negative coefficients for the response surface have been transformed through multiplication by -1 and are displayed as inverted triangles.", "\n")    
+    }
   }else{
-    X.pch = ifelse(Xpart[,2]>=0,X.pch[1],X.pch[2])	
-  }
-  
+    Xpart.plot2 <- Xpart.plot <- NULL
+  }  
+
   nr = length(Zcors); nc = length(Ycors)
   taus.est = t(apply(x$tau, c(1,2), mean, na.rm = T))
   K = dim(x$se.tau)[3]
@@ -84,10 +95,6 @@ sensPlot = function(x,
     clevels = contour.levels
   } 
   
-  if (any(Xpart[,2]<0)) {
-    cat("Note: Predictors with negative coefficients for the response surface have been transformed through multiplication by -1 and are displayed as inverted triangles.", "\n")    
-  }
-  
   par(mgp = c(2,.5,0)) #dist of axis label, tick mark label, tick mark
   if(part.cors){
   	xlab = expression(paste("Partial cor. with U in model for treatment, ", rho^zu))
@@ -97,7 +104,7 @@ sensPlot = function(x,
   	ylab = expression(paste("Coef. on U in model for response, ", zeta^y))
   }
 
-  if (limit.Xplot) {
+  if (limit.Xplot || x$model.type == "BART") {
     #old codes
     plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
          ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)), pch = X.pch, xlab = xlab, ylab = ylab)    
@@ -142,38 +149,42 @@ sensPlot = function(x,
           levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = col.insig,
           lty = lty.insig, labcex = labcex, lwd = 2,...)
   
-  
-  if (all(sign(Xpart[,1])!=sign(x$tau0))){
-    warning("Cannot add data line because XXXXX.")
-  }else{
-    if(data.line & length(Xpart)>1){
-      proj.pts = apply(Xpart.plot, 1, mean)
-      max.pt = Xpart.plot[proj.pts == max(proj.pts[sign(Xpart.plot[,1])==sign(x$tau0)]),]
-      zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
-      if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ 
-        zpts = c(zcor-1, zcor)
-      }else{
-        zpts = c(zcor, zcor+1)
-      }
-      ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
-      if((Ycors[ycor] > max.pt[2] & ycor > 1)||(ycor==length(Ycors))){ 
-        ypts = c(ycor-1, ycor)
-      }else{
-        ypts = c(ycor, ycor+1)
-      }
-      clevel = ((Zcors[zpts[2]] - Zcors[zpts[1]])*(Ycors[ypts[2]] - Ycors[ypts[1]]))^(-1)*
-        sum(taus[zpts, ypts]*
-              matrix(c(-(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]), 
-                       (Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]),
-                       (Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2]),
-                       -(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
-                     nrow = 2, byrow = T))
-      contour(Zcors, Ycors, taus, levels = round(clevel,2),
-              add = T, col = "grey",labcex = labcex, lwd = 2,...)
+  if(x$model.type == "GLM"){
+    if (all(sign(Xpart[,1])!=sign(x$tau0))){
+      warning("Cannot add data line because XXXXX.")
     }else{
-      if(data.line)
-        warning("Cannot add data line because there are no non-treatment covariates.")
-    }
+      if(data.line & length(Xpart)>1){
+        proj.pts = apply(Xpart.plot, 1, mean)
+        max.pt = Xpart.plot[proj.pts == max(proj.pts[sign(Xpart.plot[,1])==sign(x$tau0)]),]
+        zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
+        if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ 
+          zpts = c(zcor-1, zcor)
+        }else{
+          zpts = c(zcor, zcor+1)
+        }
+        ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
+        if((Ycors[ycor] > max.pt[2] & ycor > 1)||(ycor==length(Ycors))){ 
+          ypts = c(ycor-1, ycor)
+        }else{
+          ypts = c(ycor, ycor+1)
+        }
+        clevel = ((Zcors[zpts[2]] - Zcors[zpts[1]])*(Ycors[ypts[2]] - Ycors[ypts[1]]))^(-1)*
+          sum(taus[zpts, ypts]*
+                matrix(c(-(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]), 
+                         (Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]),
+                         (Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2]),
+                         -(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
+                       nrow = 2, byrow = T))
+        contour(Zcors, Ycors, taus, levels = round(clevel,2),
+                add = T, col = "grey",labcex = labcex, lwd = 2,...)
+      }else{
+        if(data.line)
+          warning("Cannot add data line because there are no non-treatment covariates.")
+      }
+  }
+  }else{
+    if(data.line)
+      warning("Cannot add data line for BART sensitivity analysis.")
   }
 } #end of sensPlot
 

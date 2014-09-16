@@ -5,7 +5,7 @@ Version: 1.0
 Date: 2014-09-02
 Author: Nicole Bohme Carnegie, Masataka Harada, Jennifer Hill
 Maintainer: "Nicole Bohme Carnegie" <carnegin@uwm.edu>
-Depends: R (>= 3.1.0), lme4
+Depends: R (>= 3.1.0), lme4, cibart
 Suggests: doParallel, foreach
 Description: Utilities to investigate sensitivity to unmeasured confounding in parametric models with either binary or continuous treatment.
 License: GPL-2

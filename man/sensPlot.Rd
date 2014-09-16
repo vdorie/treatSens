@@ -13,7 +13,7 @@ sensPlot(x, contour.levels = NULL, col.zero = "red", lty.zero = 1,
 	  which.txtlab = NULL,...)
 }
 \arguments{
-  \item{x}{output of GLM.sens. It must have a structure of sensitivity class.
+  \item{x}{an object of class \code{sensitivity}.
 }
   \item{contour.levels}{numeric vector of levels at which to draw contour lines. The default is \code{NULL}.
 }
