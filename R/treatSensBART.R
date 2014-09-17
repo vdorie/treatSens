@@ -146,16 +146,16 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
   #Call cibart sensitivity analysis
   cat("Computing final grid...\n")
   
-  control.sens <- sensControl(n.sim = nsim,
-                              n.burn.init = ns,
-                              n.thin = iter.j,
-                              if (is.null(nthreads)) guessNumCores() else nthreads)
+  control.sens <- cibart::sensControl(n.sim = nsim,
+                                      n.burn.init = ns,
+                                      n.thin = iter.j,
+                                      n.thread = if (is.null(nthreads)) cibart::guessNumCores() else nthreads)
   
-  cellResults <- fitSensitivityAnalysis(Y, Z, X,
-                                        Z.test, X.test,
-                                        zetaY, zetaZ, theta,
-                                        est.type, U.model,
-                                        control.sens, verbose)
+  cellResults <- cibart::fitSensitivityAnalysis(Y, Z, X,
+                                                Z.test, X.test,
+                                                zetaY, zetaZ, theta,
+                                                est.type, U.model,
+                                                control.sens, verbose)
   
   for (i in 1:nsim) {
     sens.coef[,,i] <- cellResults$sens.coef[i,,]
