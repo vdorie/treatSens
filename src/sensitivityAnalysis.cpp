@@ -410,16 +410,16 @@ namespace {
   void bartCallbackFunction(void* v_callbackData, dbarts::BARTFit& fit, bool,
                             const double* trainingSamples, const double*, double sigma)
   {
-    CallbackData* callbackData = (CallbackData*) v_callbackData;
+    CallbackData& callbackData(*((CallbackData*) v_callbackData));
     
-    const Control& control(callbackData->control);
-    const Data& data(callbackData->data);
-    Scratch& scratch(callbackData->scratch);
+    const Control& control(callbackData.control);
+    const Data& data(callbackData.data);
+    Scratch& scratch(callbackData.scratch);
     
-    updateConfounderProbabilities(control, data, scratch, callbackData->zetaY, callbackData->zetaZ,
+    updateConfounderProbabilities(control, data, scratch, callbackData.zetaY, callbackData.zetaZ,
                                   trainingSamples, sigma);
     sampleConfounders(data, scratch);
-    subtractConfounderFromResponse(data, scratch, callbackData->zetaY);
+    subtractConfounderFromResponse(data, scratch, callbackData.zetaY);
 
     control.setResponse(&fit, scratch.yMinusZetaU);
   }
@@ -431,7 +431,7 @@ namespace {
   
   void subtractConfounderFromResponse(const Data& data, Scratch& scratch, double zetaY)
   {
-    ext_addVectors((const double*) scratch.u, data.numObservations, zetaY, data.y, scratch.yMinusZetaU);
+    ext_addVectors((const double*) scratch.u, data.numObservations, -zetaY, data.y, scratch.yMinusZetaU);
   }
   
   double estimateSigma(const Data& data, Scratch& scratch)
@@ -539,8 +539,9 @@ namespace {
       zHatForU0 = ext_cumulativeProbabilityOfNormal(linearPredictor[i],         0.0, 1.0);
       zHatForU1 = ext_cumulativeProbabilityOfNormal(linearPredictor[i] + zetaZ, 0.0, 1.0);
       
-      bartDensityForU0 = ext_densityOfNormal(data.y[i] - yMinusZetaUHat[i], 0.0, sigma);
-      bartDensityForU1 = ext_densityOfNormal(data.y[i] - yMinusZetaUHat[i] - zetaY, 0.0, sigma);
+      double y_hat = yMinusZetaUHat[i]; // + (scratch.u[i] == 1.0 ? zetaY : 0.0);
+      bartDensityForU0 = ext_densityOfNormal(data.y[i] - y_hat, 0.0, sigma);
+      bartDensityForU1 = ext_densityOfNormal(data.y[i] - y_hat - zetaY, 0.0, sigma);
       
       probU0 = bartDensityForU0 * (data.z[i] == 1.0 ? zHatForU0 : 1.0 - zHatForU0) * (1.0 - control.theta);
       probU1 = bartDensityForU1 * (data.z[i] == 1.0 ? zHatForU1 : 1.0 - zHatForU1) * control.theta;
