@@ -1,7 +1,7 @@
 #ifndef CIBART_SENSITIVITY_ANALYSIS_HPP
 #define CIBART_SENSITIVITY_ANALYSIS_HPP
 
-#include <cstddef>
+#include <cstddef> // size_t
 
 namespace cibart {
   enum EstimandType {
@@ -10,10 +10,13 @@ namespace cibart {
     ATC
   };
   
+  // not used at the moment
   enum ConfounderModelType {
     NORMAL,
     BINOMIAL
   };
+  
+  struct TreatmentModel;
   
   void
   fitSensitivityAnalysis(const double* y,     // numObs x 1
@@ -31,6 +34,7 @@ namespace cibart {
                          double theta,        // prior prob of U = 1
                          EstimandType estimand,
                          ConfounderModelType confounderModel,
+                         TreatmentModel& treatmentModel,
                          std::size_t numSimsPerCell,
                          std::size_t numInitialBurnIn,
                          std::size_t numCellSwitchBurnIn,

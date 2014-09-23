@@ -10,6 +10,8 @@
 
 #include "sensitivityAnalysis.hpp"
 #include "guessNumCores.hpp"
+#include "probitTreatmentModel.hpp"
+#include "probitEMTreatmentModel.hpp"
 
 #include <glm/glm.h>
 
@@ -161,6 +163,14 @@ namespace {
     if (confounderModel == cibart::NORMAL)
       error("BART sensitivity analysis only implemented for binary confounders.");
     
+    cibart::ProbitNormalPrior treatmentPrior;
+    double* temp = new double[numPredictors + 1];
+    for (size_t i = 0; i < numPredictors + 1; ++i) temp[i] = 2.5 * 2.5;
+    treatmentPrior.scale = temp;
+    cibart::ProbitTreatmentModel treatmentModel(cibart::PROBIT_PRIOR_NORMAL, &treatmentPrior);
+    
+    // cibart::ProbitEMTreatmentModel treatmentModel(30);
+    
     SEXP sensParameterExpr = getListElement(sensControl, "n.sim");
     if (sensParameterExpr == R_NilValue) error("n.sim must be specified in iteration control.");
     size_t numSimsPerCell = INTEGER(sensParameterExpr)[0];
@@ -222,7 +232,7 @@ namespace {
                                    numTestObservations,
                                    REAL(zetaY), REAL(zetaZ), numZetaY, numZetaZ,
                                    REAL(theta)[0],
-                                   estimand, confounderModel,
+                                   estimand, confounderModel, treatmentModel,
                                    numSimsPerCell,
                                    numInitialBurnIn,
                                    numCellSwitchBurnIn,
@@ -235,10 +245,12 @@ namespace {
     PutRNGstate();
     
     UNPROTECT(3);
+    
+    delete [] treatmentPrior.scale;
         
     delete [] z_test;
     
-    return(result);
+    return result;
   }
   
   static SEXP getListElement(SEXP list, const char* str)
@@ -267,6 +279,124 @@ namespace {
     
     return resultExpr;
   }
+}
+
+#include <external/linearAlgebra.h>
+
+namespace {
+  
+  void setDims(SEXP X, size_t numRows, size_t numCols)
+  {
+    SEXP dimsExpr = allocVector(INTSXP, 2);
+    int* dims = INTEGER(dimsExpr);
+    dims[0] = (int) numRows; 
+    dims[1] = (int) numCols;
+    setAttrib(X, R_DimSymbol, dimsExpr);
+  }
+
+  SEXP cibart_chol(SEXP A) {
+    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
+    size_t dim = dims[0];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, dim * dim));
+    setDims(result, dim, dim);
+    
+    ext_getSymmetricPositiveDefiniteTriangularFactorization(REAL(A), dim, EXT_TRIANGLE_TYPE_UPPER, REAL(result));
+    
+    double* res = REAL(result);
+    for (size_t col = 0; col < dim - 1; ++col) {
+      for (size_t row = col + 1; row < dim; ++row) res[row + col * dim] = 0.0;
+    }
+    
+    UNPROTECT(1);
+    
+    return result;
+  }
+  
+  SEXP cibart_crossprod(SEXP A) {
+    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
+    size_t numRows = dims[0];
+    size_t numCols = dims[1];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, numCols * numCols));
+    setDims(result, numCols, numCols);
+    
+    ext_getSingleMatrixCrossproduct(REAL(A), numRows, numCols,
+                                    REAL(result), false, EXT_TRIANGLE_TYPE_BOTH);
+
+    UNPROTECT(1);
+    
+    return result;
+  }
+  
+  SEXP cibart_multiply(SEXP A, SEXP b) {
+    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
+    size_t numRows = dims[0];
+    size_t numCols = dims[1];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, numCols));
+    
+    ext_multiplyMatrixIntoVector(REAL(A), numRows, numCols, true, REAL(b), REAL(result));
+    
+    UNPROTECT(1);
+    
+    return result;
+  }
+  
+  SEXP cibart_solve(SEXP A, SEXP b) {
+    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
+    size_t lhsDim = dims[0];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, lhsDim));
+    
+    memcpy(REAL(result), (const double*) REAL(b), lhsDim * sizeof(double));
+    
+    ext_solveTriangularSystemInPlace(REAL(A), lhsDim, true, EXT_TRIANGLE_TYPE_UPPER, REAL(result), 1);
+      
+    UNPROTECT(1);
+    
+    return result;
+  }
+  
+  SEXP cibart_test(SEXP X, SEXP Z, SEXP offset, SEXP zetaZ) {
+    int* dims = INTEGER(getAttrib(X, R_DimSymbol));
+    
+    size_t numObservations = dims[0];
+    size_t numPredictors   = dims[1];
+    
+    GetRNGstate();
+        
+    Rprintf("creating treatment model object\n");
+    
+    cibart::ProbitNormalPrior treatmentPrior;
+    double* temp = new double[numPredictors + 1];
+    for (size_t i = 0; i < numPredictors + 1; ++i) temp[i] = 2.5 * 2.5;
+    treatmentPrior.scale = temp;
+    cibart::ProbitTreatmentModel treatmentModel(cibart::PROBIT_PRIOR_NORMAL, &treatmentPrior);
+    
+    Rprintf("creating treatment model scratch\n");
+    void* scratch = treatmentModel.createScratch(&treatmentModel, REAL(X), numObservations, numPredictors, REAL(Z));
+    
+    Rprintf("updating parameters\n");
+    treatmentModel.updateParameters(&treatmentModel, scratch, REAL(offset));
+    
+    SEXP result = PROTECT(allocVector(REALSXP, numObservations * 2));
+    setDims(result, numObservations, 2);
+    
+    Rprintf("getting conditional probabilities\n");
+    treatmentModel.getConditionalProbabilities(&treatmentModel, scratch, REAL(zetaZ)[0], REAL(result), REAL(result) + numObservations);
+    
+    Rprintf("deleting scratch\n");
+    treatmentModel.destroyScratch(scratch);
+    
+    delete [] temp;
+    
+    PutRNGstate();
+    
+    UNPROTECT(1);
+    
+    return result;
+  }
   
 #define CALLDEF(name, n)  {#name, (DL_FUNC) &name, n}
   
@@ -274,6 +404,11 @@ namespace {
     CALLDEF(cibart_fitSensitivityAnalysis, 12),
     CALLDEF(cibart_guessNumCores, 0),
     CALLDEF(cibart_glmFit, 5),
+    CALLDEF(cibart_chol, 1),
+    CALLDEF(cibart_crossprod, 1),
+    CALLDEF(cibart_multiply, 2),
+    CALLDEF(cibart_solve, 2),
+    CALLDEF(cibart_test, 4),
     {NULL, NULL, 0}
   };
 }
