@@ -7,6 +7,7 @@
 
 namespace cibart {
   enum ProbitPriorType {
+    PROBIT_PRIOR_FLAT,
     PROBIT_PRIOR_NORMAL,
     PROBIT_PRIOR_STUDENT_T
   };
@@ -27,6 +28,7 @@ namespace cibart {
     ProbitPriorType priorType;
     const ProbitPrior* prior;
     
+    // if FLAT, prior should just be NULL
     ProbitTreatmentModel(ProbitPriorType priorType, const ProbitPrior* prior);
   };
 }

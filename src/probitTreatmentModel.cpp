@@ -1,5 +1,7 @@
 #include "probitTreatmentModel.hpp"
 
+#include <cstring>
+
 #include <external/stddef.h>
 #include <external/stats.h>
 #include <external/linearAlgebra.h>
@@ -12,8 +14,11 @@ namespace {
   void updateParameters(cibart::TreatmentModel* restrict model, void* restrict scratch, const double* restrict offset);
   void getConditionalProbabilities(cibart::TreatmentModel* restrict model, void* restrict scratch, double zetaZ, double* restrict probU0, double* restrict probU1);
   
-  void sampleCoefficients(Scratch& restrict scratch, const double* restrict offset);
-  void sampleLatents(Scratch& restrict scratch, const double* restrict offset);
+  void sampleCoefficients(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset);
+  void sampleLatents(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset);
+  
+  void getPosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, const double* xCrossproduct, size_t numPredictors, double* factor);
+  void updatePosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, Scratch& scratch);
 }
 
 namespace cibart {
@@ -44,6 +49,7 @@ namespace {
     // Let LL' = X'X + Sig_beta^{-1}, then beta | v ~ N(L^-T L^-1 * X' (v - mu), L^-T L^-1),
     // if b ~ N(0, I), L^-T (u + L^-1 X'(v - mu)) has desired dist
     double* posteriorCovarianceInverseRightFactor; // this is L^T
+    double* xCrossproduct; // cached for t dists
   };
 
   void* createScratch(cibart::TreatmentModel* restrict modelPtr, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
@@ -61,28 +67,23 @@ namespace {
     scratch->scale = 1.0;
     
     scratch->posteriorCovarianceInverseRightFactor = new double[numPredictors * numPredictors];
+    scratch->xCrossproduct = NULL;
     
-    double*& temp(scratch->posteriorCovarianceInverseRightFactor);
+    double* xCrossproduct = scratch->posteriorCovarianceInverseRightFactor;
     
-    ext_getSingleMatrixCrossproduct(x, numObservations, numPredictors, temp,
+    if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
+      // this only needs to be cached for T priors, and is otherwise computed where the factor goes
+      scratch->xCrossproduct = new double[numPredictors * numPredictors];
+      xCrossproduct = scratch->xCrossproduct;
+    }
+    
+    ext_getSingleMatrixCrossproduct(x, numObservations, numPredictors, xCrossproduct,
                                     false, EXT_TRIANGLE_TYPE_UPPER);
     
-    if (model.priorType == cibart::PROBIT_PRIOR_NORMAL) {
-      cibart::ProbitNormalPrior& prior(*((cibart::ProbitNormalPrior*) model.prior));
-      // X'X + Sig_beta^{-1}, but we only do diagonal Sig_beta
-      for (size_t i = 0; i < numPredictors; ++i) {
-        temp[i * (1 + numPredictors)] += 1.0 / prior.scale[i];
-      }
-    }
+    getPosteriorCovarianceFactor(model, xCrossproduct, numPredictors, scratch->posteriorCovarianceInverseRightFactor);
     
-    ext_getSymmetricPositiveDefiniteTriangularFactorizationInPlace(temp, numPredictors, EXT_TRIANGLE_TYPE_UPPER);
     
-    // fill in lower left as zeros
-    for (size_t col = 0; col < numPredictors - 1; ++col) {
-      for (size_t row = col + 1; row < numPredictors; ++row) temp[row + col * numPredictors] = 0.0;
-    }
-    
-    // fill in default values for latents
+    // use some default values for latents
     for (size_t i = 0; i < numObservations; ++i) {
       scratch->latents[i] = (z[i] == 1.0 ? 0.5 : -0.5);
     }
@@ -94,6 +95,7 @@ namespace {
     Scratch* scratch = (Scratch*) scratchPtr;
     
     if (scratch != NULL) {
+      delete [] scratch->xCrossproduct;
       delete [] scratch->posteriorCovarianceInverseRightFactor;
       delete [] scratch->coefficients;
       delete [] scratch->latents;
@@ -106,22 +108,8 @@ namespace {
     cibart::ProbitTreatmentModel& model(*((cibart::ProbitTreatmentModel*) modelPtr));
     Scratch& restrict scratch(*(Scratch*) scratchPtr);
     
-    // jump coefficients, then latents
-    switch (model.priorType) {
-      case cibart::PROBIT_PRIOR_NORMAL:
-      {
-        sampleCoefficients(scratch, offset);
-        sampleLatents(scratch, offset);
-      }
-      break;
-      case cibart::PROBIT_PRIOR_STUDENT_T:
-      {
-        
-      }
-      break;
-      default:
-      break;
-    }
+    sampleCoefficients(model, scratch, offset);
+    sampleLatents(model, scratch, offset);
   }
   
   void getConditionalProbabilities(cibart::TreatmentModel* restrict, void* restrict scratchPtr, double zetaZ, double* restrict probZForU0, double* restrict probZForU1)
@@ -141,8 +129,23 @@ namespace {
     }
   }
   
-  void sampleCoefficients(Scratch& restrict scratch, const double* restrict offset)
+  void sampleCoefficients(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset)
   {
+    if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
+      cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+      
+      // sample scale first:
+      double chiSqScale = 1.0;
+      for (size_t i = 0; i < scratch.numPredictors; ++i) {
+        chiSqScale += (scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i]);
+      }
+      chiSqScale /= prior.dof;
+      
+      scratch.scale = chiSqScale / ext_simulateChiSquared(prior.dof + (double) scratch.numPredictors);
+      
+      updatePosteriorCovarianceFactor(model, scratch);
+    }
+    
     // v - zetaZ * u
     ext_addVectorsInPlace(offset, scratch.numObservations, -1.0, scratch.latents);
     // X'(v - zetaZ * u)
@@ -162,7 +165,7 @@ namespace {
                                      scratch.coefficients, 1);
   }
   
-  void sampleLatents(Scratch& restrict scratch, const double* restrict offset)
+  void sampleLatents(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset)
   {
     // X beta
     ext_multiplyMatrixIntoVector(scratch.x, scratch.numObservations, scratch.numPredictors, false, scratch.coefficients, scratch.latents);
@@ -174,6 +177,66 @@ namespace {
       scratch.latents[i] = (scratch.z[i] == 0.0 ?
                             ext_simulateLowerTruncatedNormalScale1(scratch.latents[i], 0.0) : 
                             ext_simulateUpperTruncatedNormalScale1(scratch.latents[i], 0.0));
+    }
+  }
+  
+  void getPosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, const double* xCrossproduct, size_t numPredictors, double* factor)
+  {    
+    switch (model.priorType) {
+      case cibart::PROBIT_PRIOR_STUDENT_T:
+      {
+        cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+        
+        std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
+        
+        // X'X + Sig_beta^{-1}, but we only do diagonal Sig_beta 
+        for (size_t i = 0; i < numPredictors; ++i) {
+          factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.dof);
+        }
+      }
+      break;
+      case cibart::PROBIT_PRIOR_NORMAL:
+      {
+        cibart::ProbitNormalPrior& prior(*((cibart::ProbitNormalPrior*) model.prior));
+
+        for (size_t i = 0; i < numPredictors; ++i) {
+          factor[i * (1 + numPredictors)] += 1.0 / prior.scale[i];
+        }
+      }
+      break;
+      default:
+      break;
+    }
+    
+    ext_getSymmetricPositiveDefiniteTriangularFactorizationInPlace(factor, numPredictors, EXT_TRIANGLE_TYPE_UPPER);
+    
+    // fill in lower left as zeros
+    for (size_t col = 0; col < numPredictors - 1; ++col) {
+      for (size_t row = col + 1; row < numPredictors; ++row) factor[row + col * numPredictors] = 0.0;
+    }
+  }
+  
+  // only applicable to T prior
+  void updatePosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, Scratch& scratch)
+  {
+    const double* restrict xCrossproduct = scratch.xCrossproduct;
+    double* restrict factor = scratch.posteriorCovarianceInverseRightFactor;
+    size_t numPredictors = scratch.numPredictors;
+    
+    cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+    
+    std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
+    
+    // X'X + Sig_beta^{-1}, but we only do diagonal Sig_beta 
+    for (size_t i = 0; i < numPredictors; ++i) {
+      factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.dof * scratch.scale);
+    }
+    
+    ext_getSymmetricPositiveDefiniteTriangularFactorizationInPlace(factor, numPredictors, EXT_TRIANGLE_TYPE_UPPER);
+    
+    // fill in lower left as zeros
+    for (size_t col = 0; col < numPredictors - 1; ++col) {
+      for (size_t row = col + 1; row < numPredictors; ++row) factor[row + col * numPredictors] = 0.0;
     }
   }
 }
