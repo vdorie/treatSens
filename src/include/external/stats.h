@@ -13,7 +13,7 @@ extern "C" {
 
 #define ext_simulateChiSquared(_NU_) rchisq((_NU_))
 #define ext_simulateContinuousUniform() unif_rand()
-#define ext_simulateBernoulli(_P_) (unif_rand() < (_P_) ? 1u : 0u)
+#define ext_simulateBernoulli(_P_) (unif_rand() < (_P_) ? 1u : 0u) // returns an unsigned int
   
 #define ext_quantileOfChiSquared(_P_, _NU_) qchisq((_P_), (_NU_), 1, 0)
 #define ext_percentileOfChiSquared(_Q_, _NU_) pchisq((_Q_), (_NU_), 1, 0)

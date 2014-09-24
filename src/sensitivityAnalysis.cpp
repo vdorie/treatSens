@@ -317,8 +317,6 @@ namespace {
     Data& data(*threadData.data);
     Scratch& scratch(*threadData.scratch);
     
-    
-    
     sampleConfounders(data, scratch);
     subtractConfounderFromResponse(data, scratch, gridCells[0].zetaY);
     double sigmaEstimate = estimateSigma(data, scratch);
@@ -365,11 +363,15 @@ namespace {
     
     size_t estimateOffset = gridCells[0].offset * control.numSimsPerCell;
     
+    
     dbarts::Results* bartResults = control.runSampler(fit);
+    
     estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
     standardErrors[gridCells[0].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
     
     delete bartResults;
+    
+    
     if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
     
     for (size_t i = 1; i < threadData.numGridCells; ++i) {
@@ -426,7 +428,7 @@ namespace {
   
   void sampleConfounders(const Data& data, Scratch& scratch)
   {
-    for (size_t i = 0; i < data.numObservations; ++i) scratch.u[i] = ext_simulateBernoulli(scratch.p[i]);
+    for (size_t i = 0; i < data.numObservations; ++i) scratch.u[i] = (double) ext_simulateBernoulli(scratch.p[i]);
   }
   
   void subtractConfounderFromResponse(const Data& data, Scratch& scratch, double zetaY)
@@ -454,7 +456,7 @@ namespace {
     ext_stackFree(residuals);
     ext_stackFree(lsSolution);
     
-    return std::sqrt(sumOfSquaredResiduals / (double) (data.numObservations - data.numBartPredictors));
+    return std::sqrt(sumOfSquaredResiduals / (double) (data.numObservations - numPredictors));
   }
   
   void estimateTreatmentEffect(const Control& control, const Data& data,
