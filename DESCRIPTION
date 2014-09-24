@@ -13,4 +13,5 @@ LinkingTo:
   dbarts
 Suggests:
   testthat
+Biarch: TRUE
 License: GPL (>= 2)
