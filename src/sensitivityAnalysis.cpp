@@ -499,7 +499,7 @@ namespace {
           double atc = 0.0;
           size_t testIndex = 0;
           for (size_t j = 0; j < data.numObservations; ++j) {
-            if (data.z[j] == 0.0) continue;
+            if (data.z[j] == 1.0) continue;
             
             atc += testSamples[testIndex++] - trainingSamples[j];
           }
