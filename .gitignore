@@ -1,6 +1,7 @@
 R_package/branches - .Rproj.user
 .Rhistory
 .RData
+.DS_Store
 R_package/trunk/R - BART_SA_optim.R
 Research_papers - understanding.factorization.aux
 understanding.factorization.bbl
