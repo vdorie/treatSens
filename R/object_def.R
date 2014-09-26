@@ -36,7 +36,12 @@ summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,
     cat("\n\n")
   } 
   
-  noSigCoords = contourLines(trt.coef, resp.coef, taus/apply(object$se.tau, c(1,2), mean), levels = -sign(object$tau0)*qnorm(signif.level/2))
+  K = dim(object$se.tau)[3]
+  W = apply(object$se.tau^2, c(1,2), mean, na.rm = T)
+  B = apply(object$tau, c(1,2), sd, na.rm = T)^2
+  se.est = t(sqrt(W+(1+1/K)*B))
+  
+  noSigCoords = contourLines(trt.coef, resp.coef, taus/t(se.est), levels = -sign(object$tau0)*qnorm(signif.level/2))
   if(class(unlist(noSigCoords))=="NULL") {
     cat("Sensitivity parameters where significance level", signif.level, "is lost could not be calculated.\n\n")
   } else {
