@@ -37,7 +37,6 @@ namespace {
   using namespace cibart;
   struct Control {
     EstimandType estimand;
-    ConfounderModelType confounderModel;
     TreatmentModel& treatmentModel;
     
     size_t numSimsPerCell;
@@ -71,7 +70,6 @@ namespace {
     size_t numObservations;
     size_t numPredictors;
     
-    const bool* z_test;
     const double* x_test;
     size_t numTestObservations;
         
@@ -81,7 +79,7 @@ namespace {
     size_t numBartPredictors;
     
     Data(const double* y, const double* z, const double* x,
-         size_t numObservations, size_t numPredictors, const bool* z_test, const double* x_test,
+         size_t numObservations, size_t numPredictors, const double* x_test,
          size_t numTestObservations, const TreatmentModel& treatmentModel);
     ~Data();
   };
@@ -149,7 +147,6 @@ namespace cibart {
                          const double* x,     // numObs * numPredictors
                          size_t numObservations,
                          size_t numPredictors,
-                         const bool* z_test, // numTestObs x 1
                          const double* x_test, // numTestObs x (numPredictors + 1)
                          size_t numTestObservations,
                          const double* zetaYs, // numZetaY x 1
@@ -158,7 +155,6 @@ namespace cibart {
                          size_t numZetaZ,
                          double theta,        // prior prob of U = 1
                          EstimandType estimand,
-                         ConfounderModelType confounderModel,
                          TreatmentModel& treatmentModel,
                          size_t numSimsPerCell,
                          size_t numInitialBurnIn,
@@ -169,13 +165,13 @@ namespace cibart {
                          double* standardErrors, // numZetaY x numZetaZ
                          bool verbose)
   {
-    Control control = { estimand, confounderModel, treatmentModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
+    Control control = { estimand, treatmentModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
                         numTreeSamplesToThin, numThreads, theta, verbose, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       
     lookupBARTFunctions(control);
     
     Data data(y, z, x, numObservations, numPredictors,
-              z_test, x_test, numTestObservations, treatmentModel);
+              x_test, numTestObservations, treatmentModel);
     
     size_t numCells = numZetaY * numZetaZ;
     if (numCells < numThreads) {
@@ -552,10 +548,10 @@ namespace {
   }
   
   Data::Data(const double* y, const double* z, const double* x,
-             size_t numObservations, size_t numPredictors, const bool* z_test, const double* x_test,
+             size_t numObservations, size_t numPredictors, const double* x_test,
              size_t numTestObservations, const TreatmentModel& treatmentModel) :
     y(y), z(z), x(x), numObservations(numObservations), numPredictors(numPredictors),
-    z_test(z_test), x_test(x_test), numTestObservations(numTestObservations),
+    x_test(x_test), numTestObservations(numTestObservations),
     x_train(NULL), bart_x_train(NULL), numBartPredictors(numPredictors + 1)
   {
     // create matrix [ 1 X Z ]; treatmentModel may or may not need [ 1 X ], bart definitely does not

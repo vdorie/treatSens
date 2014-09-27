@@ -12,6 +12,7 @@ namespace cibart {
     PROBIT_PRIOR_STUDENT_T
   };
   
+  // keep these POD or else destructor mayhem
   struct ProbitPrior {
   };
   
@@ -21,7 +22,7 @@ namespace cibart {
   
   struct ProbitStudentTPrior : ProbitPrior {
     const double* scale;
-    double dof;
+    double dof; // name because *someone* decided defining 'df' as a macro was a good idea
   };
   
   struct ProbitTreatmentModel : TreatmentModel {

@@ -6,6 +6,8 @@
 #include <external/stats.h>
 #include <external/linearAlgebra.h>
 
+#include <external/io.h>
+
 namespace {
   struct Scratch;
   
@@ -41,7 +43,7 @@ namespace {
     size_t numPredictors;
     double* latents;
     double* coefficients;
-    double scale; // used to create t or cauchy prior
+    double sigma_sq; // used to create t or cauchy prior
     
     // denote the coef as 'beta' and the latent variable as 'v'
     // beta | v ~ N(cov X' (v - offset), cov)
@@ -57,6 +59,25 @@ namespace {
     Scratch* scratch = new Scratch;
     cibart::ProbitTreatmentModel& model(*((cibart::ProbitTreatmentModel*) modelPtr));
     
+    ext_printf("probit treatment model:\n");
+    if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
+      cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior *) model.prior));
+      ext_printf("  family = t\n");
+      ext_printf("  df = %f\n", prior.dof);
+      ext_printf("  scale = %f", prior.scale[0]);
+      for (size_t i = 1; i < numPredictors; ++i) ext_printf(", %f", prior.scale[i]);
+      ext_printf("\n");
+    } else if (model.priorType == cibart::PROBIT_PRIOR_NORMAL) {
+      cibart::ProbitNormalPrior& prior(*((cibart::ProbitNormalPrior *) model.prior));
+      ext_printf("  family = normal\n");
+      ext_printf("  scale = %f", prior.scale[0]);
+      for (size_t i = 1; i < numPredictors; ++i) ext_printf(", %f", prior.scale[i]);
+      ext_printf("\n");
+    } else {
+      ext_printf("  family = flat\n");
+    }
+    R_FlushConsole();
+    
     scratch->x = x;
     scratch->numObservations = numObservations;
     scratch->numPredictors   = numPredictors;
@@ -64,7 +85,7 @@ namespace {
     
     scratch->latents      = new double[numObservations];
     scratch->coefficients = new double[numPredictors];
-    scratch->scale = 1.0;
+    scratch->sigma_sq = 1.0;
     
     scratch->posteriorCovarianceInverseRightFactor = new double[numPredictors * numPredictors];
     scratch->xCrossproduct = NULL;
@@ -134,14 +155,14 @@ namespace {
     if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
       cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
       
-      // sample scale first:
-      double chiSqScale = 1.0;
+      // sample sigma_sq first:
+      double sigmaScale = 1.0;
       for (size_t i = 0; i < scratch.numPredictors; ++i) {
-        chiSqScale += (scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i]);
+        sigmaScale += (scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i]);
       }
-      chiSqScale /= prior.dof;
+      sigmaScale /= prior.dof;
       
-      scratch.scale = chiSqScale / ext_simulateChiSquared(prior.dof + (double) scratch.numPredictors);
+      scratch.sigma_sq = sigmaScale / ext_simulateChiSquared(prior.dof + (double) scratch.numPredictors);
       
       updatePosteriorCovarianceFactor(model, scratch);
     }
@@ -191,7 +212,7 @@ namespace {
         
         // X'X + Sig_beta^{-1}, but we only do diagonal Sig_beta 
         for (size_t i = 0; i < numPredictors; ++i) {
-          factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.dof);
+          factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i] * prior.dof);
         }
       }
       break;
@@ -200,7 +221,7 @@ namespace {
         cibart::ProbitNormalPrior& prior(*((cibart::ProbitNormalPrior*) model.prior));
 
         for (size_t i = 0; i < numPredictors; ++i) {
-          factor[i * (1 + numPredictors)] += 1.0 / prior.scale[i];
+          factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i]);
         }
       }
       break;
@@ -229,7 +250,7 @@ namespace {
     
     // X'X + Sig_beta^{-1}, but we only do diagonal Sig_beta 
     for (size_t i = 0; i < numPredictors; ++i) {
-      factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.dof * scratch.scale);
+      factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i] * prior.dof * scratch.sigma_sq);
     }
     
     ext_getSymmetricPositiveDefiniteTriangularFactorizationInPlace(factor, numPredictors, EXT_TRIANGLE_TYPE_UPPER);

@@ -5,6 +5,7 @@
 #include <external/linearAlgebra.h>
 #include <glm/glm.h>
 
+#include <external/io.h>
 
 namespace {
   void* createScratch(cibart::TreatmentModel* restrict model, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z);
@@ -35,9 +36,14 @@ namespace {
     double* glmScratch;
   };
 
-  void* createScratch(cibart::TreatmentModel* restrict, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
+  void* createScratch(cibart::TreatmentModel* restrict modelPtr, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
     Scratch* scratch = new Scratch;
+    
+    
+    ext_printf("probit EM model:\n");
+    cibart::ProbitEMTreatmentModel& model(*((cibart::ProbitEMTreatmentModel*) modelPtr));
+    ext_printf("  max iter: %lu\n", model.maxIterations);
     
     scratch->x = x;
     scratch->numObservations = numObservations;
