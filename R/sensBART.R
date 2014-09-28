@@ -27,7 +27,9 @@ fitSensitivityAnalysis <- function(Y, Z, X, X.test,
   treatmentCall <-
     if (!missing(treatmentModel))
       matchedCall$treatmentModel else formals(fitSensitivityAnalysis)$treatmentModel
-  
+
+  if (is.character(treatmentCall)) treatmentCall <- parse(text = treatmentCall)[[1]]
+
   treatmentModel <- eval(treatmentCall, asNamespace("cibart"), parent.frame(1))
   
   ## if (missing(treatmentModel)) {
@@ -40,8 +42,8 @@ fitSensitivityAnalysis <- function(Y, Z, X, X.test,
   ##}
   ##browser()
   ##treatmentModel <- eval(treatmentCall, parent.frame(1))
-  
-  if (is(treatmentModel, "probitTreatmentModel") && !identical(treatmentModel$type, "flat")) {
+
+  if (is(treatmentModel, "probitTreatmentModel") && !identical(treatmentModel$family, "flat")) {
     treatmentModel$scale <- rep_len(treatmentModel$scale, ncol(X) + 1L)
   }
   

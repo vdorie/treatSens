@@ -6,7 +6,7 @@
 #include <external/stats.h>
 #include <external/linearAlgebra.h>
 
-#include <external/io.h>
+// #include <external/io.h>
 
 namespace {
   struct Scratch;
@@ -59,7 +59,7 @@ namespace {
     Scratch* scratch = new Scratch;
     cibart::ProbitTreatmentModel& model(*((cibart::ProbitTreatmentModel*) modelPtr));
     
-    ext_printf("probit treatment model:\n");
+    /* ext_printf("probit treatment model:\n");
     if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
       cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior *) model.prior));
       ext_printf("  family = t\n");
@@ -76,7 +76,7 @@ namespace {
     } else {
       ext_printf("  family = flat\n");
     }
-    R_FlushConsole();
+    ext_fflush_stdout(); */
     
     scratch->x = x;
     scratch->numObservations = numObservations;
@@ -93,9 +93,13 @@ namespace {
     double* xCrossproduct = scratch->posteriorCovarianceInverseRightFactor;
     
     if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
+      cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+      
       // this only needs to be cached for T priors, and is otherwise computed where the factor goes
       scratch->xCrossproduct = new double[numPredictors * numPredictors];
       xCrossproduct = scratch->xCrossproduct;
+      
+      scratch->sigma_sq = 1.0 / ext_simulateChiSquared(prior.dof);
     }
     
     ext_getSingleMatrixCrossproduct(x, numObservations, numPredictors, xCrossproduct,
@@ -158,7 +162,7 @@ namespace {
       // sample sigma_sq first:
       double sigmaScale = 1.0;
       for (size_t i = 0; i < scratch.numPredictors; ++i) {
-        sigmaScale += (scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i]) / prior.dof;
+        sigmaScale += ((scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i])) / prior.dof;
       }
       
       scratch.sigma_sq = sigmaScale / ext_simulateChiSquared(prior.dof + (double) scratch.numPredictors);
