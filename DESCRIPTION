@@ -6,6 +6,7 @@ Author: Vincent Dorie <vjd4@nyu.edu>
 Maintainer: Vincent Dorie <vjd4@nyu.edu>
 Description: Performs causal inference (CI) tasks using  Bayesian additive regression trees (BART) by Hugh Chipman <hugh.chipman@gmail.com> and Robert McCulloch.
 NeedsCompilation: yes
+Biarch: yes
 Depends:
   R (>= 2.15-3),
   dbarts (>= 0.8)
