@@ -158,9 +158,8 @@ namespace {
       // sample sigma_sq first:
       double sigmaScale = 1.0;
       for (size_t i = 0; i < scratch.numPredictors; ++i) {
-        sigmaScale += (scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i]);
+        sigmaScale += (scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i]) / prior.dof;
       }
-      sigmaScale /= prior.dof;
       
       scratch.sigma_sq = sigmaScale / ext_simulateChiSquared(prior.dof + (double) scratch.numPredictors);
       
@@ -168,9 +167,9 @@ namespace {
     }
     
     // v - zetaZ * u
-    ext_addVectorsInPlace(offset, scratch.numObservations, -1.0, scratch.latents);
+    ext_addVectorsInPlace(offset, scratch.numObservations, -1.0, scratch.latents); // clobers latents
     // X'(v - zetaZ * u)
-    ext_multiplyMatrixIntoVector(scratch.x, scratch.numObservations, scratch.numPredictors, true, scratch.latents, scratch.coefficients);
+    ext_multiplyMatrixIntoVector(scratch.x, scratch.numObservations, scratch.numPredictors, true, scratch.latents, scratch.coefficients); // clobers coefs
     
     // L^{-1} X'(v - zetaZ * u)
     ext_solveTriangularSystemInPlace(scratch.posteriorCovarianceInverseRightFactor, scratch.numPredictors, true, EXT_TRIANGLE_TYPE_UPPER,
@@ -248,7 +247,6 @@ namespace {
     
     std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
     
-    // X'X + Sig_beta^{-1}, but we only do diagonal Sig_beta 
     for (size_t i = 0; i < numPredictors; ++i) {
       factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i] * prior.dof * scratch.sigma_sq);
     }
