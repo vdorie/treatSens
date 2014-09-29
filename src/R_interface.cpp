@@ -14,6 +14,7 @@
 #include "treatmentModel.hpp"
 #include "probitTreatmentModel.hpp"
 #include "probitEMTreatmentModel.hpp"
+#include "bartTreatmentModel.hpp"
 
 #include <glm/glm.h>
 
@@ -73,8 +74,15 @@ namespace {
       return new cibart::ProbitTreatmentModel(family, prior);
     }
     
-    if (strcmp(className, "bartTreatmentModel") == 0) 
-      error("binary bart not yet supported");
+    if (strcmp(className, "bartTreatmentModel") == 0) {
+      *modelType = BART;
+      
+      double nodePriorParameter = REAL(getListElement(modelExpr, "k"))[0];
+      size_t numTrees = (size_t) INTEGER(getListElement(modelExpr, "ntree"))[0];
+      size_t numThin  = (size_t) INTEGER(getListElement(modelExpr, "keepevery"))[0];
+     
+      return new cibart::BARTTreatmentModel(&R_GetCCallable, numTrees, numThin, nodePriorParameter);
+    }
     
     error("unrecognized treatment model: '%s'", className);
   }
@@ -94,9 +102,7 @@ namespace {
       break;
       case BART:
       {
-        // ProbitTreatmentModel* treatmentModel = (ProbitTreatmentModel*) treatmentModelPtr;
-        // delete treatmentModel->prior;
-        delete treatmentModelPtr;
+        delete (cibart::BARTTreatmentModel*) treatmentModelPtr;
       }
       default:
       break;
@@ -440,7 +446,7 @@ namespace {
     treatmentModel.getConditionalProbabilities(&treatmentModel, scratch, REAL(zetaZ)[0], REAL(result), REAL(result) + numObservations);
     
     Rprintf("deleting scratch\n");
-    treatmentModel.destroyScratch(scratch);
+    treatmentModel.destroyScratch(&treatmentModel, scratch);
     
     delete [] temp;
     

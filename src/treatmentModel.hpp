@@ -15,7 +15,7 @@ namespace cibart {
     
     void* (*createScratch)(TreatmentModel* restrict model, const double* restrict x, std::size_t numObservations, std::size_t numPredictors,
                            const double* restrict z);
-    void (*destroyScratch)(void* scratch);
+    void (*destroyScratch)(TreatmentModel* model, void* scratch);
     // offset is a temp in cibart's memory; make a copy if persistence is needed
     void (*updateParameters)(TreatmentModel* restrict model, void* restrict scratch, const double* restrict offset);
     void (*getConditionalProbabilities)(TreatmentModel* restrict model, void* restrict scratch, double zetaZ, double* restrict probU0, double* restrict probU1);

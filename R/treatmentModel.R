@@ -3,16 +3,13 @@ probitEM <- function(maxBackstepIterations = 30L) {
   structure(namedList(maxIter = maxBackstepIterations), class = "probitEMTreatmentModel")
 }
 
-bart <- function(sigdf = 3, sigquant = 0.9, k = 2,
-                 power = 2, base = 0.95, binaryOffset = 0,
-                 ntree = 200, keepevery = 25, numcut = 100)
+bart <- function(k = 5, ntree = 200, keepevery = 25)
 {
-  if (sigdf <= 0.0 || sigquant <= 0.0 || sigquant >= 1.0 ||
-      k <= 0.0 || power <= 0.0 || base <= 0.0 || base >= 1.0 ||
-      ntree <= 0 || keepevery <= 0 || numcut <= 0.0)
+  if (k <= 0.0 || ntree <= 0 || keepevery <= 0)
     stop('illegal binary bart option')
   
-  structure(namedList(sigdf, sigquant, k, power, base, binaryOffset, ntree, keepevery, numcut), class = "bartTreatmentModel")
+  structure(namedList(k = as.double(k), ntree = as.integer(ntree), keepevery = as.integer(keepevery)),
+            class = "bartTreatmentModel")
 }
 
 probitStudentTPrior <- function(df = 3, scale = 2.5) {

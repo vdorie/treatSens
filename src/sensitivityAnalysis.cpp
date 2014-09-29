@@ -80,7 +80,7 @@ namespace {
     
     Data(const double* y, const double* z, const double* x,
          size_t numObservations, size_t numPredictors, const double* x_test,
-         size_t numTestObservations, const TreatmentModel& treatmentModel);
+         size_t numTestObservations);
     ~Data();
   };
   
@@ -89,8 +89,9 @@ namespace {
     double* p;
     double* u;
     
+    TreatmentModel& treatmentModel;
     void* treatmentScratch;
-    void (*destroyTreatmentScratch)(void* treatmentScratch);
+    // void (*destroyTreatmentScratch)(void* treatmentScratch);
     
     double* temp_numObs_1;
     double* temp_numObs_2;
@@ -171,7 +172,7 @@ namespace cibart {
     lookupBARTFunctions(control);
     
     Data data(y, z, x, numObservations, numPredictors,
-              x_test, numTestObservations, treatmentModel);
+              x_test, numTestObservations);
     
     size_t numCells = numZetaY * numZetaZ;
     if (numCells < numThreads) {
@@ -549,7 +550,7 @@ namespace {
   
   Data::Data(const double* y, const double* z, const double* x,
              size_t numObservations, size_t numPredictors, const double* x_test,
-             size_t numTestObservations, const TreatmentModel& treatmentModel) :
+             size_t numTestObservations) :
     y(y), z(z), x(x), numObservations(numObservations), numPredictors(numPredictors),
     x_test(x_test), numTestObservations(numTestObservations),
     x_train(NULL), bart_x_train(NULL), numBartPredictors(numPredictors + 1)
@@ -572,7 +573,7 @@ namespace {
   }
   
   Scratch::Scratch(const Control& control, const Data& data) : yMinusZetaU(NULL), p(NULL), u(NULL),
-    treatmentScratch(NULL), destroyTreatmentScratch(control.treatmentModel.destroyScratch), temp_numObs_1(NULL), temp_numObs_2(NULL)
+    treatmentModel(control.treatmentModel), treatmentScratch(NULL), temp_numObs_1(NULL), temp_numObs_2(NULL)
   {
     yMinusZetaU = new double[data.numObservations];
     u = new double[data.numObservations];
@@ -586,7 +587,7 @@ namespace {
       treatment_x += data.numObservations;
     }
     
-    treatmentScratch = control.treatmentModel.createScratch(&control.treatmentModel, treatment_x, data.numObservations, treatmentNumPredictors, data.z);
+    treatmentScratch = treatmentModel.createScratch(&treatmentModel, treatment_x, data.numObservations, treatmentNumPredictors, data.z);
     
     temp_numObs_1 = new double[data.numObservations];
     temp_numObs_2 = new double[data.numObservations];
@@ -597,7 +598,7 @@ namespace {
     delete [] temp_numObs_2; temp_numObs_2 = NULL;
     delete [] temp_numObs_1; temp_numObs_1 = NULL;
     
-    destroyTreatmentScratch(treatmentScratch);
+    treatmentModel.destroyScratch(&treatmentModel, treatmentScratch);
     treatmentScratch = NULL;
     
     delete [] p; p = NULL;

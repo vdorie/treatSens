@@ -12,12 +12,12 @@ namespace {
   struct Scratch;
   
   void* createScratch(cibart::TreatmentModel* restrict model, const double* x, size_t numObservations, size_t numPredictors, const double* z);
-  void destroyScratch(void* scratch);
+  void destroyScratch(cibart::TreatmentModel*, void* scratch);
   void updateParameters(cibart::TreatmentModel* restrict model, void* restrict scratch, const double* restrict offset);
   void getConditionalProbabilities(cibart::TreatmentModel* restrict model, void* restrict scratch, double zetaZ, double* restrict probU0, double* restrict probU1);
   
   void sampleCoefficients(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset);
-  void sampleLatents(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset);
+  void sampleLatents(Scratch& restrict scratch, const double* restrict offset);
   
   void getPosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, const double* xCrossproduct, size_t numPredictors, double* factor);
   void updatePosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, Scratch& scratch);
@@ -116,7 +116,7 @@ namespace {
     return scratch;
   }
   
-  void destroyScratch(void* scratchPtr) {
+  void destroyScratch(cibart::TreatmentModel*, void* scratchPtr) {
     Scratch* scratch = (Scratch*) scratchPtr;
     
     if (scratch != NULL) {
@@ -134,7 +134,7 @@ namespace {
     Scratch& restrict scratch(*(Scratch*) scratchPtr);
     
     sampleCoefficients(model, scratch, offset);
-    sampleLatents(model, scratch, offset);
+    sampleLatents(scratch, offset);
   }
   
   void getConditionalProbabilities(cibart::TreatmentModel* restrict, void* restrict scratchPtr, double zetaZ, double* restrict probZForU0, double* restrict probZForU1)
@@ -189,7 +189,7 @@ namespace {
                                      scratch.coefficients, 1);
   }
   
-  void sampleLatents(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset)
+  void sampleLatents(Scratch& restrict scratch, const double* restrict offset)
   {
     // X beta
     ext_multiplyMatrixIntoVector(scratch.x, scratch.numObservations, scratch.numPredictors, false, scratch.coefficients, scratch.latents);

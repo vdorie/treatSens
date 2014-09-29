@@ -9,7 +9,7 @@
 
 namespace {
   void* createScratch(cibart::TreatmentModel* restrict model, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z);
-  void destroyScratch(void* scratch);
+  void destroyScratch(cibart::TreatmentModel*, void* scratch);
   void updateParameters(cibart::TreatmentModel* restrict model, void* restrict scratch, const double* restrict offset);
   void getConditionalProbabilities(cibart::TreatmentModel* restrict model, void* restrict scratch, double zetaZ, double* restrict probU0, double* restrict probU1);
 }
@@ -36,14 +36,13 @@ namespace {
     double* glmScratch;
   };
 
-  void* createScratch(cibart::TreatmentModel* restrict modelPtr, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
+  void* createScratch(cibart::TreatmentModel* restrict, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
     Scratch* scratch = new Scratch;
     
-    
-    ext_printf("probit EM model:\n");
+    /* ext_printf("probit EM model:\n");
     cibart::ProbitEMTreatmentModel& model(*((cibart::ProbitEMTreatmentModel*) modelPtr));
-    ext_printf("  max iter: %lu\n", model.maxIterations);
+    ext_printf("  max iter: %lu\n", model.maxIterations); */
     
     scratch->x = x;
     scratch->numObservations = numObservations;
@@ -56,7 +55,7 @@ namespace {
     return scratch;
   }
   
-  void destroyScratch(void* scratchPtr) {
+  void destroyScratch(cibart::TreatmentModel*, void* scratchPtr) {
     Scratch* scratch = (Scratch*) scratchPtr;
     
     if (scratch != NULL) {
