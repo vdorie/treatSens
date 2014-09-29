@@ -366,7 +366,7 @@ namespace {
     control.initializeFit(fit, &bartControl, &bartModel, &bartData);
     
     size_t estimateOffset = gridCells[0].offset * control.numSimsPerCell;
-    
+        
     dbarts::Results* bartResults = control.runSampler(fit);
     estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
     standardErrors[gridCells[0].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
@@ -417,7 +417,7 @@ namespace {
     const Control& control(callbackData.control);
     const Data& data(callbackData.data);
     Scratch& scratch(callbackData.scratch);
-    
+        
     updateTreatmentModelParameters(control, data, scratch, callbackData.zetaZ);
     updateConfounderProbabilities(control, data, scratch, callbackData.zetaY, callbackData.zetaZ,
                                   trainingSamples, sigma);
@@ -441,7 +441,7 @@ namespace {
   {
     // perform a standard linear regression
     // we can use the whole X matrix that we allocated consisting of [ 1 X Z ]
-    size_t numPredictors = data.numPredictors + 1;
+    size_t numPredictors = data.numPredictors + 2;
     const double* const& lm_x(data.x_train);
     
     double* lsSolution = ext_stackAllocate(numPredictors, double);
@@ -453,11 +453,11 @@ namespace {
     if (lsResult <= 0) ext_throwError("error estimating sigma: %s", lsMessage);
     
     double sumOfSquaredResiduals = ext_sumSquaresOfVectorElements(residuals, data.numObservations);
-    
+            
     ext_stackFree(residuals);
     ext_stackFree(lsSolution);
     
-    return std::sqrt(sumOfSquaredResiduals / (double) (data.numObservations - data.numBartPredictors));
+    return std::sqrt(sumOfSquaredResiduals / (double) (data.numObservations - numPredictors));
   }
   
   void estimateTreatmentEffect(const Control& control, const Data& data,

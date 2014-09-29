@@ -122,12 +122,13 @@ namespace {
       delete scratch;
     }
   }
-  
+
   void updateParameters(TreatmentModel* restrict modelPtr, void* restrict scratchPtr, const double* restrict offset)
   {
     FunctionTable& functionTable(*(((BARTTreatmentModel*) modelPtr)->functionTable));
     Scratch* scratch = (Scratch*) scratchPtr;
     
+        
     functionTable.setOffset(scratch->bartFit, offset);
     
     scratch->bartResults = functionTable.runSampler(scratch->bartFit);
