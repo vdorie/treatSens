@@ -20,7 +20,6 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                      core = NULL, 		#number of CPU cores used (Max=8). Compatibility with Mac is unknown.
                      spy.range = NULL,  	#custom range for sensitivity parameter on Y, e.g.(0,10), zero.loc will be overridden.
                      spz.range = NULL,  	#custom range for sensitivity parameter on Z, e.g.(-2,2), zero.loc will be overridden.
-                     jitter = FALSE,    	#add jitter to grids near the axis.
                      trim.wt = 10     	#the maximum size of weight is set at "trim.wt"% of the inferential group. type NULL to turn off.
 ){
   #this code let R issue warnings as they occur.
@@ -214,10 +213,11 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                      standardize=standardize, weights=weights, iter.j=iter.j, 
                      offset = offset, p = NULL)
   
-  range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, jitter)
+  range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
   zetaZ = range$zetaZ
   zetaY = range$zetaY
-  
+  grid.dim = c(length(zetaZ), length(zetaY))
+
   sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[2], grid.dim[1], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
   cat("Computing final grid...\n")

@@ -12,7 +12,7 @@ theta = 0.5, grid.dim = c(8,4), standardize = TRUE,
 nsim = 20, zero.loc = 1/3, verbose = FALSE, 
 buffer = 0.1, weights = NULL, data = NULL, seed = 1234, 
 iter.j = 10, offset = TRUE, core = NULL, spy.range = NULL, 
-spz.range = NULL, jitter = FALSE, trim.wt = 10)
+spz.range = NULL, trim.wt = 10)
 }
 \arguments{
   \item{formula}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a symbolic description of the model to be fitted.
@@ -25,7 +25,7 @@ spz.range = NULL, jitter = FALSE, trim.wt = 10)
 }
   \item{theta}{this option specifies the marginal probability that a binary unobserved confounder takes one \code{(i.e Pr(U=1))}. The default is \code{0.5}.
 }
-  \item{grid.dim}{the final dimensions of output grid. \code{GLM.sens} draws \code{nsim} of unobserved confounders and corresponding treatment effect estimates for each grid cell. The first argument specifies the horizontal (treatment) dimension, and the second argument specifies the vertical (response) dimension. The default is \code{c(8, 4)}, that is, confounding effects are evaluated at 32 grid points.
+  \item{grid.dim}{the final dimensions of output grid. \code{GLM.sens} draws \code{nsim} of unobserved confounders and corresponding treatment effect estimates for each grid cell. The first argument specifies the horizontal (treatment) dimension, and the second argument specifies the vertical (response) dimension. The default is \code{c(9, 5)}, that is, confounding effects are evaluated at 40 grid points. Note that the dimensions given will be increased by one to an odd number where necessary when \code{zero.loc = "full"} or sensitivity parameter ranges are given in order to force inclusion of 0 in the range of sensitivity parameters. 
 }
   \item{standardize}{logical. If \code{TRUE} all variables except binary ones are standardized to have mean 0 and standard deviation 1. The default is \code{TRUE}.
 }
@@ -52,8 +52,6 @@ spz.range = NULL, jitter = FALSE, trim.wt = 10)
   \item{spy.range}{custom range for the sensitiviy parameter associated with Y (the coefficient on U in the outcome model or partial correlation of U with Y given X), e.g. \code{c(0,2)}. When this option is specified, \code{zetaz.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
 }
   \item{spz.range}{custom range for the sensitivity parameter associated with Z (the coefficient on U in the treatment model or partial correlation of U with Z given X), e.g. \code{c(-2,2)}. When this option is specified, \code{zetay.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
-}
-  \item{jitter}{logical. If \code{TRUE}, this option adds jitter to grids near the axis. The default is \code{FALSE}.
 }
   \item{trim.wt}{the maximum size of weight as a percentage of the sample size of the inferential group for the causal estimand. This option is used only when \code{weights} option is specified as  "ATE", "ATT" or "ATC". The default is \code{10}. For example, \code{trim.wt=10} in a dataset with 300 treated observations when the estimand has been set to "ATT" gives a maximum weight of 30. 
 }

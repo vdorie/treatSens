@@ -30,12 +30,6 @@ sensPlot = function(x,
 	print.text <- "Coefficients on U" 
   }
 
-  addYdim = sum(Ycors==0)==0
-  Zcors = sort(c(Zcors,0))	#Note don't need if stmt for Z because main code excludes zeta.z = 0
-  if(addYdim==TRUE){
-    Ycors = c(0,Ycors)
-  }
- 
 ##############  
 #######Only inclue X on the plot for GLM-style
 ############
@@ -66,21 +60,11 @@ sensPlot = function(x,
   W = apply(x$se.tau^2, c(1,2), mean, na.rm = T)
   B = apply(x$tau, c(1,2), sd, na.rm = T)^2
   se.est = t(sqrt(W+(1+1/K)*B))
-  taus = matrix(null.tau,nr,nc)
-  se.taus = matrix(null.se,nr,nc)
-  row0 = c(1:length(Zcors))%*%((Zcors==0)*1) 
-  if(addYdim==TRUE){
-    taus[1:(row0-1),2:nc] = taus.est[1:(row0-1),]
-    taus[(row0+1):length(Zcors),2:nc] = taus.est[(row0):nrow(se.est),]
-    se.taus[1:(row0-1),2:nc] = se.est[1:(row0-1),]
-    se.taus[(row0+1):length(Zcors),2:nc] = se.est[(row0):nrow(se.est),]
-  }
-  else{
-    taus[1:(row0-1),] = taus.est[1:(row0-1),]
-    taus[(row0+1):length(Zcors),] = taus.est[(row0):nrow(taus.est),]
-    se.taus[1:(row0-1),] = se.est[1:(row0-1),]
-    se.taus[(row0+1):length(Zcors),] = se.est[(row0):nrow(taus.est),]
-  }
+  taus = taus.est
+  se.taus = se.est
+  taus[Zcors==0,] = null.tau
+  taus[,Ycors==0] = null.tau
+  
   dimnames(taus)[[1]] = Zcors
   dimnames(taus)[[2]] = Ycors
   taus <<- taus
@@ -145,7 +129,7 @@ sensPlot = function(x,
   contour(Zcors, Ycors, taus, levels = 0, lwd = 2,
           add = T, col = col.zero,lty = lty.zero,labcex = labcex,...)
   
-  contour(Zcors, Ycors, taus/se.taus, labels = "N.S.",
+  contour(as.numeric(dimnames(x$sp.z)[[2]]), as.numeric(dimnames(x$sp.y)[[1]]), taus.est/se.est, labels = "N.S.",
           levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = col.insig,
           lty = lty.insig, labcex = labcex, lwd = 2,...)
   
