@@ -241,7 +241,6 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   if(!is.null(core) & U.model=="binomial"){
     ngrid = grid.dim[2]*grid.dim[1]
     out.foreach <- foreach::"%dopar%"(foreach::foreach(h=ngrid:1,.combine=cbind,.verbose=F),{
-      source("GLM_sens.R")
       j=grid.dim[1]-(h-1)%%grid.dim[1]
       i=grid.dim[2]-((h-1)-(h-1)%%grid.dim[1])/grid.dim[1]
       cell = cell +1
