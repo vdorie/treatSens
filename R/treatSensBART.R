@@ -151,10 +151,9 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                                       n.thin = iter.j,
                                       n.thread = if (is.null(nthreads)) cibart::guessNumCores() else nthreads)
   
-  cellResults <- cibart::fitSensitivityAnalysis(Y, Z, X,
-                                                Z.test, X.test,
+  cellResults <- cibart::fitSensitivityAnalysis(Y, Z, X, X.test,
                                                 zetaY, zetaZ, theta,
-                                                est.type, U.model,
+                                                est.type, probit(),
                                                 control.sens, verbose)
   
   for (i in 1:nsim) {
