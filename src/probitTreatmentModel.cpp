@@ -84,7 +84,10 @@ namespace {
     scratch->z = z;
     
     scratch->latents      = new double[numObservations];
+    // use some default values for latents
+    for (size_t i = 0; i < numObservations; ++i) scratch->latents[i] = (z[i] == 1.0 ? 0.5 : -0.5);
     scratch->coefficients = new double[numPredictors];
+    ext_setVectorToConstant(scratch->coefficients, numPredictors, 0.0);
     scratch->sigma_sq = 1.0;
     
     scratch->posteriorCovarianceInverseRightFactor = new double[numPredictors * numPredictors];
@@ -106,12 +109,6 @@ namespace {
                                     false, EXT_TRIANGLE_TYPE_UPPER);
     
     getPosteriorCovarianceFactor(model, xCrossproduct, numPredictors, scratch->posteriorCovarianceInverseRightFactor);
-    
-    
-    // use some default values for latents
-    for (size_t i = 0; i < numObservations; ++i) {
-      scratch->latents[i] = (z[i] == 1.0 ? 0.5 : -0.5);
-    }
     
     return scratch;
   }
@@ -203,7 +200,8 @@ namespace {
                             ext_simulateUpperTruncatedNormalScale1(scratch.latents[i], 0.0));
     }
   }
-  
+
+  // if student, xCrossproduct is its own thing; otherwise, it is equal to factor and contains upper-right triangle of X'X
   void getPosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, const double* xCrossproduct, size_t numPredictors, double* factor)
   {    
     switch (model.priorType) {
@@ -211,7 +209,13 @@ namespace {
       {
         cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
         
-        std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
+        // std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
+        // just copy in upper-right triangle and not garbage in lower left
+        for (size_t col = 0; col < numPredictors; ++col) {
+          for (size_t row = 0; row <= col; ++row) {
+            factor[row + col * numPredictors] = xCrossproduct[row + col * numPredictors];
+          }
+        }
         
         // X'X + Sig_beta^{-1}, but we only do diagonal Sig_beta 
         for (size_t i = 0; i < numPredictors; ++i) {
@@ -235,9 +239,9 @@ namespace {
     ext_getSymmetricPositiveDefiniteTriangularFactorizationInPlace(factor, numPredictors, EXT_TRIANGLE_TYPE_UPPER);
     
     // fill in lower left as zeros
-    for (size_t col = 0; col < numPredictors - 1; ++col) {
+    /* for (size_t col = 0; col < numPredictors - 1; ++col) {
       for (size_t row = col + 1; row < numPredictors; ++row) factor[row + col * numPredictors] = 0.0;
-    }
+    } */
   }
   
   // only applicable to T prior
@@ -249,7 +253,12 @@ namespace {
     
     cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
     
-    std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
+    // std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
+    for (size_t col = 0; col < numPredictors; ++col) {
+      for (size_t row = 0; row <= col; ++row) {
+        factor[row + col * numPredictors] = xCrossproduct[row + col * numPredictors];
+      }
+    }
     
     for (size_t i = 0; i < numPredictors; ++i) {
       factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i] * prior.dof * scratch.sigma_sq);
@@ -258,8 +267,8 @@ namespace {
     ext_getSymmetricPositiveDefiniteTriangularFactorizationInPlace(factor, numPredictors, EXT_TRIANGLE_TYPE_UPPER);
     
     // fill in lower left as zeros
-    for (size_t col = 0; col < numPredictors - 1; ++col) {
+    /* for (size_t col = 0; col < numPredictors - 1; ++col) {
       for (size_t row = col + 1; row < numPredictors; ++row) factor[row + col * numPredictors] = 0.0;
-    }
+    } */
   }
 }

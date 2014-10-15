@@ -216,7 +216,7 @@ namespace cibart {
     if (control.numThreads <= 1) {
       Scratch scratch(control, data);
       
-      ThreadData threadData = { gridCells, numCells, numCells, &control, &data, &scratch, estimates, standardErrors };
+      ThreadData threadData = { gridCells, numCells, numCells, &control, &data, &scratch, estimates, standardErrors, NULL };
       
 #ifdef HAVE_GETTIMEOFDAY
       gettimeofday(&startTime, NULL);
@@ -234,7 +234,7 @@ namespace cibart {
     } else {
       ext_mt_manager_t threadManager;
       ext_mt_create(&threadManager, control.numThreads);
-      
+            
       size_t numCellsPerThread;
       size_t offByOneIndex;
       
@@ -366,14 +366,16 @@ namespace {
     control.initializeFit(fit, &bartControl, &bartModel, &bartData);
     
     size_t estimateOffset = gridCells[0].offset * control.numSimsPerCell;
-        
+    
     dbarts::Results* bartResults = control.runSampler(fit);
     estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
     standardErrors[gridCells[0].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
     
     delete bartResults;
-    if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
-    
+    /* if (control.verbose) {
+      ext_printf("Completed %u cell of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
+      ext_fflush_stdout();
+    } */
     for (size_t i = 1; i < threadData.numGridCells; ++i) {
       // simply change the input BART uses, and make sure our call back function knows
       // what's up
@@ -391,7 +393,10 @@ namespace {
       standardErrors[gridCells[i].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
       
       delete bartResults;
-      if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[i].cellNumber + 1, threadData.totalNumGridCells);
+      /* if (control.verbose) {
+        ext_printf("Completed %u cell of %u cells.\n", gridCells[i].cellNumber + 1, threadData.totalNumGridCells);
+        ext_fflush_stdout();
+      } */
     }
     
     control.invalidateFit(fit);
@@ -580,6 +585,7 @@ namespace {
     p = new double[data.numObservations];
     ext_setVectorToConstant(p, data.numObservations, control.theta);
     
+    // [ 1 X ]
     const double* treatment_x = data.x_train;
     size_t treatmentNumPredictors = data.numPredictors + 1;
     if (!control.treatmentModel.predictorsIncludeIntercept) {
