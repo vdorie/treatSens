@@ -10,6 +10,7 @@
 #include <dbarts/results.hpp>
 #include <dbarts/types.hpp>
 
+#include <external/random.h>
 #include <external/stats.h>
 
 using std::size_t;
@@ -20,7 +21,7 @@ using std::uint32_t;
 namespace {
   using cibart::TreatmentModel;
   
-  void* createScratch(TreatmentModel* restrict model, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z);
+  void* createScratch(TreatmentModel* restrict model, ext_rng* restrict generator, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z);
   void destroyScratch(TreatmentModel* model, void* scratch);
   void updateParameters(TreatmentModel* restrict model, void* restrict scratch, const double* restrict offset);
   void getConditionalProbabilities(TreatmentModel* restrict model, void* restrict scratch, double zetaZ, double* restrict probU0, double* restrict probU1);
@@ -74,7 +75,7 @@ namespace {
     dbarts::Results* bartResults;
   };
   
-  dbarts::Control* createBARTControl(BARTTreatmentModel& model);
+  dbarts::Control* createBARTControl(BARTTreatmentModel& model, ext_rng* generator);
   dbarts::Data*    createBARTData(const double* x, size_t numObservations, size_t numPredictors, const double* z);
   dbarts::Model*   createBARTModel(BARTTreatmentModel& model, const dbarts::Control* bartControl);
   
@@ -82,14 +83,14 @@ namespace {
   void destroyBARTData(dbarts::Data* data);
   void destroyBARTModel(BARTTreatmentModel& model, dbarts::Model* bartModel);
 
-  void* createScratch(TreatmentModel* restrict modelPtr, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
+  void* createScratch(TreatmentModel* restrict modelPtr, ext_rng* restrict generator, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
     BARTTreatmentModel& model(*((BARTTreatmentModel*) modelPtr));
     FunctionTable& functionTable(*model.functionTable);
     
     Scratch* scratch = new Scratch;
     
-    scratch->bartControl = createBARTControl(model);
+    scratch->bartControl = createBARTControl(model, generator);
         
     scratch->bartData = createBARTData(x, numObservations, numPredictors, z);
     
@@ -175,7 +176,7 @@ namespace {
     functionTable->invalidateChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*)) lookupFunction("dbarts", "invalidateChiSquaredPrior");
   }
   
-  dbarts::Control* createBARTControl(BARTTreatmentModel& model)
+  dbarts::Control* createBARTControl(BARTTreatmentModel& model, ext_rng* generator)
   {
     dbarts::Control* control = new dbarts::Control;
     control->numSamples = 1;
@@ -185,6 +186,7 @@ namespace {
     control->responseIsBinary = true;
     control->verbose = false;
     control->numThreads = 1;
+    control->rng = generator;
     
     return control;
   }

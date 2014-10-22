@@ -18,6 +18,8 @@
 
 #include <glm/glm.h>
 
+#include <external/random.h>
+
 using std::size_t;
 using std::uint32_t;
 
@@ -433,8 +435,18 @@ namespace {
     treatmentPrior.scale = temp;
     cibart::ProbitTreatmentModel treatmentModel(cibart::PROBIT_PRIOR_NORMAL, &treatmentPrior);
     
+    ext_rng_userFunction uniformFunction;
+    uniformFunction.f.stateless = &unif_rand;
+    uniformFunction.state = NULL;
+    ext_rng* rng = ext_rng_create(EXT_RNG_ALGORITHM_USER_UNIFORM, &uniformFunction);
+  
+    ext_rng_userFunction normalFunction;
+    normalFunction.f.stateless = &norm_rand;
+    normalFunction.state = NULL;
+    ext_rng_setStandardNormalAlgorithm(rng, EXT_RNG_STANDARD_NORMAL_USER_NORM, &normalFunction);
+    
     Rprintf("creating treatment model scratch\n");
-    void* scratch = treatmentModel.createScratch(&treatmentModel, REAL(X), numObservations, numPredictors, REAL(Z));
+    void* scratch = treatmentModel.createScratch(&treatmentModel, rng, REAL(X), numObservations, numPredictors, REAL(Z));
     
     Rprintf("updating parameters\n");
     treatmentModel.updateParameters(&treatmentModel, scratch, REAL(offset));

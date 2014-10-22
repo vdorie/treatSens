@@ -2,16 +2,17 @@
 
 #include <cstring>
 
-#include <external/stddef.h>
-#include <external/stats.h>
 #include <external/linearAlgebra.h>
+#include <external/random.h>
+#include <external/stats.h>
+#include <external/stddef.h>
 
 // #include <external/io.h>
 
 namespace {
   struct Scratch;
   
-  void* createScratch(cibart::TreatmentModel* restrict model, const double* x, size_t numObservations, size_t numPredictors, const double* z);
+  void* createScratch(cibart::TreatmentModel* restrict model, ext_rng* restrict generator, const double* x, size_t numObservations, size_t numPredictors, const double* z);
   void destroyScratch(cibart::TreatmentModel*, void* scratch);
   void updateParameters(cibart::TreatmentModel* restrict model, void* restrict scratch, const double* restrict offset);
   void getConditionalProbabilities(cibart::TreatmentModel* restrict model, void* restrict scratch, double zetaZ, double* restrict probU0, double* restrict probU1);
@@ -37,6 +38,8 @@ namespace cibart {
 
 namespace {
   struct Scratch {
+    ext_rng* generator;
+    
     const double* x;
     const double* z;
     size_t numObservations;
@@ -54,10 +57,12 @@ namespace {
     double* xCrossproduct; // cached for t dists
   };
 
-  void* createScratch(cibart::TreatmentModel* restrict modelPtr, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
+  void* createScratch(cibart::TreatmentModel* restrict modelPtr, ext_rng* restrict generator, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
     Scratch* scratch = new Scratch;
     cibart::ProbitTreatmentModel& model(*((cibart::ProbitTreatmentModel*) modelPtr));
+    
+    scratch->generator = generator;
     
     /* ext_printf("probit treatment model:\n");
     if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
@@ -102,7 +107,7 @@ namespace {
       scratch->xCrossproduct = new double[numPredictors * numPredictors];
       xCrossproduct = scratch->xCrossproduct;
       
-      scratch->sigma_sq = 1.0 / ext_simulateChiSquared(prior.dof);
+      scratch->sigma_sq = 1.0 / ext_rng_simulateChiSquared(generator, prior.dof);
     }
     
     ext_getSingleMatrixCrossproduct(x, numObservations, numPredictors, xCrossproduct,
@@ -162,7 +167,7 @@ namespace {
         sigmaScale += ((scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i])) / prior.dof;
       }
       
-      scratch.sigma_sq = sigmaScale / ext_simulateChiSquared(prior.dof + (double) scratch.numPredictors);
+      scratch.sigma_sq = sigmaScale / ext_rng_simulateChiSquared(scratch.generator, prior.dof + (double) scratch.numPredictors);
       
       updatePosteriorCovarianceFactor(model, scratch);
     }
@@ -178,7 +183,7 @@ namespace {
 
     // b + L^{-1} X'(v - zetaZ * u), b ~ N(0, 1)
     for (size_t i = 0; i < scratch.numPredictors; ++i) {
-      scratch.coefficients[i] += ext_simulateStandardNormal();
+      scratch.coefficients[i] += ext_rng_simulateStandardNormal(scratch.generator);
     }
     
     // beta = L^{-T} (b + L^{-1} X'(v - zetaZ * u))
@@ -196,8 +201,8 @@ namespace {
     // ~ N(X beta + zetaZ * u, 1)^{+/-}
     for (size_t i = 0; i < scratch.numObservations; ++i) {
       scratch.latents[i] = (scratch.z[i] == 0.0 ?
-                            ext_simulateLowerTruncatedNormalScale1(scratch.latents[i], 0.0) : 
-                            ext_simulateUpperTruncatedNormalScale1(scratch.latents[i], 0.0));
+                            ext_rng_simulateLowerTruncatedNormalScale1(scratch.generator, scratch.latents[i], 0.0) : 
+                            ext_rng_simulateUpperTruncatedNormalScale1(scratch.generator, scratch.latents[i], 0.0));
     }
   }
 

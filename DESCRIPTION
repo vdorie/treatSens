@@ -8,8 +8,7 @@ Description: Performs causal inference (CI) tasks using  Bayesian additive regre
 NeedsCompilation: yes
 Biarch: yes
 Depends:
-  R (>= 2.15-3),
-  dbarts (>= 0.8)
+  R (>= 2.15-3)
 LinkingTo:
   dbarts
 Suggests:

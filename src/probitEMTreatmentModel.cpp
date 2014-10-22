@@ -8,7 +8,7 @@
 #include <external/io.h>
 
 namespace {
-  void* createScratch(cibart::TreatmentModel* restrict model, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z);
+  void* createScratch(cibart::TreatmentModel* restrict model, ext_rng* restrict generator, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z);
   void destroyScratch(cibart::TreatmentModel*, void* scratch);
   void updateParameters(cibart::TreatmentModel* restrict model, void* restrict scratch, const double* restrict offset);
   void getConditionalProbabilities(cibart::TreatmentModel* restrict model, void* restrict scratch, double zetaZ, double* restrict probU0, double* restrict probU1);
@@ -36,7 +36,7 @@ namespace {
     double* glmScratch;
   };
 
-  void* createScratch(cibart::TreatmentModel* restrict, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
+  void* createScratch(cibart::TreatmentModel* restrict, ext_rng* restrict, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
     Scratch* scratch = new Scratch;
     

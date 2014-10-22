@@ -1,6 +1,7 @@
 #include "config.hpp"
 #include "sensitivityAnalysis.hpp"
 
+#include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <dbarts/cstdint.hpp>
@@ -18,12 +19,16 @@
 #include <dbarts/results.hpp>
 #include <dbarts/R_C_interface.hpp>
 
-#include <external/io.h>
-#include <external/stats.h>
-#include <external/linearAlgebra.h>
-
 #include <external/alloca.h>
+#include <external/io.h>
+#include <external/linearAlgebra.h>
+#include <external/random.h>
+#include <external/stats.h>
 
+#include <R.h>
+#include <Rdefines.h>
+#include <Rinternals.h>
+#include <Rmath.h>
 #include <R_ext/Rdynload.h>
 
 #include "treatmentModel.hpp"
@@ -32,6 +37,7 @@
 
 using std::size_t;
 using std::uint32_t;
+using std::uint_least32_t;
 
 namespace {
   using namespace cibart;
@@ -95,6 +101,8 @@ namespace {
     
     double* temp_numObs_1;
     double* temp_numObs_2;
+    
+    ext_rng* rng;
     
     Scratch(const Control& control, const Data& data);
     ~Scratch();
@@ -216,7 +224,7 @@ namespace cibart {
     if (control.numThreads <= 1) {
       Scratch scratch(control, data);
       
-      ThreadData threadData = { gridCells, numCells, numCells, &control, &data, &scratch, estimates, standardErrors, NULL };
+      ThreadData threadData = { gridCells, numCells, numCells, &control, &data, &scratch, estimates, standardErrors };
       
 #ifdef HAVE_GETTIMEOFDAY
       gettimeofday(&startTime, NULL);
@@ -342,6 +350,7 @@ namespace {
     bartControl.numBurnIn = control.numInitialBurnIn;
     bartControl.numThreads = 1;
     bartControl.treeThinningRate = control.numTreeSamplesToThin;
+    bartControl.rng = scratch.rng;
     
     dbarts::Model bartModel;
     
@@ -434,7 +443,7 @@ namespace {
   
   void sampleConfounders(const Data& data, Scratch& scratch)
   {
-    for (size_t i = 0; i < data.numObservations; ++i) scratch.u[i] = ext_simulateBernoulli(scratch.p[i]);
+    for (size_t i = 0; i < data.numObservations; ++i) scratch.u[i] = ext_rng_simulateBernoulli(scratch.rng, scratch.p[i]);
   }
   
   void subtractConfounderFromResponse(const Data& data, Scratch& scratch, double zetaY)
@@ -577,9 +586,18 @@ namespace {
     bart_x_train = NULL;
   }
   
+  static ext_rng* createRNG(bool useNativeGenerator);
+  
   Scratch::Scratch(const Control& control, const Data& data) : yMinusZetaU(NULL), p(NULL), u(NULL),
     treatmentModel(control.treatmentModel), treatmentScratch(NULL), temp_numObs_1(NULL), temp_numObs_2(NULL)
   {
+    if (control.numThreads > 1) {
+      rng = createRNG(false);
+      ext_rng_setSeed(rng, (uint_least32_t) (unif_rand() * (double) (UINT_LEAST32_MAX)));
+    } else {
+      rng = createRNG(true);
+    }
+    
     yMinusZetaU = new double[data.numObservations];
     u = new double[data.numObservations];
     p = new double[data.numObservations];
@@ -593,7 +611,7 @@ namespace {
       treatment_x += data.numObservations;
     }
     
-    treatmentScratch = treatmentModel.createScratch(&treatmentModel, treatment_x, data.numObservations, treatmentNumPredictors, data.z);
+    treatmentScratch = treatmentModel.createScratch(&treatmentModel, rng, treatment_x, data.numObservations, treatmentNumPredictors, data.z);
     
     temp_numObs_1 = new double[data.numObservations];
     temp_numObs_2 = new double[data.numObservations];
@@ -625,6 +643,89 @@ namespace {
     control.invalidateNormalPrior     = (void (*)(dbarts::NormalPrior*)) R_GetCCallable("dbarts", "invalidateNormalPrior");
     control.initializeChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*, double, double)) R_GetCCallable("dbarts", "initializeChiSquaredPriorFromOptions");
     control.invalidateChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*)) R_GetCCallable("dbarts", "invalidateChiSquaredPrior");
+  }
+  
+  static ext_rng* createRNG(bool useNativeGenerator)
+  {
+    ext_rng* result;
+    
+    if (useNativeGenerator) {
+      ext_rng_userFunction uniformFunction;
+      uniformFunction.f.stateless = &unif_rand;
+      uniformFunction.state = NULL;
+      result = ext_rng_create(EXT_RNG_ALGORITHM_USER_UNIFORM, &uniformFunction);
+    
+      ext_rng_userFunction normalFunction;
+      normalFunction.f.stateless = &norm_rand;
+      normalFunction.state = NULL;
+      ext_rng_setStandardNormalAlgorithm(result, EXT_RNG_STANDARD_NORMAL_USER_NORM, &normalFunction);
+    } else {
+      
+      SEXP seedsExpr = findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
+      if (seedsExpr == R_UnboundValue) GetRNGstate();
+      if (TYPEOF(seedsExpr) == PROMSXP) seedsExpr = eval(R_SeedsSymbol, R_GlobalEnv);
+    
+      uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
+    
+      ext_rng_algorithm_t algorithmType = (ext_rng_algorithm_t) (seed0 % 100);
+      ext_rng_standardNormal_t stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
+    
+      void* state = (void*) (1 + INTEGER(seedsExpr));
+      switch (algorithmType) {
+        case EXT_RNG_ALGORITHM_KNUTH_TAOCP:
+        case EXT_RNG_ALGORITHM_KNUTH_TAOCP2:
+        {
+          ext_rng_knuthState* kt = (ext_rng_knuthState*) std::malloc(sizeof(ext_rng_knuthState));
+          std::memcpy(kt->state1, state, EXT_RNG_KNUTH_NUM_RANDOM * sizeof(uint_least32_t));
+          kt->info = EXT_RNG_KNUTH_NUM_RANDOM; // this is a static var which we cannot access
+          for (size_t i = 0; i < EXT_RNG_KNUTH_QUALITY; ++i) kt->state2[i] = 0; // also static
+          state = kt;
+        }
+        break;
+        case EXT_RNG_ALGORITHM_USER_UNIFORM:
+        {
+          ext_rng_userFunction* uniformFunction = (ext_rng_userFunction*) std::malloc(sizeof(ext_rng_userFunction));
+          uniformFunction->f.stateless = &unif_rand;
+          uniformFunction->state = NULL;
+          state = uniformFunction;
+        }
+        break;
+        default:
+        break;
+      }
+    
+      result = ext_rng_create(algorithmType, state);
+      if (algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP || algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP2 || algorithmType == EXT_RNG_ALGORITHM_USER_UNIFORM) std::free(state);
+      if (result == NULL) return NULL; 
+    
+      void* normalState = NULL;
+      switch (stdNormalType) {
+        case EXT_RNG_STANDARD_NORMAL_BOX_MULLER:
+        normalState = malloc(sizeof(double));
+        *((double*) normalState) = 0.0; // static var, again
+        break;
+        case EXT_RNG_STANDARD_NORMAL_USER_NORM:
+        {
+          ext_rng_userFunction* normalFunction = (ext_rng_userFunction*) std::malloc(sizeof(ext_rng_userFunction));
+          normalFunction->f.stateless = &norm_rand;
+          normalFunction->state = NULL;
+          normalState = normalFunction;
+        }
+        break;
+        default:
+        break;
+      }
+    
+      int errorCode = ext_rng_setStandardNormalAlgorithm(result, stdNormalType, normalState);
+      if (stdNormalType == EXT_RNG_STANDARD_NORMAL_BOX_MULLER || stdNormalType == EXT_RNG_STANDARD_NORMAL_USER_NORM) std::free(normalState);
+    
+      if (errorCode != 0) {
+        ext_rng_destroy(result);
+        return NULL;
+      }
+    }
+    
+    return result;
   }
   
 #ifdef HAVE_GETTIMEOFDAY

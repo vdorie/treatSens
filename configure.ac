@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT(cibart, 0.8, vjd4@nyu.edu)
+AC_INIT(cibart, 1.0, vjd4@nyu.edu)
 AC_CONFIG_SRCDIR([src/R_interface.cpp])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADER([src/config.hpp])
@@ -32,7 +32,11 @@ AC_PROG_CXX
 AC_PROG_CXXCPP
 
 AC_LANG(C)
+AC_LANG_PUSH(C++)
 AC_C_RESTRICT
+AC_LANG_POP(C++)
+
+AC_C_BIGENDIAN
 
 # Checks for libraries.
 AX_PTHREAD
@@ -52,6 +56,7 @@ then
 fi
 
 AC_CHECK_HEADERS([sys/time.h])
+AC_CHECK_HEADERS([unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_INT64_T
@@ -59,6 +64,7 @@ AC_TYPE_UINT64_T
 
 # Checks for library functions.
 AC_CHECK_FUNCS([gettimeofday])
+AC_CHECK_FUNCS([clock_gettime])
 AC_FUNC_ALLOCA
 
 

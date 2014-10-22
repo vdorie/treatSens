@@ -8,12 +8,14 @@
    after that. Consider them C classes and not C++. */
 
 #include <external/stddef.h> // size_t, restrict
-   
+
+struct ext_rng;
+
 namespace cibart {
   struct TreatmentModel {
     bool predictorsIncludeIntercept;
     
-    void* (*createScratch)(TreatmentModel* restrict model, const double* restrict x, std::size_t numObservations, std::size_t numPredictors,
+    void* (*createScratch)(TreatmentModel* restrict model, ext_rng* restrict generator, const double* restrict x, std::size_t numObservations, std::size_t numPredictors,
                            const double* restrict z);
     void (*destroyScratch)(TreatmentModel* model, void* scratch);
     // offset is a temp in cibart's memory; make a copy if persistence is needed
