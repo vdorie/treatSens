@@ -357,7 +357,7 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
   iter.j = control.fit$iter.j
   offset = control.fit$offset
   p = control.fit$p
-  
+
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
     U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, sensParam))      
@@ -374,7 +374,7 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
     }else{
       stop(paste("Only probit link is allowed."))
     }
-    
+
     U = out.contYbinaryZU$U
     p = out.contYbinaryZU$p
   }
