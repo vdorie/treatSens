@@ -1,3 +1,6 @@
+// necessary to get UINT_LEAST32_MAX
+#define __STDC_LIMIT_MACROS 1
+
 #include "config.hpp"
 #include "sensitivityAnalysis.hpp"
 
@@ -587,7 +590,7 @@ namespace {
   }
   
   static ext_rng* createRNG(bool useNativeGenerator);
-  
+
   Scratch::Scratch(const Control& control, const Data& data) : yMinusZetaU(NULL), p(NULL), u(NULL),
     treatmentModel(control.treatmentModel), treatmentScratch(NULL), temp_numObs_1(NULL), temp_numObs_2(NULL)
   {
@@ -628,6 +631,8 @@ namespace {
     delete [] p; p = NULL;
     delete [] u; u = NULL;
     delete [] yMinusZetaU; yMinusZetaU = NULL;
+    
+    ext_rng_destroy(rng);
   }
   
   void lookupBARTFunctions(Control& control)

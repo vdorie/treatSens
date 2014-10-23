@@ -255,7 +255,7 @@ namespace {
     CPUMap processorIdMap;
     LineType lineType;
     
-    while (offset < fileLength) {
+    while (offset < (off_t) fileLength) {
       lineType = NA;
       
       if ((cpuInfo[offset] == 'p' || cpuInfo[offset] == 'P') && fileLength - offset >= 9 &&
@@ -273,27 +273,27 @@ namespace {
       }
       
       if (lineType == NA) {
-        while (offset < fileLength && cpuInfo[offset] != '\n') ++offset;
+        while (offset < (off_t) fileLength && cpuInfo[offset] != '\n') ++offset;
         ++offset;
-        if (offset >= fileLength) break;
+        if (offset >= (off_t) fileLength) break;
         continue;
       }
       
-      while (offset < fileLength && cpuInfo[offset] != ':' && cpuInfo[offset] != '\n') ++offset;
+      while (offset < (off_t) fileLength && cpuInfo[offset] != ':' && cpuInfo[offset] != '\n') ++offset;
       if (cpuInfo[offset] == '\n') {
         ++offset; continue;
       }
-      if (offset == fileLength) break;
+      if (offset == (off_t) fileLength) break;
       ++offset;
       
-      while (offset < fileLength && cpuInfo[offset] < '0' && cpuInfo[offset] > '9' && cpuInfo[offset] != '\n') ++offset;
+      while (offset < (off_t) fileLength && cpuInfo[offset] < '0' && cpuInfo[offset] > '9' && cpuInfo[offset] != '\n') ++offset;
       if (cpuInfo[offset] == '\n') {
         ++offset; continue;
       }
-      if (offset == fileLength) break;
+      if (offset == (off_t) fileLength) break;
       
       off_t endOfNumber = offset + 1;
-      while (endOfNumber < fileLength && cpuInfo[endOfNumber] >= '0' && cpuInfo[endOfNumber] <= '9') ++endOfNumber;
+      while (endOfNumber < (off_t) fileLength && cpuInfo[endOfNumber] >= '0' && cpuInfo[endOfNumber] <= '9') ++endOfNumber;
       
       char* buffer = ext_stackAllocate(endOfNumber - offset + 1, char);
       memcpy(buffer, (const char*) cpuInfo + offset, endOfNumber - offset);
@@ -319,9 +319,9 @@ namespace {
           break;
       }
       
-      while (offset < fileLength && cpuInfo[offset] != '\n') ++offset;
+      while (offset < (off_t) fileLength && cpuInfo[offset] != '\n') ++offset;
       ++offset;
-      if (offset >= fileLength) break;
+      if (offset >= (off_t) fileLength) break;
     }
     
     parseRecord(processorIdMap, currentPhysicalId, currentCoreId, currentProcessorId, INVALID_ID);
