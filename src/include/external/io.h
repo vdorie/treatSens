@@ -20,11 +20,12 @@
 extern "C" {
 #endif
   
-  void ext_printMessage(const char* format, ...); // printf w/terminal newline
-  NORETURN void ext_throwError(const char* format, ...);   // printf w/terminal newline and stops program
-  void ext_issueWarning(const char* format, ...);
+void ext_printMessage(const char* format, ...); // printf w/terminal newline
+NORETURN void ext_throwError(const char* format, ...);   // printf w/terminal newline and stops program
+void ext_issueWarning(const char* format, ...);
 #define ext_printf Rprintf
-  
+#define ext_fflush_stdout R_FlushConsole
+
 #ifdef __cplusplus
 }
 #endif

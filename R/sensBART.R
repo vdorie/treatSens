@@ -1,12 +1,3 @@
-## from lme4
-namedList <- function(...) {
-  result <- list(...)
-  substituteNames <- sapply(substitute(list(...)), deparse)[-1]
-  if (is.null(resultNames <- names(result))) resultNames <- substituteNames
-  if (any(noNames <- resultNames == "")) resultNames[noNames] <- substituteNames[noNames]
-  setNames(result, resultNames)
-}
-
 sensControl <- function(n.sim = 20L,
                         n.burn.init = 500L,
                         n.burn.cell = as.integer(n.burn.init / 5L),
@@ -22,19 +13,44 @@ sensControl <- function(n.sim = 20L,
             class = c("sensControl"))
 }
 
-fitSensitivityAnalysis <- function(Y, Z, X,
-                                   Z.test, X.test,
+fitSensitivityAnalysis <- function(Y, Z, X, X.test,
                                    zetaY, zetaZ, theta,
-                                   est.type, U.model,
+                                   est.type, treatmentModel = probitEM(),
                                    control = sensControl(), verbose = FALSE)
 {
+  matchedCall <- match.call()
+  
   if (!is(control, "sensControl")) stop("control must be of class sensControl; call sensControl() to create");
 
+
+  ## try eval(thing, env, encolsl)
+  treatmentCall <-
+    if (!missing(treatmentModel))
+      matchedCall$treatmentModel else formals(fitSensitivityAnalysis)$treatmentModel
+
+  if (is.character(treatmentCall)) treatmentCall <- parse(text = treatmentCall)[[1]]
+
+  treatmentModel <- eval(treatmentCall, asNamespace("cibart"), parent.frame(1))
+  
+  ## if (missing(treatmentModel)) {
+  ##  treatmentModel <- eval(formals(fitSensitivityAnalysis)$treatmentModel, asNamespace("cibart"))
+  ## treatmentCall <- quote(a())
+  ## treatmentCall[[1]] <- if (missing(treatmentModel)) {
+  ##   quoteInNamespace(formals(fitSensitivityAnalysis)$treatmentModel, TRUE)
+  ##} else {
+  ##  quoteInNamespace(matchedCall$treatmentModel, TRUE)
+  ##}
+  ##browser()
+  ##treatmentModel <- eval(treatmentCall, parent.frame(1))
+
+  if (is(treatmentModel, "probitTreatmentModel") && !identical(treatmentModel$family, "flat")) {
+    treatmentModel$scale <- rep_len(treatmentModel$scale, ncol(X) + 1L)
+  }
+  
   .Call("cibart_fitSensitivityAnalysis",
-        Y, Z,
-        X, Z.test,
+        Y, Z, X,
         X.test,
         zetaY, zetaZ,
-        theta, est.type, U.model,
+        theta, est.type, treatmentModel,
         control, verbose)
 }

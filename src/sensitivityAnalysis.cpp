@@ -1,6 +1,10 @@
+// necessary to get UINT_LEAST32_MAX
+#define __STDC_LIMIT_MACROS 1
+
 #include "config.hpp"
 #include "sensitivityAnalysis.hpp"
 
+#include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <dbarts/cstdint.hpp>
@@ -18,26 +22,31 @@
 #include <dbarts/results.hpp>
 #include <dbarts/R_C_interface.hpp>
 
-#include <external/io.h>
-#include <external/stats.h>
-#include <external/linearAlgebra.h>
-
-#include <glm/glm.h>
-
 #include <external/alloca.h>
+#include <external/io.h>
+#include <external/linearAlgebra.h>
+#include <external/random.h>
+#include <external/stats.h>
 
+#include <R.h>
+#include <Rdefines.h>
+#include <Rinternals.h>
+#include <Rmath.h>
 #include <R_ext/Rdynload.h>
+
+#include "treatmentModel.hpp"
 
 #define DEFAULT_BART_MAX_NUM_CUTS 100u
 
 using std::size_t;
 using std::uint32_t;
+using std::uint_least32_t;
 
 namespace {
   using namespace cibart;
   struct Control {
     EstimandType estimand;
-    ConfounderModelType confounderModel;
+    TreatmentModel& treatmentModel;
     
     size_t numSimsPerCell;
     size_t numInitialBurnIn;
@@ -70,18 +79,16 @@ namespace {
     size_t numObservations;
     size_t numPredictors;
     
-    const bool* z_test;
     const double* x_test;
     size_t numTestObservations;
         
     // various transformations
-    const double* bart_x_train;
+    const double* x_train; // root matrix
+    const double* bart_x_train; // possibly offset
     size_t numBartPredictors;
-    const double* glm_x;
-    size_t numGLMPredictors;
     
     Data(const double* y, const double* z, const double* x,
-         size_t numObservations, size_t numPredictors, const bool* z_test, const double* x_test,
+         size_t numObservations, size_t numPredictors, const double* x_test,
          size_t numTestObservations);
     ~Data();
   };
@@ -90,9 +97,15 @@ namespace {
     double* yMinusZetaU;
     double* p;
     double* u;
-    double* glmScratch;
+    
+    TreatmentModel& treatmentModel;
+    void* treatmentScratch;
+    // void (*destroyTreatmentScratch)(void* treatmentScratch);
     
     double* temp_numObs_1;
+    double* temp_numObs_2;
+    
+    ext_rng* rng;
     
     Scratch(const Control& control, const Data& data);
     ~Scratch();
@@ -104,6 +117,7 @@ namespace {
   void sampleConfounders(const Data& data, Scratch& scratch);
   void subtractConfounderFromResponse(const Data& data, Scratch& scratch, double zetaY);
   double estimateSigma(const Data& data, Scratch& scratch);
+  void updateTreatmentModelParameters(const Control& control, const Data& data, Scratch& scratch, double zetaZ);
   void updateConfounderProbabilities(const Control& control, const Data& data, Scratch& scratch, double zetaY, double zetaZ,
                                      const double* yMinusZetaUHat, double sigma);
   void estimateTreatmentEffect(const Control& control, const Data& data,
@@ -145,7 +159,6 @@ namespace cibart {
                          const double* x,     // numObs * numPredictors
                          size_t numObservations,
                          size_t numPredictors,
-                         const bool* z_test, // numTestObs x 1
                          const double* x_test, // numTestObs x (numPredictors + 1)
                          size_t numTestObservations,
                          const double* zetaYs, // numZetaY x 1
@@ -154,7 +167,7 @@ namespace cibart {
                          size_t numZetaZ,
                          double theta,        // prior prob of U = 1
                          EstimandType estimand,
-                         ConfounderModelType confounderModel,
+                         TreatmentModel& treatmentModel,
                          size_t numSimsPerCell,
                          size_t numInitialBurnIn,
                          size_t numCellSwitchBurnIn,
@@ -164,13 +177,13 @@ namespace cibart {
                          double* standardErrors, // numZetaY x numZetaZ
                          bool verbose)
   {
-    Control control = { estimand, confounderModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
+    Control control = { estimand, treatmentModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
                         numTreeSamplesToThin, numThreads, theta, verbose, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       
     lookupBARTFunctions(control);
     
     Data data(y, z, x, numObservations, numPredictors,
-              z_test, x_test, numTestObservations);
+              x_test, numTestObservations);
     
     size_t numCells = numZetaY * numZetaZ;
     if (numCells < numThreads) {
@@ -232,7 +245,7 @@ namespace cibart {
     } else {
       ext_mt_manager_t threadManager;
       ext_mt_create(&threadManager, control.numThreads);
-      
+            
       size_t numCellsPerThread;
       size_t offByOneIndex;
       
@@ -338,6 +351,7 @@ namespace {
     bartControl.numBurnIn = control.numInitialBurnIn;
     bartControl.numThreads = 1;
     bartControl.treeThinningRate = control.numTreeSamplesToThin;
+    bartControl.rng = scratch.rng;
     
     dbarts::Model bartModel;
     
@@ -370,9 +384,11 @@ namespace {
     standardErrors[gridCells[0].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
     
     delete bartResults;
-    
-    
-    if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
+
+    if (control.verbose && control.numThreads == 1) {
+      ext_printf("Completed %u cell of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
+      ext_fflush_stdout();
+    }
     
     for (size_t i = 1; i < threadData.numGridCells; ++i) {
       // simply change the input BART uses, and make sure our call back function knows
@@ -391,7 +407,10 @@ namespace {
       standardErrors[gridCells[i].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
       
       delete bartResults;
-      if (control.verbose) ext_printf("Completed %u cell of %u cells.\n", gridCells[i].cellNumber + 1, threadData.totalNumGridCells);
+      if (control.verbose && control.numThreads == 1) {
+        ext_printf("Completed %u cell of %u cells.\n", gridCells[i].cellNumber + 1, threadData.totalNumGridCells);
+        ext_fflush_stdout();
+      }
     }
     
     control.invalidateFit(fit);
@@ -417,7 +436,8 @@ namespace {
     const Control& control(callbackData.control);
     const Data& data(callbackData.data);
     Scratch& scratch(callbackData.scratch);
-    
+        
+    updateTreatmentModelParameters(control, data, scratch, callbackData.zetaZ);
     updateConfounderProbabilities(control, data, scratch, callbackData.zetaY, callbackData.zetaZ,
                                   trainingSamples, sigma);
     sampleConfounders(data, scratch);
@@ -428,7 +448,7 @@ namespace {
   
   void sampleConfounders(const Data& data, Scratch& scratch)
   {
-    for (size_t i = 0; i < data.numObservations; ++i) scratch.u[i] = (double) ext_simulateBernoulli(scratch.p[i]);
+    for (size_t i = 0; i < data.numObservations; ++i) scratch.u[i] = (double) ext_rng_simulateBernoulli(scratch.rng, scratch.p[i]);
   }
   
   void subtractConfounderFromResponse(const Data& data, Scratch& scratch, double zetaY)
@@ -440,8 +460,8 @@ namespace {
   {
     // perform a standard linear regression
     // we can use the whole X matrix that we allocated consisting of [ 1 X Z ]
-    size_t numPredictors = data.numGLMPredictors + 1;
-    const double* const& lm_x(data.glm_x);
+    size_t numPredictors = data.numPredictors + 2;
+    const double* const& lm_x(data.x_train);
     
     double* lsSolution = ext_stackAllocate(numPredictors, double);
     double* residuals = ext_stackAllocate(data.numObservations, double);
@@ -452,7 +472,7 @@ namespace {
     if (lsResult <= 0) ext_throwError("error estimating sigma: %s", lsMessage);
     
     double sumOfSquaredResiduals = ext_sumSquaresOfVectorElements(residuals, data.numObservations);
-    
+            
     ext_stackFree(residuals);
     ext_stackFree(lsSolution);
     
@@ -516,95 +536,105 @@ namespace {
     }
   }
   
+  void updateTreatmentModelParameters(const Control& control, const Data& data, Scratch& scratch, double zetaZ)
+  {
+    double*& offset(scratch.temp_numObs_1);
+    ext_scalarMultiplyVector((const double*) scratch.u, data.numObservations, zetaZ, offset);
+    
+    control.treatmentModel.updateParameters(&control.treatmentModel, scratch.treatmentScratch, offset);
+  }
+  
   void updateConfounderProbabilities(const Control& control, const Data& data, Scratch& scratch,
                                      double zetaY, double zetaZ,
                                      const double* yMinusZetaUHat, double sigma)
   {
-    double*& glmOffset(scratch.temp_numObs_1);
-    ext_scalarMultiplyVector((const double*) scratch.u, data.numObservations, zetaZ, glmOffset);
+    double*& probZForU0(scratch.temp_numObs_1);
+    double*& probZForU1(scratch.temp_numObs_2);
     
-    double* coefficients = ext_stackAllocate(data.numGLMPredictors, double);
-    glm_fitGeneralizedLinearModel(data.z, NULL /* sets n = 1 for all obs */, data.numObservations,
-                                  data.glm_x, data.numGLMPredictors,
-                                  NULL /* weights = 1 */, glmOffset, coefficients,
-                                  GLM_FAMILY_BINOMIAL, GLM_LINK_PROBIT, 30,
-                                  scratch.glmScratch);
+    control.treatmentModel.getConditionalProbabilities(&control.treatmentModel, scratch.treatmentScratch, zetaZ, probZForU0, probZForU1);
     
-    double*& linearPredictor(scratch.temp_numObs_1);
-    double zHatForU0, zHatForU1;
+    double probU0, probU1;
     double bartDensityForU0, bartDensityForU1;
-    double probU1, probU0;
-    
-    ext_leftMultiplyMatrixAndVector(data.glm_x, data.numObservations, data.numGLMPredictors, coefficients, linearPredictor);
     
     for (size_t i = 0; i < data.numObservations; ++i) {
-      zHatForU0 = ext_cumulativeProbabilityOfNormal(linearPredictor[i],         0.0, 1.0);
-      zHatForU1 = ext_cumulativeProbabilityOfNormal(linearPredictor[i] + zetaZ, 0.0, 1.0);
+      bartDensityForU0 = ext_densityOfNormal(data.y[i] - yMinusZetaUHat[i], 0.0, sigma);
+      bartDensityForU1 = ext_densityOfNormal(data.y[i] - yMinusZetaUHat[i] - zetaY, 0.0, sigma);
       
-      double y_hat = yMinusZetaUHat[i]; // + (scratch.u[i] == 1.0 ? zetaY : 0.0);
-      bartDensityForU0 = ext_densityOfNormal(data.y[i] - y_hat, 0.0, sigma);
-      bartDensityForU1 = ext_densityOfNormal(data.y[i] - y_hat - zetaY, 0.0, sigma);
-      
-      probU0 = bartDensityForU0 * (data.z[i] == 1.0 ? zHatForU0 : 1.0 - zHatForU0) * (1.0 - control.theta);
-      probU1 = bartDensityForU1 * (data.z[i] == 1.0 ? zHatForU1 : 1.0 - zHatForU1) * control.theta;
+      probU0 = bartDensityForU0 * probZForU0[i] * (1.0 - control.theta);
+      probU1 = bartDensityForU1 * probZForU1[i] * control.theta;
 
       scratch.p[i] = probU1 / (probU0 + probU1);
     }
-    
-    ext_stackFree(coefficients);
   }
   
   Data::Data(const double* y, const double* z, const double* x,
-             size_t numObservations, size_t numPredictors, const bool* z_test, const double* x_test,
+             size_t numObservations, size_t numPredictors, const double* x_test,
              size_t numTestObservations) :
     y(y), z(z), x(x), numObservations(numObservations), numPredictors(numPredictors),
-    z_test(z_test), x_test(x_test), numTestObservations(numTestObservations),
-    bart_x_train(NULL), numBartPredictors(numPredictors + 1),
-    glm_x(NULL), numGLMPredictors(numPredictors + 1)
+    x_test(x_test), numTestObservations(numTestObservations),
+    x_train(NULL), bart_x_train(NULL), numBartPredictors(numPredictors + 1)
   {
-    // we need two different X matrices, built from the one that we are given:
-    // [ X Z ] as used in BART and 
-    // [ 1 X ] as used in glm
-    //
-    // since in C matrices are stored by their columns, we can instead allocate
-    // [ 1 X Z ]
-    // and offset it appropriately
+    // create matrix [ 1 X Z ]; treatmentModel may or may not need [ 1 X ], bart definitely does not
     
-    double* temp = new double[numObservations * (numPredictors + 2)];
+    double* x_temp = new double[numObservations * (numPredictors + 2)];
+    ext_setVectorToConstant(x_temp, numObservations, 1.0);
+    std::memcpy(x_temp + numObservations, x, numObservations * numPredictors * sizeof(double));
+    std::memcpy(x_temp + numObservations * (numPredictors + 1), z, numObservations * sizeof(double));
     
-    ext_setVectorToConstant(temp, numObservations, 1.0);
-    std::memcpy(temp + numObservations, x, numObservations * numPredictors * sizeof(double));
-    std::memcpy(temp + numObservations * (numPredictors + 1), z, numObservations * sizeof(double));
-    
-    glm_x = temp;
-    bart_x_train = temp + numObservations;
+    x_train = x_temp;
+    bart_x_train = x_temp + numObservations;
   }
   
   Data::~Data() {
-    delete [] glm_x;
-    glm_x = NULL;
+    delete [] x_train;
+    x_train = NULL;
     bart_x_train = NULL;
   }
   
+  static ext_rng* createRNG(bool useNativeGenerator);
+
   Scratch::Scratch(const Control& control, const Data& data) : yMinusZetaU(NULL), p(NULL), u(NULL),
-    glmScratch(NULL), temp_numObs_1(NULL)
+    treatmentModel(control.treatmentModel), treatmentScratch(NULL), temp_numObs_1(NULL), temp_numObs_2(NULL)
   {
+    if (control.numThreads > 1) {
+      rng = createRNG(false);
+      ext_rng_setSeed(rng, (uint_least32_t) (unif_rand() * (double) (UINT_LEAST32_MAX)));
+    } else {
+      rng = createRNG(true);
+    }
+    
     yMinusZetaU = new double[data.numObservations];
     u = new double[data.numObservations];
     p = new double[data.numObservations];
     ext_setVectorToConstant(p, data.numObservations, control.theta);
     
-    glmScratch = new double[glm_getDoubleScratchSize(data.numObservations, data.numGLMPredictors)];
+    // [ 1 X ]
+    const double* treatment_x = data.x_train;
+    size_t treatmentNumPredictors = data.numPredictors + 1;
+    if (!control.treatmentModel.predictorsIncludeIntercept) {
+      --treatmentNumPredictors;
+      treatment_x += data.numObservations;
+    }
+    
+    treatmentScratch = treatmentModel.createScratch(&treatmentModel, rng, treatment_x, data.numObservations, treatmentNumPredictors, data.z);
     
     temp_numObs_1 = new double[data.numObservations];
+    temp_numObs_2 = new double[data.numObservations];
   }
+  
   Scratch::~Scratch()
   {
-    delete [] yMinusZetaU; yMinusZetaU = NULL;
-    delete [] u; u = NULL;
-    delete [] p; p = NULL;
-    delete [] glmScratch; glmScratch = NULL;
+    delete [] temp_numObs_2; temp_numObs_2 = NULL;
     delete [] temp_numObs_1; temp_numObs_1 = NULL;
+    
+    treatmentModel.destroyScratch(&treatmentModel, treatmentScratch);
+    treatmentScratch = NULL;
+    
+    delete [] p; p = NULL;
+    delete [] u; u = NULL;
+    delete [] yMinusZetaU; yMinusZetaU = NULL;
+    
+    ext_rng_destroy(rng);
   }
   
   void lookupBARTFunctions(Control& control)
@@ -620,6 +650,89 @@ namespace {
     control.invalidateNormalPrior     = (void (*)(dbarts::NormalPrior*)) R_GetCCallable("dbarts", "invalidateNormalPrior");
     control.initializeChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*, double, double)) R_GetCCallable("dbarts", "initializeChiSquaredPriorFromOptions");
     control.invalidateChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*)) R_GetCCallable("dbarts", "invalidateChiSquaredPrior");
+  }
+  
+  static ext_rng* createRNG(bool useNativeGenerator)
+  {
+    ext_rng* result;
+    
+    if (useNativeGenerator) {
+      ext_rng_userFunction uniformFunction;
+      uniformFunction.f.stateless = &unif_rand;
+      uniformFunction.state = NULL;
+      result = ext_rng_create(EXT_RNG_ALGORITHM_USER_UNIFORM, &uniformFunction);
+    
+      ext_rng_userFunction normalFunction;
+      normalFunction.f.stateless = &norm_rand;
+      normalFunction.state = NULL;
+      ext_rng_setStandardNormalAlgorithm(result, EXT_RNG_STANDARD_NORMAL_USER_NORM, &normalFunction);
+    } else {
+      
+      SEXP seedsExpr = findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
+      if (seedsExpr == R_UnboundValue) GetRNGstate();
+      if (TYPEOF(seedsExpr) == PROMSXP) seedsExpr = eval(R_SeedsSymbol, R_GlobalEnv);
+    
+      uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
+    
+      ext_rng_algorithm_t algorithmType = (ext_rng_algorithm_t) (seed0 % 100);
+      ext_rng_standardNormal_t stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
+    
+      void* state = (void*) (1 + INTEGER(seedsExpr));
+      switch (algorithmType) {
+        case EXT_RNG_ALGORITHM_KNUTH_TAOCP:
+        case EXT_RNG_ALGORITHM_KNUTH_TAOCP2:
+        {
+          ext_rng_knuthState* kt = (ext_rng_knuthState*) std::malloc(sizeof(ext_rng_knuthState));
+          std::memcpy(kt->state1, state, EXT_RNG_KNUTH_NUM_RANDOM * sizeof(uint_least32_t));
+          kt->info = EXT_RNG_KNUTH_NUM_RANDOM; // this is a static var which we cannot access
+          for (size_t i = 0; i < EXT_RNG_KNUTH_QUALITY; ++i) kt->state2[i] = 0; // also static
+          state = kt;
+        }
+        break;
+        case EXT_RNG_ALGORITHM_USER_UNIFORM:
+        {
+          ext_rng_userFunction* uniformFunction = (ext_rng_userFunction*) std::malloc(sizeof(ext_rng_userFunction));
+          uniformFunction->f.stateless = &unif_rand;
+          uniformFunction->state = NULL;
+          state = uniformFunction;
+        }
+        break;
+        default:
+        break;
+      }
+    
+      result = ext_rng_create(algorithmType, state);
+      if (algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP || algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP2 || algorithmType == EXT_RNG_ALGORITHM_USER_UNIFORM) std::free(state);
+      if (result == NULL) return NULL; 
+    
+      void* normalState = NULL;
+      switch (stdNormalType) {
+        case EXT_RNG_STANDARD_NORMAL_BOX_MULLER:
+        normalState = malloc(sizeof(double));
+        *((double*) normalState) = 0.0; // static var, again
+        break;
+        case EXT_RNG_STANDARD_NORMAL_USER_NORM:
+        {
+          ext_rng_userFunction* normalFunction = (ext_rng_userFunction*) std::malloc(sizeof(ext_rng_userFunction));
+          normalFunction->f.stateless = &norm_rand;
+          normalFunction->state = NULL;
+          normalState = normalFunction;
+        }
+        break;
+        default:
+        break;
+      }
+    
+      int errorCode = ext_rng_setStandardNormalAlgorithm(result, stdNormalType, normalState);
+      if (stdNormalType == EXT_RNG_STANDARD_NORMAL_BOX_MULLER || stdNormalType == EXT_RNG_STANDARD_NORMAL_USER_NORM) std::free(normalState);
+    
+      if (errorCode != 0) {
+        ext_rng_destroy(result);
+        return NULL;
+      }
+    }
+    
+    return result;
   }
   
 #ifdef HAVE_GETTIMEOFDAY

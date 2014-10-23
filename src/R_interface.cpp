@@ -11,13 +11,106 @@
 #include "sensitivityAnalysis.hpp"
 #include "guessNumCores.hpp"
 
+#include "treatmentModel.hpp"
+#include "probitTreatmentModel.hpp"
+#include "probitEMTreatmentModel.hpp"
+#include "bartTreatmentModel.hpp"
+
 #include <glm/glm.h>
+
+#include <external/random.h>
 
 using std::size_t;
 using std::uint32_t;
 
 namespace {
-  static SEXP getListElement(SEXP list, const char *str);
+  SEXP getListElement(SEXP list, const char *str);
+    
+  enum TreatmentModelType {
+    PROBIT_EM,
+    PROBIT,
+    BART
+  };
+  
+  cibart::TreatmentModel* createTreatmentModel(SEXP modelExpr, TreatmentModelType* modelType)
+  {
+    SEXP classExpr = GET_CLASS(modelExpr);
+    if (isNull(classExpr) || !IS_CHARACTER(classExpr)) error("treatment model not of appropriate class");
+    
+    const char* className = CHAR(STRING_ELT(classExpr, 0));
+    if (strcmp(className, "probitEMTreatmentModel") == 0) {
+      *modelType = PROBIT_EM;
+      return new cibart::ProbitEMTreatmentModel(INTEGER(getListElement(modelExpr, "maxIter"))[0]);
+    }
+    
+    if (strcmp(className, "probitTreatmentModel") == 0) {
+      *modelType = PROBIT;
+      
+      SEXP familyExpr = getListElement(modelExpr, "family");
+      if (isNull(familyExpr) || !IS_CHARACTER(familyExpr)) error("probit treatment model lacks family attribute");
+      
+      cibart::ProbitPriorType family;
+      const char* familyName = CHAR(STRING_ELT(familyExpr, 0));
+      if (strcmp(familyName, "studentt") == 0) {
+        family = cibart::PROBIT_PRIOR_STUDENT_T;
+      } else if (strcmp(familyName, "normal") == 0) {
+        family = cibart::PROBIT_PRIOR_NORMAL;
+      } else if (strcmp(familyName, "flat") == 0) {
+        family = cibart::PROBIT_PRIOR_FLAT;
+      } else error("unrecognized probit treatment model family: '%s'", familyName);
+      
+      cibart::ProbitPrior* prior = NULL;
+      switch(family) {
+        case cibart::PROBIT_PRIOR_STUDENT_T:
+        prior = new cibart::ProbitStudentTPrior;
+        ((cibart::ProbitStudentTPrior *) prior)->scale = REAL(getListElement(modelExpr, "scale"));
+        ((cibart::ProbitStudentTPrior *) prior)->dof   = REAL(getListElement(modelExpr, "df"))[0];
+        break;
+        case cibart::PROBIT_PRIOR_NORMAL:
+        prior = new cibart::ProbitNormalPrior;
+        ((cibart::ProbitNormalPrior *) prior)->scale = REAL(getListElement(modelExpr, "scale"));
+        default:
+        break;
+      }
+      
+      return new cibart::ProbitTreatmentModel(family, prior);
+    }
+    
+    if (strcmp(className, "bartTreatmentModel") == 0) {
+      *modelType = BART;
+      
+      double nodePriorParameter = REAL(getListElement(modelExpr, "k"))[0];
+      size_t numTrees = (size_t) INTEGER(getListElement(modelExpr, "ntree"))[0];
+      size_t numThin  = (size_t) INTEGER(getListElement(modelExpr, "keepevery"))[0];
+     
+      return new cibart::BARTTreatmentModel(&R_GetCCallable, numTrees, numThin, nodePriorParameter);
+    }
+    
+    error("unrecognized treatment model: '%s'", className);
+  }
+  
+  void destroyTreatmentModel(cibart::TreatmentModel* treatmentModelPtr, TreatmentModelType modelType)
+  {
+    switch(modelType) {
+      case PROBIT_EM:
+      delete (cibart::ProbitEMTreatmentModel*) treatmentModelPtr;
+      break;
+      case PROBIT:
+      {
+        cibart::ProbitTreatmentModel* treatmentModel = (cibart::ProbitTreatmentModel*) treatmentModelPtr;
+        delete treatmentModel->prior;
+        delete treatmentModel;
+      }
+      break;
+      case BART:
+      {
+        delete (cibart::BARTTreatmentModel*) treatmentModelPtr;
+      }
+      default:
+      break;
+      
+    }
+  }
   
   SEXP cibart_glmFit(SEXP y, SEXP n, SEXP x, SEXP w, SEXP offset)
   {
@@ -78,9 +171,9 @@ namespace {
   }
   
   SEXP cibart_fitSensitivityAnalysis(SEXP y, SEXP z, SEXP xExpr,
-                                     SEXP z_testExpr, SEXP x_testExpr,
+                                     SEXP x_testExpr,
                                      SEXP zetaY, SEXP zetaZ, SEXP theta,
-                                     SEXP estimandExpr, SEXP confounderModelExpr,
+                                     SEXP estimandExpr, SEXP treatmentModelExpr,
                                      SEXP sensControl, SEXP verboseExpr)
   {
     int* dims;
@@ -104,13 +197,7 @@ namespace {
       x = REAL(xExpr);
     }
     
-    if (!isLogical(z_testExpr)) error("z_test must be of type logical.");
     if (!isReal(x_testExpr)) error("x_test must be of type real.");
-    
-    if (length(z_testExpr) != (int) numObservations) error("length of z_test and y must be equal.");
-    bool* z_test = new bool[numObservations];
-    int* intTemp = LOGICAL(z_testExpr);
-    for (size_t i = 0; i < numObservations; ++i) z_test[i] = intTemp[i] != 0;
     
     size_t numTestObservations = 0;
     const double* x_test = NULL;
@@ -144,22 +231,8 @@ namespace {
       error("Illegal estimand type: %s. Must be 'ATE', 'ATT', or 'ATC'.", estimandName);
     }
     
-    
-    if (!isString(confounderModelExpr)) error("estimand must be of type char.");
-    
-    // turn model name into enum
-    const char* modelName = CHAR(STRING_ELT(confounderModelExpr, 0));
-    cibart::ConfounderModelType confounderModel;
-    if (strncmp(modelName, "normal", 7) == 0) {
-      confounderModel = cibart::NORMAL;
-    } else if (strncmp(modelName, "binomial", 9) == 0) {
-      confounderModel = cibart::BINOMIAL;
-    } else {
-      error("Illegal confounder model type: %s. Must be 'normal' or 'binomial'.", modelName);
-    }
-    
-    if (confounderModel == cibart::NORMAL)
-      error("BART sensitivity analysis only implemented for binary confounders.");
+    TreatmentModelType treatmentModelType;
+    cibart::TreatmentModel* treatmentModel = createTreatmentModel(treatmentModelExpr, &treatmentModelType);
     
     SEXP sensParameterExpr = getListElement(sensControl, "n.sim");
     if (sensParameterExpr == R_NilValue) error("n.sim must be specified in iteration control.");
@@ -218,11 +291,11 @@ namespace {
     
     cibart::fitSensitivityAnalysis(REAL(y), REAL(z), x,
                                    numObservations, numPredictors,
-                                   z_test, x_test,
+                                   x_test,
                                    numTestObservations,
                                    REAL(zetaY), REAL(zetaZ), numZetaY, numZetaZ,
                                    REAL(theta)[0],
-                                   estimand, confounderModel,
+                                   estimand, *treatmentModel,
                                    numSimsPerCell,
                                    numInitialBurnIn,
                                    numCellSwitchBurnIn,
@@ -235,13 +308,13 @@ namespace {
     PutRNGstate();
     
     UNPROTECT(3);
-        
-    delete [] z_test;
     
-    return(result);
+    destroyTreatmentModel(treatmentModel, treatmentModelType);
+    
+    return result;
   }
   
-  static SEXP getListElement(SEXP list, const char* str)
+  SEXP getListElement(SEXP list, const char* str)
   {
     SEXP elmt = R_NilValue, names = getAttrib(list, R_NamesSymbol);
     for (int i = 0; i < length(list); i++)
@@ -267,13 +340,146 @@ namespace {
     
     return resultExpr;
   }
+}
+
+#include <external/linearAlgebra.h>
+
+namespace {
+  
+  void setDims(SEXP X, size_t numRows, size_t numCols)
+  {
+    SEXP dimsExpr = allocVector(INTSXP, 2);
+    int* dims = INTEGER(dimsExpr);
+    dims[0] = (int) numRows; 
+    dims[1] = (int) numCols;
+    setAttrib(X, R_DimSymbol, dimsExpr);
+  }
+
+  SEXP cibart_chol(SEXP A) {
+    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
+    size_t dim = dims[0];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, dim * dim));
+    setDims(result, dim, dim);
+    
+    ext_getSymmetricPositiveDefiniteTriangularFactorization(REAL(A), dim, EXT_TRIANGLE_TYPE_UPPER, REAL(result));
+    
+    double* res = REAL(result);
+    for (size_t col = 0; col < dim - 1; ++col) {
+      for (size_t row = col + 1; row < dim; ++row) res[row + col * dim] = 0.0;
+    }
+    
+    UNPROTECT(1);
+    
+    return result;
+  }
+  
+  SEXP cibart_crossprod(SEXP A) {
+    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
+    size_t numRows = dims[0];
+    size_t numCols = dims[1];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, numCols * numCols));
+    setDims(result, numCols, numCols);
+    
+    ext_getSingleMatrixCrossproduct(REAL(A), numRows, numCols,
+                                    REAL(result), false, EXT_TRIANGLE_TYPE_BOTH);
+
+    UNPROTECT(1);
+    
+    return result;
+  }
+  
+  SEXP cibart_multiply(SEXP A, SEXP b) {
+    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
+    size_t numRows = dims[0];
+    size_t numCols = dims[1];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, numCols));
+    
+    ext_multiplyMatrixIntoVector(REAL(A), numRows, numCols, true, REAL(b), REAL(result));
+    
+    UNPROTECT(1);
+    
+    return result;
+  }
+  
+  SEXP cibart_solve(SEXP A, SEXP b) {
+    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
+    size_t lhsDim = dims[0];
+    
+    SEXP result = PROTECT(allocVector(REALSXP, lhsDim));
+    
+    memcpy(REAL(result), (const double*) REAL(b), lhsDim * sizeof(double));
+    
+    ext_solveTriangularSystemInPlace(REAL(A), lhsDim, true, EXT_TRIANGLE_TYPE_UPPER, REAL(result), 1);
+      
+    UNPROTECT(1);
+    
+    return result;
+  }
+  
+  SEXP cibart_test(SEXP X, SEXP Z, SEXP offset, SEXP zetaZ) {
+    int* dims = INTEGER(getAttrib(X, R_DimSymbol));
+    
+    size_t numObservations = dims[0];
+    size_t numPredictors   = dims[1];
+    
+    GetRNGstate();
+        
+    Rprintf("creating treatment model object\n");
+    
+    cibart::ProbitNormalPrior treatmentPrior;
+    double* temp = new double[numPredictors + 1];
+    for (size_t i = 0; i < numPredictors + 1; ++i) temp[i] = 2.5 * 2.5;
+    treatmentPrior.scale = temp;
+    cibart::ProbitTreatmentModel treatmentModel(cibart::PROBIT_PRIOR_NORMAL, &treatmentPrior);
+    
+    ext_rng_userFunction uniformFunction;
+    uniformFunction.f.stateless = &unif_rand;
+    uniformFunction.state = NULL;
+    ext_rng* rng = ext_rng_create(EXT_RNG_ALGORITHM_USER_UNIFORM, &uniformFunction);
+  
+    ext_rng_userFunction normalFunction;
+    normalFunction.f.stateless = &norm_rand;
+    normalFunction.state = NULL;
+    ext_rng_setStandardNormalAlgorithm(rng, EXT_RNG_STANDARD_NORMAL_USER_NORM, &normalFunction);
+    
+    Rprintf("creating treatment model scratch\n");
+    void* scratch = treatmentModel.createScratch(&treatmentModel, rng, REAL(X), numObservations, numPredictors, REAL(Z));
+    
+    Rprintf("updating parameters\n");
+    treatmentModel.updateParameters(&treatmentModel, scratch, REAL(offset));
+    
+    SEXP result = PROTECT(allocVector(REALSXP, numObservations * 2));
+    setDims(result, numObservations, 2);
+    
+    Rprintf("getting conditional probabilities\n");
+    treatmentModel.getConditionalProbabilities(&treatmentModel, scratch, REAL(zetaZ)[0], REAL(result), REAL(result) + numObservations);
+    
+    Rprintf("deleting scratch\n");
+    treatmentModel.destroyScratch(&treatmentModel, scratch);
+    
+    delete [] temp;
+    
+    PutRNGstate();
+    
+    UNPROTECT(1);
+    
+    return result;
+  }
   
 #define CALLDEF(name, n)  {#name, (DL_FUNC) &name, n}
   
   static R_CallMethodDef callMethods[] = {
-    CALLDEF(cibart_fitSensitivityAnalysis, 12),
+    CALLDEF(cibart_fitSensitivityAnalysis, 11),
     CALLDEF(cibart_guessNumCores, 0),
     CALLDEF(cibart_glmFit, 5),
+    CALLDEF(cibart_chol, 1),
+    CALLDEF(cibart_crossprod, 1),
+    CALLDEF(cibart_multiply, 2),
+    CALLDEF(cibart_solve, 2),
+    CALLDEF(cibart_test, 4),
     {NULL, NULL, 0}
   };
 }
