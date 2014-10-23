@@ -1,8 +1,47 @@
+getWeights.BART <- function(Z, est.type, trim.wt, null.trt)
+{
+  n.obs <- length(Z)
+  
+  if (identical(est.type, "ATE")) {
+    wts <- 1/null.trt$fitted
+    wts[Z==0] <-1/(1-null.trt$fitted[Z==0])
+    wts = wts*n.obs/sum(wts) #normalizing weight
+    cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect.","\n")
+  } else if (identical(est.type, "ATT")) {
+    wts <- null.trt$fitted/(1-null.trt$fitted)
+    wts[Z==1] <-1
+    wts[Z==0] = wts[Z==0]*(nc/sum(wts[Z==0])) #normalizing weight
+    cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the treated.","\n")
+  } else if (identical(est.type, "ATC")) {
+    wts <- (1-null.trt$fitted)/null.trt$fitted
+    wts[Z==0] <- 1
+    wts[Z==1] = wts[Z==1]*(nt/sum(wts[Z==1])) #normalizing weight
+    cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")
+  } else {
+    stop(paste("est.type must be either \"ATE\", \"ATT\", \"ATC\""))
+  }
+  
+  ##   trim.weight option
+  if (!is.null(trim.wt)) {
+    if (is.numeric(trim.wt) & length(trim.wt)==1) {
+      if (identical(est.type,"ATE")) max.wt = trim.wt/100*n.obs
+      if (identical(est.type,"ATT")) max.wt = trim.wt/100*nt
+      if (identical(est.type,"ATC")) max.wt = trim.wt/100*nc
+      wts[wts>max.wt] = max.wt
+      cat("Weight trimming is applied.  The maximum size of weights is set to", max.wt,", which is", trim.wt,"% of the size of the inferential group.","\n")
+    } else {
+      stop(paste("trim.wt must be a number greater than 0."))}
+  }
+
+  wts
+}
+
 ###############
 #Main function call
 ###############
 treatSens.BART <- function(formula,         #formula: assume treatment is 1st term on rhs
                       #sensParam = "coef",      #BART ONLY DOES COEF??  type of sensitivity parameter: accepts "coef" for model coefficients and "cor" for partial correlations
+                      trt.model = probit(),    ## options are probitEM(), probit(family), bart()
                       theta = 0.5, 		#Pr(U=1) for binomial model
                       grid.dim = c(8,4),  #1st dimension specifies zeta.z, 2nd dimension specifies zeta.y.
                       standardize = TRUE,	#Logical: should variables be standardized?
@@ -10,13 +49,13 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                       zero.loc = 1/3,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
                       verbose = FALSE,
                       buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
-                      est.type = NULL, 		#Type of estimator targeted: "ATE", "ATT", or "ATC".
+                      est.type = "ATE",		#Type of estimator targeted: "ATE", "ATT", or "ATC".
                       data = NULL,
                       seed = 1234,     	#default seed is 1234.
                       iter.j = 10,     	#number of iteration in trt.family=binomial(link="probit")
                       #offset = TRUE, 		#THIS IS AUTOMATIC IN BART?? Logical: fit models with zeta*U fixed at target value, or with zeta fitted
                       ns = 1000,
-                      nthreads = NULL, 		#number of CPU cores used (Max=8). Compatibility with Mac is unknown.
+                      nthreads = NULL, 		#number of parallel processes used to divide grid
                       spy.range = NULL,  	#custom range for sensitivity parameter on Y, e.g.(0,10), zero.loc will be overridden.
                       spz.range = NULL,  	#custom range for sensitivity parameter on Z, e.g.(-2,2), zero.loc will be overridden.
                       trim.wt = 10     	#the maximum size of weight is set at "trim.wt"% of the inferential group. type NULL to turn off.
@@ -54,13 +93,14 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warningsBART(formula, grid.dim, 
-                           verbose, spy.range, spz.range, est.type, data)
+                               verbose, spy.range, spz.range, est.type, data)
   
   formula=out.warnings$formula
   grid.dim=out.warnings$grid.dim
   data=out.warnings$data
   spy.range=out.warnings$zetay.range
   spz.range=out.warnings$zetaz.range
+  
   
   #check and change U.model
   
@@ -127,13 +167,16 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
   
   tau0 <- mean(apply(diffs, 1, mean))
   se.tau0 <- sd(apply(diffs, 1, mean))
+  sgnTau0 <- sign(tau0)
+
+  grid.weights <- getWeights.BART(Z, est.type, trim.wt, null.trt)
   
   ########################
   #Need to check how range is determined & what to do for BART
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
-                     standardize=standardize, weights=est.type, iter.j=iter.j, 
-                     offset = offset, p = NULL)
+                     standardize=standardize, weights=grid.weights, iter.j=iter.j, 
+                     offset = TRUE, p = NULL)
   
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
   zetaZ = range$zetaZ
@@ -150,12 +193,16 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                                       n.burn.init = ns,
                                       n.thin = iter.j,
                                       n.thread = if (is.null(nthreads)) cibart::guessNumCores() else nthreads)
-  
-  cellResults <- cibart::fitSensitivityAnalysis(Y, Z, X,
-                                                Z.test, X.test,
-                                                zetaY, zetaZ, theta,
-                                                est.type, U.model,
-                                                control.sens, verbose)
+
+  ## this trick sets up the call in the frame the called us, so that any parameters
+  ## used in the trt.model specification are looked up there
+  cibartCall <- call("fitSensitivityAnalysis", Y, Z, X,
+                     X.test, zetaY, zetaZ, theta,
+                     est.type, match.call()$trt.model,
+                     control.sens, verbose)
+  cibartCall[[1]] <- quote(cibart::fitSensitivityAnalysis)
+
+  cellResults <- eval(cibartCall, parent.frame(1))
   
   for (i in 1:nsim) {
     sens.coef[,,i] <- cellResults$sens.coef[i,,]
@@ -195,6 +242,9 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
 #fit.treatSens
 ###########
 
+## TODO: make this cibart specific
+
+if (FALSE) {
 fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
@@ -204,7 +254,7 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
   iter.j = control.fit$iter.j
   offset = control.fit$offset
   p = control.fit$p
-  
+
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
     U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, sensParam))      
@@ -274,4 +324,5 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
       p = p
     ))
   }
+}
 }
