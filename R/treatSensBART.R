@@ -194,14 +194,16 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                                       n.thin = iter.j,
                                       n.thread = if (is.null(nthreads)) cibart::guessNumCores() else nthreads)
 
+  treatmentModel <- match.call()$trt.model
+  if (is.null(treatmentModel)) treatmentModel <- formals(treatSens.BART)$trt.model
+  
   ## this trick sets up the call in the frame the called us, so that any parameters
   ## used in the trt.model specification are looked up there
   cibartCall <- call("fitSensitivityAnalysis", Y, Z, X,
                      X.test, zetaY, zetaZ, theta,
-                     est.type, match.call()$trt.model,
+                     est.type, treatmentModel,
                      control.sens, verbose)
   cibartCall[[1]] <- quote(cibart::fitSensitivityAnalysis)
-
   cellResults <- eval(cibartCall, parent.frame(1))
   
   for (i in 1:nsim) {
