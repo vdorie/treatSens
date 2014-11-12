@@ -19,6 +19,8 @@ extern "C" {
   // z = alpha * x + y; z must be distinct from x and y
   void ext_addVectors(const double* restrict x, ext_size_t length, double alpha, const double* restrict y, double* restrict z);
   
+  double ext_dotProduct(const double* x, ext_size_t length, const double* y);
+  
   // x: = alpha
   void ext_setVectorToConstant(double* x, ext_size_t length, double alpha);
   void ext_setIndexedVectorToConstant(double* restrict x, const ext_size_t* restrict indices, ext_size_t length, double alpha);

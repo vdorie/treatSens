@@ -56,7 +56,16 @@ typedef ext_rng_mersenneTwisterState MersenneTwisterState;
 typedef ext_rng_knuthState KnuthState;
 typedef ext_rng_userFunction UserFunction;
 
-static const size_t stateLengths[] = { 3, 2, 2, sizeof(MersenneTwisterState), sizeof(KnuthState), sizeof(UserFunction), sizeof(KnuthState), 6 };
+static const size_t stateLengths[] = {
+  3 * sizeof(uint_least32_t),
+  2 * sizeof(uint_least32_t),
+  2 * sizeof(uint_least32_t),
+  sizeof(MersenneTwisterState),
+  sizeof(KnuthState),
+  sizeof(UserFunction),
+  sizeof(KnuthState),
+  6 * sizeof(uint_least32_t)
+};
 
 // this is duplicated in randomBase.c, randomNorm.c, and random.c
 struct ext_rng {
@@ -87,7 +96,7 @@ ext_rng* ext_rng_create(ext_rng_algorithm_t algorithm, const void* v_state)
     return NULL;
   }
   
-  size_t stateLength = stateLengths[algorithm] * sizeof(uint_least32_t);
+  size_t stateLength = stateLengths[algorithm];
   
   result->state = malloc(stateLength);
   if (result->state == NULL) {
@@ -187,10 +196,8 @@ int ext_rng_setSeed(ext_rng* generator, uint_least32_t seed)
     }
     break;
     case EXT_RNG_ALGORITHM_USER_UNIFORM:
+    case EXT_RNG_ALGORITHM_INVALID:
     return EINVAL;
-    break;
-    default:
-    break;
   }
   
   return 0;
@@ -199,7 +206,7 @@ int ext_rng_setSeed(ext_rng* generator, uint_least32_t seed)
 int ext_rng_setSeedFromClock(ext_rng* generator)
 {
   uint_least32_t seed;
-  unsigned int pid = getpid();
+  unsigned int pid = (unsigned int) getpid();
   
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
   struct timespec tp;
@@ -299,15 +306,21 @@ static void validateSeed(ext_rng* generator, bool isFirstRun)
       if (!notAllAreZero || !allAreValid) ext_rng_setSeedFromClock(generator);
     }
     break;
-    default:
+    case EXT_RNG_ALGORITHM_USER_UNIFORM:
+    case EXT_RNG_ALGORITHM_INVALID:
     break;
   }
 }
 
-#define THIRTY_TWO_BIT_MAX     4294967296.0
+// #define THIRTY_TWO_BIT_MAX     4294967296.0
 #define THIRTY_TWO_BIT_INVERSE 2.328306437080797e-10 /* = 1/(2^32 - 1) */
 #define KNUTH_CONSTANT         9.31322574615479e-10
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 // guarantees results in (0, 1)
 inline static double truncateToUnitInterval(double x) {
   if (x <= 0.0) return 0.5 * THIRTY_TWO_BIT_INVERSE;
@@ -320,7 +333,7 @@ static uint_least32_t knuth_getNext(KnuthState* kt);
 
 double ext_rng_simulateContinuousUniform(ext_rng* generator)
 {
-  double result;
+  double result; // for some reason GCC thinks this might get used unitialized, but the switch is exhaustive
   
   uint_least32_t* state = (uint_least32_t*) generator->state;
   
@@ -360,7 +373,7 @@ double ext_rng_simulateContinuousUniform(ext_rng* generator)
     case EXT_RNG_ALGORITHM_KNUTH_TAOCP:
     case EXT_RNG_ALGORITHM_KNUTH_TAOCP2:
     {
-      result = (double) knuth_getNext((KnuthState*) generator->state) * KNUTH_CONSTANT;
+      result = knuth_getNext((KnuthState*) generator->state) * KNUTH_CONSTANT;
     }
     break;
     case EXT_RNG_ALGORITHM_USER_UNIFORM:
@@ -396,7 +409,7 @@ double ext_rng_simulateContinuousUniform(ext_rng* generator)
       k = (int_least32_t) (p2 / LECUYER_M2);
       p2 -= k * LECUYER_M2;
       if (p2 < 0) p2 += LECUYER_M2;
-      state[3] = state[4]; state[4] = state[5]; state[5] = (int_least32_t) p2;
+      state[3] = state[4]; state[4] = state[5]; state[5] = (uint_least32_t) p2;
 
       result = (double) ((p1 > p2) ? (p1 - p2) : (p1 - p2 + LECUYER_M1)) * normc;
 #undef normc
@@ -406,13 +419,14 @@ double ext_rng_simulateContinuousUniform(ext_rng* generator)
 #undef a23n
     }
     break;
-    default:
+    case EXT_RNG_ALGORITHM_INVALID:
 	  ext_throwError("ext_rng_simulateContinuousUniform: unimplemented rng kind %s", rngNames[generator->algorithm]);
-    return -1.0;
   }
-  
+
   return truncateToUnitInterval(result);
 }
+
+#pragma GCC diagnostic pop
 
 /* ===================  Mersenne Twister ========================== */
 /* From http://www.math.keio.ac.jp/~matumoto/emt.html */
@@ -443,6 +457,7 @@ double ext_rng_simulateContinuousUniform(ext_rng* generator)
 /* Period parameters */
 #define N EXT_RNG_MERSENNE_TWISTER_NUM_RANDOM
 #define M 397
+#define MmN (397 - EXT_RNG_MERSENNE_TWISTER_NUM_RANDOM)
 #define MATRIX_A 0x9908b0df   /* constant vector a */
 #define UPPER_MASK 0x80000000 /* most significant w-r bits */
 #define LOWER_MASK 0x7fffffff /* least significant r bits */
@@ -458,9 +473,9 @@ double ext_rng_simulateContinuousUniform(ext_rng* generator)
 
 /* Initializing the array with a seed */
 static void
-mersenneTwister_generateStateFromSeed(MersenneTwisterState* mt, int_least32_t seed)
+mersenneTwister_generateStateFromSeed(MersenneTwisterState* mt, uint_least32_t seed)
 {
-  for (int_least32_t i = 0; i < N; ++i) {
+  for (uint_least32_t i = 0; i < N; ++i) {
     mt->state[i] = seed & 0xffff0000;
     seed = 69069 * seed + 1;
     mt->state[i] |= (seed & 0xffff0000) >> 16;
@@ -499,10 +514,10 @@ static double mersenneTwister_getNext(MersenneTwisterState* mt)
 	  }
     for (; kk < N - 1; kk++) {
 	    y = (state[kk] & UPPER_MASK) | (state[kk + 1] & LOWER_MASK);
-	    state[kk] = state[kk + (M - N)] ^ (y >> 1) ^ mag01[y & 0x1];
+	    state[kk] = state[(int_least32_t) kk + MmN] ^ (y >> 1) ^ mag01[y & 0x1];
     }
     y = (state[N - 1] & UPPER_MASK) | (state[0] & LOWER_MASK);
-    state[N - 1] = state[M-1] ^ (y >> 1) ^ mag01[y & 0x1];
+    state[N - 1] = state[M - 1] ^ (y >> 1) ^ mag01[y & 0x1];
 
     mt->info = 0;
   }

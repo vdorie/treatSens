@@ -44,6 +44,14 @@ void ext_addVectors(const double* restrict x, size_t length, double alpha, const
   }
 }
 
+double ext_dotProduct(const double* x, size_t u_length, const double* y)
+{
+  int length = (int) u_length;
+  
+  return F77_NAME(ddot)(&length, x, &increment, y, &increment);
+}
+
+
 void ext_setVectorToConstant(double* x, size_t length, double alpha)
 {
   if (length == 0) return;
@@ -241,7 +249,7 @@ int ext_findLeastSquaresFit(const double* y, size_t n, const double* x, size_t p
 {
   double* _x = malloc(n * p * sizeof(double));
   double _y[n];
-  if (_x == NULL || _y == NULL) {
+  if (_x == NULL) {
     if (message != NULL) message[0] = "unable to allocate memory for least-squares fit";
     return -1;
   }
@@ -361,9 +369,10 @@ void ext_getSingleMatrixCrossproduct(const double* restrict x, size_t numRows, s
   if (triangleType != EXT_TRIANGLE_TYPE_BOTH) return;
   
   // copy in rest of product
-  for (size_t col = 1; col < (size_t) outputDimension; ++col) {
+  size_t u_outputDimension = (size_t) outputDimension;
+  for (size_t col = 1; col < u_outputDimension; ++col) {
     for (size_t row = 0; row < col; ++row) {
-      result[row + outputDimension * col] = result[col + outputDimension * row];
+      result[row + u_outputDimension * col] = result[col + u_outputDimension * row];
     }
   }
 }

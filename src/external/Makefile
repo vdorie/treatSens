@@ -3,8 +3,8 @@ INCLUDE_DIR=../include
 PKG_CPPFLAGS=-I$(INCLUDE_DIR)
 ALL_CPPFLAGS=$(R_XTRA_CPPFLAGS) $(PKG_CPPFLAGS) $(CPPFLAGS)
 
-LOCAL_SOURCES = binaryIO.c io.c linearAlgebra.c moments.c randomBase.c randomNorm.c random.c thread.c
-LOCAL_OBJECTS = binaryIO.o io.o linearAlgebra.o moments.o randomBase.o randomNorm.o random.o thread.o
+LOCAL_SOURCES=binaryIO.c io.c linearAlgebra.c moments.c randomBase.c randomNorm.c random.c stringWriter.c thread.c
+LOCAL_OBJECTS=binaryIO.o io.o linearAlgebra.o moments.o randomBase.o randomNorm.o random.o stringWriter.o thread.o
 
 all : libexternal.a
 
@@ -25,6 +25,7 @@ $(INCLUDE_DIR)/external/random.h : $(INCLUDE_DIR)/external/stddef.h
 $(INCLUDE_DIR)/external/stats_mt.h : $(INCLUDE_DIR)/external/stddef.h $(INCLUDE_DIR)/external/thread.h
 $(INCLUDE_DIR)/external/stats.h : $(INCLUDE_DIR)/external/stddef.h
 $(INCLUDE_DIR)/external/stddef.h :
+$(INCLUDE_DIR)/external/stringWriter.h : $(INCLUDE_DIR)/external/stddef.h
 $(INCLUDE_DIR)/external/thread.h : $(INCLUDE_DIR)/external/stddef.h
 
 binaryIO.o : binaryIO.c $(INCLUDE_DIR)/external/binaryIO.h
@@ -50,5 +51,8 @@ random.o : random.c $(INCLUDE_DIR)/external/random.h
 
 thread.o : thread.c pthread.c $(INCLUDE_DIR)/external/thread.h
 	$(CC) $(ALL_CPPFLAGS) $(CFLAGS) -c thread.c -o thread.o
+
+stringWriter.o : stringWriter.c $(INCLUDE_DIR)/external/stringWriter.h
+	$(CC) $(ALL_CPPFLAGS) $(CFLAGS) -c stringWriter.c -o stringWriter.o
 
 pthread.c :
