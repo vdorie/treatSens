@@ -20,7 +20,7 @@ namespace {
   void sampleCoefficients(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset);
   void sampleLatents(Scratch& restrict scratch, const double* restrict offset);
   
-  void getPosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, const double* xCrossproduct, size_t numPredictors, double* factor);
+  void getPosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, Scratch& scratch, const double* xCrossproduct, size_t numPredictors, double* factor);
   void updatePosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, Scratch& scratch);
 }
 
@@ -113,7 +113,7 @@ namespace {
     ext_getSingleMatrixCrossproduct(x, numObservations, numPredictors, xCrossproduct,
                                     false, EXT_TRIANGLE_TYPE_UPPER);
     
-    getPosteriorCovarianceFactor(model, xCrossproduct, numPredictors, scratch->posteriorCovarianceInverseRightFactor);
+    getPosteriorCovarianceFactor(model, *scratch, xCrossproduct, numPredictors, scratch->posteriorCovarianceInverseRightFactor);
     
     return scratch;
   }
@@ -161,10 +161,11 @@ namespace {
     if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
       cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
       
+      const double* restrict scales = prior.scale;
       // sample sigma_sq first:
       double sigmaScale = 1.0;
       for (size_t i = 0; i < scratch.numPredictors; ++i) {
-        sigmaScale += ((scratch.coefficients[i] / prior.scale[i]) * (scratch.coefficients[i] / prior.scale[i])) / prior.dof;
+        sigmaScale += ((scratch.coefficients[i] / scales[i]) * (scratch.coefficients[i] / scales[i])) / prior.dof;
       }
       
       scratch.sigma_sq = sigmaScale / ext_rng_simulateChiSquared(scratch.generator, prior.dof + (double) scratch.numPredictors);
@@ -207,7 +208,7 @@ namespace {
   }
 
   // if student, xCrossproduct is its own thing; otherwise, it is equal to factor and contains upper-right triangle of X'X
-  void getPosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, const double* xCrossproduct, size_t numPredictors, double* factor)
+  void getPosteriorCovarianceFactor(cibart::ProbitTreatmentModel& model, Scratch& scratch, const double* xCrossproduct, size_t numPredictors, double* factor)
   {    
     switch (model.priorType) {
       case cibart::PROBIT_PRIOR_STUDENT_T:
@@ -223,8 +224,9 @@ namespace {
         }
         
         // X'X + Sig_beta^{-1}, but we only do diagonal Sig_beta 
+        double a = prior.dof * scratch.sigma_sq;
         for (size_t i = 0; i < numPredictors; ++i) {
-          factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i] * prior.dof);
+          factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i] * a);
         }
       }
       break;
@@ -257,6 +259,7 @@ namespace {
     size_t numPredictors = scratch.numPredictors;
     
     cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+    const double* restrict scales = prior.scale;
     
     // std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
     for (size_t col = 0; col < numPredictors; ++col) {
@@ -265,8 +268,9 @@ namespace {
       }
     }
     
+    double a = prior.dof * scratch.sigma_sq;
     for (size_t i = 0; i < numPredictors; ++i) {
-      factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i] * prior.dof * scratch.sigma_sq);
+      factor[i * (1 + numPredictors)] += 1.0 / (scales[i] * scales[i] * a);
     }
     
     ext_getSymmetricPositiveDefiniteTriangularFactorizationInPlace(factor, numPredictors, EXT_TRIANGLE_TYPE_UPPER);
