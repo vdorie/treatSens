@@ -1,4 +1,37 @@
 ############
+#combine.sensitivity
+#combines the results in two sensitivity objects into single object for plotting
+############
+combine.sensitivity <- function(x1, x2){
+  if(!class(x1) == "sensitivity" | !class(x2) == "sensitivity")
+    stop("Objects must be of class \"sensitivity\"")
+  if(!all.equal(c(x1$Y, x1$Z), c(x2$Y, x2$Z)))
+    stop("Combining objects only allowed for sensitivity analyses on same data set")
+  if(!(x1$sensParam == x2$sensParam))
+    stop("Combining objects only allowed for sensitivity analyses using same type of sensitivity parameter")
+  
+  grid1 = expand.grid(as.numeric(dimnames(x1$sp.y)[[1]]), as.numeric(dimnames(x1$sp.z)[[2]]))
+  gridpts1 = matrix(c(rep(grid1[,1], dim(x1$tau)[3]), rep(grid1[,2], dim(x1$tau)[3])), ncol = 2)
+  tauLong1 = c(x1$tau)
+  seTauLong1 = c(x1$se.tau)
+
+  grid2 = expand.grid(as.numeric(dimnames(x2$sp.y)[[1]]), as.numeric(dimnames(x2$sp.z)[[2]]))
+  gridpts2 = matrix(c(rep(grid2[,1], dim(x2$tau)[3]), rep(grid2[,2], dim(x2$tau)[3])), ncol = 2)
+  tauLong2 = c(x2$tau)
+  seTauLong2 = c(x2$se.tau)
+
+  result <- list(model.type = x1$model.type, sensParam = x1$sensParam, tau = rbind(tauLong1, tauLong2), se.tau = rbind(seTauLong1, seTauLong2), 
+                 sp.z = c(grid1[,2], grid2[,2]), sp.y = c(grid1[,1], grid2[,1]), 
+                 Y = x1$Y, Z = x1$Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
+            #should any of the following be averaged across objects?
+                 tau0 = x1$tau0, se.tau0 = x1$se.tau0,
+                 Xcoef = x1$Xcoef,
+                 varnames = x1$varnames,var_ytilde = x1$var_ytilde,var_ztilde = x1$var_ztilde, XpartCor = x1$XpartCor)
+  class(result) <- "sensitivity.combo"
+  return(result)
+}
+
+############
 #summary.sensitivity
 #Prints average value of tau (trt effect) for each cell in grid
 #Default to dimensions labeled with target sensitivity parameters

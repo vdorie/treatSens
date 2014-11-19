@@ -26,21 +26,30 @@ is.binary <- function(x) {
 ###
 
 parse.formula <- function(form, data) {
-  varnames <- all.vars(form)
-  inp <- parse(text = paste("list(", paste(varnames, collapse = ","), 
-                            ")"))
+  
   if(missing(data))
     data = environment(form)
-  env = environment(form)
-  variables <- eval(inp, data, env)
+  
+  cl <- match.call()
+  mf <- match.call(expand.dots = FALSE)
+  m <- match(c("form", "data"), names(mf), 0L)
+  mf <- mf[c(1L, m)]
+  mf$drop.unused.levels <- TRUE
+  mf[[1L]] <- quote(stats::model.frame)
+  mf <- eval(mf, parent.frame())
+  mt <- attr(mf, "terms")
+  resp <- model.response(mf, "numeric")    	#response from LHS
+  if (is.empty.model(mt)) {
+    stop("Formula RHS empty; at least need treatment variable")
+  }
+  else {
+    x <- model.matrix(mt, mf, contrasts)
+  }
   
   #extract variables from formula & data
-  trt <- variables[[2]]				#assume treatment is 1st var on RHS
-  resp <- variables[[1]]				#response from LHS
-  variables[[2]] <- NULL
-  variables[[1]] <- NULL
-  if(length(variables) > 0) {
-    covars <- matrix(unlist(variables), nrow = length(resp), byrow = F)			#variables on RHS, less the intercept, treatment(possibly multiple columns if factor)
+  trt <- x[,2]				#assume treatment is 1st var on RHS
+  if(dim(x)[2] > 2) {
+    covars <- x[,-c(1,2)]			#variables on RHS, less the intercept, treatment
   }else{
     covars = NULL
   }
