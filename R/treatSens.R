@@ -113,54 +113,46 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   }  
   
   #####WEIGHTED ESTIMATES
-  #create weights if the user specifies either ATE, ATT, or ATC.
+  #check weight variable value (calculation also done in fit.treatSens).
   
   nt = sum(Z==1)
   nc = sum(Z==0)
   
   if (!is.null(weights)) {
     if (identical(class(weights),"character")) {
+       if (identical(weights,"ATE")) {
+         wts <- 1/null.trt$fitted
+         wts[Z==0] <-1/(1-null.trt$fitted[Z==0])
+         wts = wts*n.obs/sum(wts) #normalizing weight
+          cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect.","\n")}
       
+  	  if (identical(weights,"ATT")) {
+  	    wts <- null.trt$fitted/(1-null.trt$fitted)
+  	    wts[Z==1] <-1
+  	    wts[Z==0] = wts[Z==0]*(nc/sum(wts[Z==0])) #normalizing weight
+  	      cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the treated.","\n")}
+  	    
+  	  if (identical(weights,"ATC")) {
+  	    wts <- (1-null.trt$fitted)/null.trt$fitted
+  	    wts[Z==0] <- 1
+  	    wts[Z==1] = wts[Z==1]*(nt/sum(wts[Z==1])) #normalizing weight
+  	      cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")}
+  	 
       if (!any(weights==c("ATE","ATT","ATC"))) {
-        stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
-      
-      #    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
-      #      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
-      
-      if (identical(weights,"ATE")) {
-        wts <- 1/null.trt$fitted
-        wts[Z==0] <-1/(1-null.trt$fitted[Z==0])
-        wts = wts*n.obs/sum(wts) #normalizing weight
-        cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect.","\n")}
-      
-      if (identical(weights,"ATT")) {
-        wts <- null.trt$fitted/(1-null.trt$fitted)
-        wts[Z==1] <-1
-        wts[Z==0] = wts[Z==0]*(nc/sum(wts[Z==0])) #normalizing weight
-        cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the treated.","\n")}
-      
-      if (identical(weights,"ATC")) {
-        wts <- (1-null.trt$fitted)/null.trt$fitted
-        wts[Z==0] <- 1
-        wts[Z==1] = wts[Z==1]*(nt/sum(wts[Z==1])) #normalizing weight
-        cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")}
-      
-      #   trim.weight option
-      if (!is.null(trim.wt)) {
-        if (is.numeric(trim.wt) & length(trim.wt)==1) {
-          if (identical(weights,"ATE")) max.wt = trim.wt/100*n.obs
-          if (identical(weights,"ATT")) max.wt = trim.wt/100*nt
-          if (identical(weights,"ATC")) max.wt = trim.wt/100*nc
-          wts[wts>max.wt] = max.wt
-          cat("Weight trimming is applied.  The maximum size of weights is set to", max.wt,", which is", trim.wt,"% of the size of the inferential group.","\n")
-        } else {
-          stop(paste("trim.wt must be a number greater than 0."))}
+        stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))
       }
-      weights <- wts
-    } else if (identical(class(weights),"numeric") & length(weights)==n.obs) {
+      
+      if(!is.binary(Z)){
+        stop("ATE, ATT, ATC are only possible for binary treatment.")
+      }
+      
+      } else if (identical(class(weights),"numeric") & length(weights)==n.obs) {
+        wts = weights
       cat("User-supplied weight is used.","\n")
-    } else {
+     } else {
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
+  }else {
+    wts = NULL
   }
   
   ##########
@@ -168,7 +160,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   cat("Fitting null models...\n")
   #fit null model for the outcome & get residuals
   if(!is.null(X)) {
-    null.resp <- glm(Y~Z+X, family=resp.family, weights=weights)
+    null.resp <- glm(Y~Z+X, family=resp.family, weights=wts)
   }else{
     null.resp <- glm(Y~Z, resp.family)
   }
@@ -196,7 +188,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
-    null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
+    null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=wts)
     null.trt.plot <- glm(Z~X.positive, family=trt.family)
     Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
   }
@@ -211,7 +203,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
-                     offset = offset, p = NULL)
+                     offset = offset, p = NULL, trim.wt = trim.wt)
   
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
   zetaZ = range$zetaZ
@@ -354,6 +346,7 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
   U.model = control.fit$U.model
   std = control.fit$standardize
   weights = control.fit$weights
+  trim.wt = control.fit$trim.wt
   iter.j = control.fit$iter.j
   offset = control.fit$offset
   p = control.fit$p
@@ -384,23 +377,76 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
     #Do we want to return a warning/the error message/our own error message if try fails?
     #fit models with U
     if(std) U = std.nonbinary(U)
+
+    #####FIT TRT MODEL	
+    if(!is.null(X)) {
+      fit.trt <- glm(Z~U+X, family=trt.family)
+    }else{
+      fit.trt <- glm(Z~U, family=trt.family)		
+    }
+
+    #####WEIGHTED ESTIMATES
+    #create weights if the user specifies either ATE, ATT, or ATC.
+  
+    nt = sum(Z==1)
+    nc = sum(Z==0)
+    n.obs = length(Y)
+  
+    if (!is.null(weights)) {
+      if (identical(class(weights),"character")) {
+      
+          if (identical(weights,"ATE")) {
+          wts <- 1/fit.trt$fitted
+          wts[Z==0] <-1/(1-fit.trt$fitted[Z==0])
+     	     wts = wts*n.obs/sum(wts) #normalizing weight
+     	 }
+      
+  	  if (identical(weights,"ATT")) {
+  	      wts <- fit.trt$fitted/(1-fit.trt$fitted)
+  	      wts[Z==1] <-1
+  	      wts[Z==0] = wts[Z==0]*(nc/sum(wts[Z==0])) #normalizing weight
+  	    }
+  	    
+  	  if (identical(weights,"ATC")) {
+  	      wts <- (1-fit.trt$fitted)/fit.trt$fitted
+  	      wts[Z==0] <- 1
+  	      wts[Z==1] = wts[Z==1]*(nt/sum(wts[Z==1])) #normalizing weight
+  	    }
+  	    
+  	    #   trim.weight option
+  	    if (!is.null(trim.wt)) {
+  	      if (is.numeric(trim.wt) & length(trim.wt)==1) {
+  	        if (identical(weights,"ATE")) max.wt = trim.wt/100*n.obs
+  	        if (identical(weights,"ATT")) max.wt = trim.wt/100*nt
+  	        if (identical(weights,"ATC")) max.wt = trim.wt/100*nc
+  	        wts[wts>max.wt] = max.wt
+  	        cat("Weight trimming is applied.  The maximum size of weights is set to", max.wt,", which is", trim.wt,"% of the size of the inferential group.","\n")
+  	      } else {
+  	        stop(paste("trim.wt must be a number greater than 0."))
+  	      }
+  	    }
+  	    
+  	  } else {
+  	    wts = weights
+  	  } 
+    } else {
+      wts = weights
+    } 
     
     if(!is.null(X)) {
       fit.glm <- switch(offset+1,
-                        "FALSE" = glm(Y~Z+U+X, family=resp.family, weights=weights),
-                        "TRUE" = glm(Y~Z+X, family=resp.family, weights=weights, offset=zetaY*U))   
+                        "FALSE" = glm(Y~Z+U+X, family=resp.family, weights=wts),
+                        "TRUE" = glm(Y~Z+X, family=resp.family, weights=wts, offset=zetaY*U))   
       
       sens.se <- switch(class(weights),
                         "NULL" = summary(fit.glm)$coefficients[2,2],
-                        "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
-                        "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
-      fit.trt <- glm(Z~U+X, family=trt.family)
+                        "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=wts), #pweight is custom function
+                        "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=wts)) #pweight is custom function
     }else{
       fit.glm <- switch(offset+1,
-                        "FALSE" = glm(Y~Z+U, family=resp.family, weights=weights),
-                        "TRUE" = glm(Y~Z, family=resp.family, weights=weights, offset=zetaY*U))   
+                        "FALSE" = glm(Y~Z+U, family=resp.family, weights=wts),
+                        "TRUE" = glm(Y~Z, family=resp.family, weights=wts, offset=zetaY*U))   
       sens.se = summary(fit.glm)$coefficients[2,2]
-      fit.trt <- glm(Z~U, family=trt.family)		
     }
     
     return(list(

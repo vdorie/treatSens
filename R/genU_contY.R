@@ -75,7 +75,7 @@ contYZbinaryU <- function(y, z, cy, cz, vy, vz, theta) {
 contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offset, p) { 
   n = length(y)
   nx = dim(x)[2]
-  null.resp = lm(y~z+x, weights=weights)
+  null.resp = lm(y~z+x)  #lm(y~z+x, weights=weights)
   null.trt = glm(z~x, family = binomial(link ="probit"))
   v_Y = var(null.resp$resid)*(n-1)/(n-nx-2)
   v_Z = var(null.trt$resid)*(n-1)/(n-nx-1)
@@ -91,14 +91,14 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offse
     U = rbinom(n,1,p)
     
     if (!offset) { 
-      U.fit = lm(y~z+x+U, weights=weights)
+      U.fit = lm(y~z+x+U)   #lm(y~z+x+U, weights=weights)
       y.coef = U.fit$coef
       y.coef[length(y.coef)]  = cy
       z.coef = glm(z~x+U, family=binomial(link="probit"))$coef
       z.coef[length(z.coef)] = cz
       v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
     } else {
-      U.fit = lm(y~z+x, offset=cy*U, weights=weights)
+      U.fit = lm(y~z+x, offset=cy*U)  #lm(y~z+x, offset=cy*U, weights=weights)
       y.coef = c(U.fit$coef, cy)
       z.coef = c(glm(z~x, family=binomial(link="probit"), offset=cz*U)$coef, cz)
       v_Y = var(U.fit$resid)*(n-1)/(n-nx-2)
@@ -135,7 +135,7 @@ contYbinaryZU <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offse
 
 contYbinaryZU.noX <- function(y, z, cy, cz, theta, iter.j=10, weights=NULL, offset, p) { 
   n = length(y)
-  null.resp = lm(y~z, weights=weights)
+  null.resp = lm(y~z)   #lm(y~z, weights=weights)
   null.trt = glm(z~1, family = binomial(link ="probit"))
   v_Y = var(null.resp$resid)*(n-1)/(n-2)
   v_Z = var(null.trt$resid)*(n-1)/(n-1)
@@ -153,14 +153,14 @@ contYbinaryZU.noX <- function(y, z, cy, cz, theta, iter.j=10, weights=NULL, offs
     U = rbinom(n,1,p)
     
     if (!offset) { 
-      U.fit = lm(y~z+U, weights=weights)
+      U.fit = lm(y~z+U)  #lm(y~z+U, weights=weights)
       y.coef = U.fit$coef
       y.coef[length(y.coef)]  = cy
       z.coef = glm(z~U, family=binomial(link="probit"))$coef
       z.coef[length(z.coef)] = cz
       v_Y = var(U.fit$resid)*(n-1)/(n-2)
     } else {
-      U.fit = lm(y~z, offset=cy*U, weights=weights)
+      U.fit = lm(y~z, offset=cy*U)   #lm(y~z, offset=cy*U, weights=weights)
       y.coef = c(U.fit$coef, cy)
       z.coef = c(glm(z~1, family=binomial(link="probit"), offset=cz*U)$coef, cz)
       v_Y = var(U.fit$resid)*(n-1)/(n-2)
