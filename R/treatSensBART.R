@@ -167,7 +167,7 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
   sampler$run(numSamples = 1, numBurnIn = 500) ## burn it in without any test data
     
   x.test <- rbind(X.train, X.train)
-  sampler$setTestPredictors(x.test)
+  sampler$setTestPredictor(x.test)
     
   n <- nrow(X.train)
   p <- ncol(X.train)
