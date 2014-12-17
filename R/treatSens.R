@@ -203,7 +203,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
-                     offset = offset, p = NULL, trim.wt = trim.wt)
+                     offset = offset, p = NULL, trim.wt = trim.wt, mod.score = wts)
   
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
   zetaZ = range$zetaZ
@@ -350,6 +350,8 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
   iter.j = control.fit$iter.j
   offset = control.fit$offset
   p = control.fit$p
+  
+  wts = control.fit$mod.score
 
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
@@ -360,9 +362,9 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
     if(identical(trt.family$link,"probit")){
       if(!is.null(X)) {
         #debug(contYbinaryZU)
-        out.contYbinaryZU <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+        out.contYbinaryZU <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, wts, offset, p))
       } else {
-        out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+        out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, wts, offset, p))
       }
     }else{
       stop(paste("Only probit link is allowed."))
@@ -391,7 +393,7 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
     nt = sum(Z==1)
     nc = sum(Z==0)
     n.obs = length(Y)
-  
+    
     if (!is.null(weights)) {
       if (identical(class(weights),"character")) {
       
