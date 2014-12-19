@@ -155,63 +155,68 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
   X.train <- if (is.null(X)) Z else cbind(X, Z)
   colnames(X.train) <- colnames(X.test)
 
-  ## response is y, covariates are in x
-  ## suppose they're all in a list or data frame 'trainingData'
-    
-  sampler.control <- dbartsControl(keepTrainingFits = FALSE,
-                                   n.samples = as.integer(100),                                   
-                                   n.burn    = as.integer(0),                                   
-                                   updateState = FALSE)      ## only useful if you plan on save()ing
-  
-  sampler <- dbarts(X.train, Y, control = sampler.control)
-  sampler$run(numSamples = 1, numBurnIn = 500) ## burn it in without any test data
-    
-  x.test <- rbind(X.train, X.train)
-  sampler$setTestPredictor(x.test)
-    
-  n <- nrow(X.train)
-  p <- ncol(X.train)
-  
-  x.sd <- apply(X.train, 2, sd, na.rm = T) ## get sds for each column
-  x.mean <- apply(X.train, 2, mean, na.rm = T) ## get means for each column
-  for (i in 1:(p-1)) {   ##exclude Z column
-    newColumn <- c(rep(x.mean[i]+x.sd[i], n), rep(x.mean[i]-x.sd[i], n))
-    sampler$setTestPredictor(newColumn, i)
-    ## I believe that if you look inside x.test, its ith column will have changed
-    
-    samples <- sampler$run()
-    ## samples$test should now have the comparisons you want
-    
-    oldColumn <- c(X.train[,i], X.train[,i])
-    sampler$setTestPredictor(oldColumn, i)
-  }
-  
-  null.resp.bart <- bart(x.train = X.train, y.train = Y, x.test = X.test, verbose = FALSE)
-  Y.res <- Y - null.resp.bart$yhat.train.mean  ## residuals from BART fit - means, or random column? if latter, 
+  null.resp <- bart(x.train = X.train, y.train = Y, x.test = X.test, verbose = FALSE)
+  Y.res <- Y - null.resp$yhat.train.mean  ## residuals from BART fit - means, or random column? if latter, 
   v_Y <- var(Y.res) * (n.obs - 1) / (n.obs - NCOL(X) - 2)
-  
-  if(!is.null(X)) {
-    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
-    Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
-  }else{
-    Xpartials <- NULL
-  }
-  
   
   ## calculate tau0 and se.tau0 from the difference of two response surface
   if (identical(est.type, "ATE")) {
-    diffs <- null.resp.bart$yhat.train - null.resp.bart$yhat.test
+    diffs <- null.resp$yhat.train - null.resp$yhat.test
     diffs[, Z == 0] <- -diffs[, Z == 0]
   } else if (identical(est.type, "ATT")) {
-    diffs = null.resp.bart$yhat.train[, Z == 1] - null.resp.bart$yhat.test
+    diffs = null.resp$yhat.train[, Z == 1] - null.resp$yhat.test
   } else if (identical(est.type, "ATC")) {
-    diffs = null.resp.bart$yhat.test - null.resp.bart$yhat.train[, Z == 0]
+    diffs = null.resp$yhat.test - null.resp$yhat.train[, Z == 0]
   }
   
   tau0 <- mean(apply(diffs, 1, mean))
   se.tau0 <- sd(apply(diffs, 1, mean))
   sgnTau0 <- sign(tau0)
 
+
+  ##Calculating coefficients for X  
+  if(!is.null(X)) {
+    Xcoef = cbind(null.trt$coef[-1], NA)
+    
+    sampler.control <- dbartsControl(keepTrainingFits = FALSE,
+                                     n.samples = as.integer(100),                                   
+                                     n.burn    = as.integer(0),                                   
+                                     updateState = FALSE)      ## only useful if you plan on save()ing
+    
+    sampler <- dbarts(X.train, Y, control = sampler.control)
+    sampler$run(numSamples = 1, numBurnIn = 500) ## burn it in without any test data
+    
+    x.test <- rbind(X.train, X.train)
+    sampler$setTestPredictor(x.test)
+    
+    n <- nrow(X.train)
+    p <- ncol(X.train)
+    
+    x.sd <- apply(X.train, 2, sd, na.rm = T) ## get sds for each column
+    x.mean <- apply(X.train, 2, mean, na.rm = T) ## get means for each column
+    for (i in 1:(p-1)) {   ##exclude Z column
+      newColumn <- c(rep(x.mean[i]+x.sd[i], n), rep(x.mean[i]-x.sd[i], n))
+      sampler$setTestPredictor(newColumn, i)
+      
+      samples <- sampler$run()
+      
+      diffs <- samples$test[1:n,] - samples$test[-(1:n),]
+      Xcoef[i,2] = mean(diffs, na.rm = T)
+      
+      oldColumn <- c(X.train[,i], X.train[,i])
+      sampler$setTestPredictor(oldColumn, i)
+    }
+    
+    Xcoef.plot = abs(Xcoef)
+    
+    ###########Need to update this:
+    Xpartials <- NULL #X.partials(Y, Z, X, resp.family, trt.family)
+    
+  }else{
+    Xcoef <- Xcoef.plot <- Xpartials <- NULL
+  }
+  ###end X coef calculations
+  
   grid.weights <- getWeights.BART(Z, est.type, trim.wt, null.trt)
   
   ########################
@@ -266,7 +271,7 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = tau0, se.tau0 = se.tau0,
-                   Xcoef = NULL, Xcoef.plot = NULL,
+                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
                    varnames = all.vars(formula), var_ytilde = v_Y, var_ztilde = v_Z)
     class(result) <- "sensitivity"
   }else{
@@ -275,7 +280,7 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = tau0, se.tau0 = se.tau0,
-                   Xcoef = NULL, Xcoef.plot = NULL,
+                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
                    varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z, XpartCor = Xpartials)
     class(result) <- "sensitivity"
   }
