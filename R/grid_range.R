@@ -49,7 +49,7 @@ grid.search <- function(extreme.cors, zero.loc, Xcoef.plot, Y, Z, X,
   if(!is.null(control.fit$resp.family)){
     fname <- "fit.treatSens"
   }else{
-    fname <- ifelse(is.null(control.fit$g), "fit.BART.sens", "fit.LMER.sens")
+    fname <- ifelse(is.null(control.fit$g), "fit.treatSens.BART", "fit.LMER.sens")
   }
   fn.call <- call(fname, sensParam = sensParam, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, zetaY=NA, zetaZ=NA, v_Y = v_Y, v_Z = v_Z,
                   control.fit = control.fit, theta = theta)

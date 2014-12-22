@@ -48,7 +48,7 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                       nsim = 20,			#number of simulated Us to average over per cell in grid
                       zero.loc = 1/3,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
                       verbose = FALSE,
-                      buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
+                      buffer = 0, 		#restriction to range of coef on U to ensure stability around the edges
                       est.type = "ATE",		#Type of estimator targeted: "ATE", "ATT", or "ATC".
                       data = NULL,
                       seed = 1234,     	#default seed is 1234.
@@ -64,7 +64,7 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
   options(warn=1)
   
   sensParam = "coef"
-  resp.family = gaussian
+  resp.family = NULL
   trt.family = binomial(link="probit")
   
   #return error if only either spy.range or spz.range is specified.
@@ -156,8 +156,9 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
   colnames(X.train) <- colnames(X.test)
 
   null.resp <- bart(x.train = X.train, y.train = Y, x.test = X.test, verbose = FALSE)
-  Y.res <- Y - null.resp$yhat.train.mean  ## residuals from BART fit - means, or random column? if latter, 
-  v_Y <- var(Y.res) * (n.obs - 1) / (n.obs - NCOL(X) - 2)
+  Y.res <- Y - t(null.resp$yhat.train)  ## residual vectors from BART fit
+  v_Y <- max(apply(Y.res, 2, var)) * (n.obs - 1) / (n.obs - NCOL(X) - 2)
+  Y.res <- Y.res[,1]
   
   ## calculate tau0 and se.tau0 from the difference of two response surface
   if (identical(est.type, "ATE")) {
@@ -209,11 +210,8 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
     
     Xcoef.plot = abs(Xcoef)
     
-    ###########Need to update this:
-    Xpartials <- NULL #X.partials(Y, Z, X, resp.family, trt.family)
-    
   }else{
-    Xcoef <- Xcoef.plot <- Xpartials <- NULL
+    Xcoef <- Xcoef.plot <- NULL
   }
   ###end X coef calculations
   
@@ -221,10 +219,14 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
   
   ########################
   #Need to check how range is determined & what to do for BART
+  
+  treatmentModel <- match.call()$trt.model
+  if (is.null(treatmentModel)) treatmentModel <- formals(treatSens.BART)$trt.model
+  
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=grid.weights, iter.j=iter.j, 
-                     offset = TRUE, p = NULL)
+                     offset = TRUE, p = NULL, g = NULL, X.test = X.test, est.type = est.type, treatmentModel = treatmentModel, nthread = nthreads)
   
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
   zetaZ = range$zetaZ
@@ -242,9 +244,6 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                                       n.thin = iter.j,
                                       n.thread = if (is.null(nthreads)) cibart::guessNumCores() else nthreads)
 
-  treatmentModel <- match.call()$trt.model
-  if (is.null(treatmentModel)) treatmentModel <- formals(treatSens.BART)$trt.model
-  
   ## this trick sets up the call in the frame the called us, so that any parameters
   ## used in the trt.model specification are looked up there
   cibartCall <- call("fitSensitivityAnalysis", Y, Z, X,
@@ -292,87 +291,34 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
 #fit.treatSens
 ###########
 
-## TODO: make this cibart specific
+fit.treatSens.BART <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
 
-if (FALSE) {
-fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
-  resp.family = control.fit$resp.family
-  trt.family = control.fit$trt.family
-  U.model = control.fit$U.model
-  std = control.fit$standardize
-  weights = control.fit$weights
-  iter.j = control.fit$iter.j
-  offset = control.fit$offset
-  p = control.fit$p
+  treatmentModel = control.fit$treatmentModel
+  est.type = control.fit$est.type
+  X.test = control.fit$X.test
+  nthreads = control.fit$nthread
 
-  #Generate U w/Y.res, Z.res 
-  if(U.model == "normal"){  
-    U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, sensParam))      
-  }
+  control.sens <- cibart::sensControl(n.sim = 100,
+                                      n.burn.init = 1000,
+                                      n.thin = 10,
+                                      n.thread = if (is.null(nthreads)) cibart::guessNumCores() else nthreads)
   
-  if(U.model == "binomial"){
-    if(identical(trt.family$link,"probit")){
-      if(!is.null(X)) {
-        #debug(contYbinaryZU)
-        out.contYbinaryZU <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p))
-      } else {
-        out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
-      }
-    }else{
-      stop(paste("Only probit link is allowed."))
-    }
-    
-    U = out.contYbinaryZU$U
-    p = out.contYbinaryZU$p
-  }
-  
-  if(!(class(U) == "try-error")){
-    #try keeps loop from failing 
-    #Do we want to return a warning/the error message/our own error message if try fails?
-    #fit models with U
-    if(std) U = std.nonbinary(U)
-    
-    if(!is.null(X)) {
-      fit.glm <- switch(offset+1,
-                        "FALSE" = glm(Y~Z+U+X, family=resp.family, weights=weights),
-                        "TRUE" = glm(Y~Z+X, family=resp.family, weights=weights, offset=zetaY*U))   
-      
-      sens.se <- switch(class(weights),
-                        "NULL" = summary(fit.glm)$coefficients[2,2],
-                        "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
-                        "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
-      fit.trt <- glm(Z~U+X, family=trt.family)
-    }else{
-      fit.glm <- switch(offset+1,
-                        "FALSE" = glm(Y~Z+U, family=resp.family, weights=weights),
-                        "TRUE" = glm(Y~Z, family=resp.family, weights=weights, offset=zetaY*U))   
-      sens.se = summary(fit.glm)$coefficients[2,2]
-      fit.trt <- glm(Z~U, family=trt.family)		
-    }
+  cibartCall <- call("fitSensitivityAnalysis", Y, Z, X,
+                     X.test, zetaY, zetaZ, theta,
+                     est.type, treatmentModel,
+                     control.sens, verbose = FALSE)
+  cibartCall[[1]] <- quote(cibart::fitSensitivityAnalysis)
+  cellResults <- eval(cibartCall, parent.frame(1))
     
     return(list(
-      sens.coef = fit.glm$coef[2],
-      sens.se = sens.se, 	#SE of Z coef
-      zeta.y = ifelse(offset==1,zetaY,fit.glm$coef[3]),     		#estimated coefficient of U in response model
-      zeta.z = fit.trt$coef[2],                                 #estimated coef of U in trt model
-      zy.se = ifelse(offset==1,NA,summary(fit.glm)$coefficients[3,2]),   #SE of U coef in response model
-      zz.se = summary(fit.trt)$coefficients[2,2], 	            #SE of U coef in trt model
-      resp.sigma2 = sum(fit.glm$resid^2)/fit.glm$df.residual,
-      trt.sigma2 = sum(fit.trt$resid^2)/fit.trt$df.residual,
-      p = p
+      sens.coef = mean(cellResults$sens.coef),
+      sens.se = cellResults$sens.se[1,1], 	#SE of Z coef
+      zeta.y = zetaY,
+      zeta.z = zetaZ,
+      zy.se = NULL,
+      zz.se = NULL,
+      resp.sigma2 = NULL,
+      trt.sigma2 = NULL,
+      p = NULL
     ))
-  }else{
-    return(list(
-      sens.coef = NA,
-      sens.se = NA, 	
-      zeta.y = NA, 	
-      zeta.z = NA,	
-      zy.se = NA, 
-      zz.se = NA,
-      resp.sigma2 = NA,
-      trt.sigma2 = NA,
-      p = p
-    ))
-  }
-}
 }
