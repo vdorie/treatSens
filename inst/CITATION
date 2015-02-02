@@ -1,11 +1,8 @@
 authors <- c("Nicole Bohme Carnegie", "Masataka Harada", "Jennifer Hill")
 
 csatitle <- "treatSens: A Package to Assess Sensitivity of Causal Analyses to Unmeasured Confounding"
-csadesc <- packageDescription("treatSens")
-csaversion <- csadesc$Version
-csadate <- csadesc$Date
-s <- regexpr("20[0-9][0-9]", csadate)
-csayear <- ifelse (s==-1, "2003", substr(csadate, s, s+3))
+csaversion <-  paste("R package version", meta$Version)
+csayear <- sub(".*(2[[:digit:]]{3})-.*", "\\1", meta$Date)
       
 
 citHeader(

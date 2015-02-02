@@ -180,7 +180,7 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
     Xcoef = cbind(null.trt$coef[-1], NA)
     
     sampler.control <- dbartsControl(keepTrainingFits = FALSE,
-                                     n.samples = as.integer(100),                                   
+                                     n.samples = as.integer(1000),                                   
                                      n.burn    = as.integer(0),                                   
                                      updateState = FALSE)      ## only useful if you plan on save()ing
     
@@ -196,7 +196,11 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
     x.sd <- apply(X.train, 2, sd, na.rm = T) ## get sds for each column
     x.mean <- apply(X.train, 2, mean, na.rm = T) ## get means for each column
     for (i in 1:(p-1)) {   ##exclude Z column
-      newColumn <- c(rep(x.mean[i]+x.sd[i], n), rep(x.mean[i]-x.sd[i], n))
+      if(is.binary(X.train[,i])){
+        newColumn <- c(rep(1, n), rep(0,n))
+      }else{
+        newColumn <- c(rep(x.mean[i]+x.sd[i], n), rep(x.mean[i]-x.sd[i], n))
+      }
       sampler$setTestPredictor(newColumn, i)
       
       samples <- sampler$run()
