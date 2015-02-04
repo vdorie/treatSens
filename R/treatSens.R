@@ -43,7 +43,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
    # set seed
   set.seed(seed)
-  debug(parse.formula)
+  
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
   
