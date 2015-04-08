@@ -58,7 +58,8 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
                       nthreads = NULL, 		#number of parallel processes used to divide grid
                       spy.range = NULL,  	#custom range for sensitivity parameter on Y, e.g.(0,10), zero.loc will be overridden.
                       spz.range = NULL,  	#custom range for sensitivity parameter on Z, e.g.(-2,2), zero.loc will be overridden.
-                      trim.wt = 10     	#the maximum size of weight is set at "trim.wt"% of the inferential group. type NULL to turn off.
+                      trim.wt = 10,     	#the maximum size of weight is set at "trim.wt"% of the inferential group. type NULL to turn off.
+                      benchmarking = c("2SD", "1SD") #scale for benchmarking points for plot - difference between +1 and -1 SD in X or +-0.5 SD.
 ){
   #this code let R issue warnings as they occur.
   options(warn=1)
@@ -199,7 +200,11 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
       if(is.binary(X.train[,i])){
         newColumn <- c(rep(1, n), rep(0,n))
       }else{
-        newColumn <- c(rep(x.mean[i]+x.sd[i], n), rep(x.mean[i]-x.sd[i], n))
+        if(benchmarking = "2SD"){
+          newColumn <- c(rep(x.mean[i]+x.sd[i], n), rep(x.mean[i]-x.sd[i], n))
+        }else{
+          newColumn <- c(rep(x.mean[i]+x.sd[i]/2, n), rep(x.mean[i]-x.sd[i]/2, n))
+        }
       }
       sampler$setTestPredictor(newColumn, i)
       
@@ -212,7 +217,8 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
       sampler$setTestPredictor(oldColumn, i)
     }
     
-    Xcoef.plot = abs(Xcoef)
+    Xcoef.plot = Xcoef
+    Xcoef.plot[,2] = abs(Xcoef[,2])
     
   }else{
     Xcoef <- Xcoef.plot <- NULL
