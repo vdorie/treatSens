@@ -200,7 +200,7 @@ treatSens.BART <- function(formula,         #formula: assume treatment is 1st te
       if(is.binary(X.train[,i])){
         newColumn <- c(rep(1, n), rep(0,n))
       }else{
-        if(benchmarking = "2SD"){
+        if(benchmarking == "2SD"){
           newColumn <- c(rep(x.mean[i]+x.sd[i], n), rep(x.mean[i]-x.sd[i], n))
         }else{
           newColumn <- c(rep(x.mean[i]+x.sd[i]/2, n), rep(x.mean[i]-x.sd[i]/2, n))
