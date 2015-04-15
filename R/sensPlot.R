@@ -9,7 +9,7 @@ sensPlot = function(x,
                   col.insig = "blue",
                   lty.insig = 1,
                   data.line = TRUE,
-                  X.pch = NULL,
+                  X.pch = NULL,  #vector of length 3: non-transformed points, transformed points, points outside plotting range
                   signif.level = 0.05,
                   labcex = 0.75,
                   limit.Xplot = FALSE, #MH: limit plotting covariates to enlarge contour
@@ -52,14 +52,16 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   ############
   Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
   Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
-  Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,0)) #MH: add sign of coef of X on Y to Xpart  
+  Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,2)) #MH: add sign of coef of X on Y to Xpart  
     
   #note that due to correlation among Xs, some may not appear on plot
   #because observed partial cors don't map directly to coefs in this case
   #forcing inclusion can lead to difficult to read plot.  
   if(is.null(X.pch)){
+    out.pch = 1
     X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
   }else{
+    out.pch = X.pch[3]
     X.pch = ifelse(Xpart[,2]>=0,X.pch[1],X.pch[2])	
   }
   if (any(Xpart[,2]<0)) {
@@ -103,8 +105,16 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   
   if (limit.Xplot) {
     #old codes
-    plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
-         ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)), pch = X.pch, xlab = xlab, ylab = ylab)    
+    plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("blue","red")[Xpart.plot2[,3]], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
+         ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)), pch = X.pch, xlab = xlab, ylab = ylab)
+    outsidePts = Xpart.plot2[(Xpart.plot[,1] < min(Zcors, na.rm = T)) | (Xpart.plot[,1] > max(Zcors, na.rm = T)) | (Xpart.plot[,2] > max(Ycors, na.rm = T)),]
+    if(length(outsidePts) > 0){
+      outsidePts[,1] = apply(cbind(outsidePts[,1], min(Zcors, na.rm = T)), 1, max)
+      outsidePts[,1] = apply(cbind(outsidePts[,1], max(Zcors, na.rm = T)), 1, min)
+      outsidePts[,2] = apply(cbind(outsidePts[,2], max(Ycors, na.rm = T)), 1, min)
+      points(outsidePts[,1], outsidePts[,2], col=c("blue","red")[outsidePts[,3]], pch = out.pch, cex = 1.5, lwd = 3)
+      warning("Note: predictors outside plot region plotted at margin with O")
+    }
   } else {
     #MH: define max, min of plots
     xplot.min = ifelse(min(Zcors, na.rm = T)<min(Xpart.plot[,1]),min(Zcors, na.rm = T),min(Xpart.plot[,1]))
@@ -150,15 +160,20 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
      warning("Cannot add data line because XXXXX.")
   }else{
      if(data.line & length(Xpart)>1){
-      proj.pts = apply(Xpart.plot, 1, mean)
-      max.pt = Xpart.plot[proj.pts == max(proj.pts[sign(Xpart.plot[,1])==sign(x$tau0)]),]
-      zcor = (1:length(Zcors))[abs(Zcors-max.pt[1]) ==  min(abs(Zcors-max.pt[1]))]
+      proj.pts = apply(Xpart.plot^2, 1, mean)
+      max.pt = Xpart.plot[proj.pts == max(proj.pts),]
+      max.pt[1] = sign(x$tau0)*abs(max.pt[1])
+      Zdiff = (Zcors-max.pt[1])*sign(max.pt[1])
+      Zgrt = which(Zdiff < 0)
+      zcor = Zgrt[which(Zdiff[Zgrt] == max(Zdiff[Zgrt]))]  
       if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ 
         zpts = c(zcor-1, zcor)
       }else{
         zpts = c(zcor, zcor+1)
       }
-      ycor = (1:length(Ycors))[abs(Ycors-max.pt[2]) ==  min(abs(Ycors-max.pt[2]))]
+      Ydiff = Ycors-max.pt[2]
+      Ygrt = which(Ydiff < 0)
+      ycor = Ygrt[which(Ydiff[Ygrt] == max(Ydiff[Ygrt]))]
       if((Ycors[ycor] > max.pt[2] & ycor > 1)||(ycor==length(Ycors))){ 
         ypts = c(ycor-1, ycor)
       }else{

@@ -182,6 +182,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
   }else{
     v_Y <- var(Y.res)*(n.obs-1)/(n.obs-2)
+    Xcoef <- NULL
     Xpartials <- NULL
   }
 
@@ -197,14 +198,13 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
     null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
-    null.trt.plot <- glm(Z~X.positive, family=trt.family)
-    Xcoef.plot = cbind(null.trt.plot$coef[-1], null.resp.plot$coef[-c(1,2)])
+    Xcoef.plot = cbind(null.trt$coef[-1], null.resp.plot$coef[-c(1,2)])
   }
   if(!is.null(X) & sensParam == "cor") {
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xpartials[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
-    Xcoef.plot <- X.partials(Y, Z, X.positive, resp.family, trt.family)
+    Xcoef.plot <- cbind(X.partials[,1], X.partials(Y, Z, X.positive, resp.family, trt.family)[,2])
     Xcoef <- Xpartials
   }
   
