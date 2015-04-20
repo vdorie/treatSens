@@ -1,1 +1,1 @@
-export(treatSens, sensPlot, summary.sensitivity, treatSens.BART)
+export(treatSens, sensPlot, summary.sensitivity)
