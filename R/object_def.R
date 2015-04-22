@@ -14,15 +14,19 @@ combine.sensitivity <- function(x1, x2){
   gridpts1 = matrix(c(rep(grid1[,1], dim(x1$tau)[3]), rep(grid1[,2], dim(x1$tau)[3])), ncol = 2)
   tauLong1 = c(x1$tau)
   seTauLong1 = c(x1$se.tau)
+  sigRespLong1 <- x1$sig2.resp
+  sigTrtLong1  <- x1$sig2.trt
 
   grid2 = expand.grid(as.numeric(dimnames(x2$sp.y)[[1]]), as.numeric(dimnames(x2$sp.z)[[2]]))
   gridpts2 = matrix(c(rep(grid2[,1], dim(x2$tau)[3]), rep(grid2[,2], dim(x2$tau)[3])), ncol = 2)
   tauLong2 = c(x2$tau)
   seTauLong2 = c(x2$se.tau)
+  sigRespLong2 <- x2$sig2.resp
+  sigTrtLong2  <- x2$sig2.trt
 
   result <- list(model.type = x1$model.type, sensParam = x1$sensParam, tau = rbind(tauLong1, tauLong2), se.tau = rbind(seTauLong1, seTauLong2), 
                  sp.z = c(grid1[,2], grid2[,2]), sp.y = c(grid1[,1], grid2[,1]), 
-                 Y = x1$Y, Z = x1$Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
+                 Y = x1$Y, Z = x1$Z, sig2.resp = rbind(sigRespLong1, sigRespLong2), sig2.trt = rbind(sigTrtLong1, sigTrtLong2),
             #should any of the following be averaged across objects?
                  tau0 = x1$tau0, se.tau0 = x1$se.tau0,
                  Xcoef = x1$Xcoef,
@@ -98,7 +102,7 @@ summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,
 #prints average values for each cell in grid of:
 #tau, SE of tau, (realized sens params,) coefficients and their se's
 ##############
-print.sensitivity = function(x, digits=3, part.cors = F ){
+print.sensitivity = function(x, digits=3, part.cors = F, ...){
   if(part.cors){
 	trt.coef <- as.numeric(dimnames(x$tau)[[2]])/sqrt(x$var_ztilde)
 	resp.coef <- as.numeric(dimnames(x$tau)[[1]])/sqrt(x$var_ytilde) *(1-trt.coef^2)
@@ -114,7 +118,7 @@ print.sensitivity = function(x, digits=3, part.cors = F ){
   colnames(table) <- trt.coef
   rownames(table) <- resp.coef
   cat("Estimated treatment effects\n")
-  print(table)
+  print(table, ...)
   
   K = dim(x$se.tau)[3]
   W = apply(x$se.tau^2, c(1,2), mean)
@@ -124,14 +128,14 @@ print.sensitivity = function(x, digits=3, part.cors = F ){
   colnames(table) <- trt.coef
   rownames(table) <- resp.coef
   cat("Standard error of estimated treatment effects\n")
-  print(table)
+  print(table, ...)
   
   if(!part.cors){
   	table <- round(apply(x$sp.y, c(1,2), mean),digits)
   	colnames(table) <- trt.coef
   	rownames(table) <- resp.coef
   	cat("Estimated zeta.y - coefficient of U in response model\n")
-  	print(table)
+  	print(table, ...)
   
   	K = dim(x$se.spy)[3]
   	W = apply(x$se.spy^2, c(1,2), mean)
@@ -141,13 +145,13 @@ print.sensitivity = function(x, digits=3, part.cors = F ){
   	colnames(table) <- trt.coef
   	rownames(table) <- resp.coef
   	cat("Standard error of zeta.y\n")
-  	print(table)
+  	print(table, ...)
   
   	table <- round(apply(x$sp.z, c(1,2), mean),digits)
   	colnames(table) <- trt.coef
   	rownames(table) <- resp.coef
   	cat("Estimated zeta.z - coefficient of U in treatment model\n")
-  	print(table)
+  	print(table, ...)
   
   	K = dim(x$se.spz)[3]
   	W = apply(x$se.spz^2, c(1,2), mean)
@@ -157,8 +161,9 @@ print.sensitivity = function(x, digits=3, part.cors = F ){
   	colnames(table) <- trt.coef
   	rownames(table) <- resp.coef
   	cat("Standard error of zeta.z\n")
-  	print(table)
+  	print(table, ...)
   }
+  invisible(x)
 }
 
 

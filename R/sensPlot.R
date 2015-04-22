@@ -82,7 +82,7 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   
   dimnames(taus)[[1]] = Zcors
   dimnames(taus)[[2]] = Ycors
-  taus <<- taus
+  taus <<- taus ## is this right? it potentially changes the value of tau in a parent environment
   dimnames(se.taus)[[1]] = Zcors
   dimnames(se.taus)[[2]] = Ycors
   se.taus <<- se.taus

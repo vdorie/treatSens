@@ -10,7 +10,6 @@ LMER.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 				zero.loc = 1/3,		#location of zero at maximum Y correlation, as fraction in [0,1]
 				verbose = F,
 				data = NULL) {
-	require(lme4)
 	#check that data is a data frame
 	if(!is.null(data)) {
 		if(class(data) == "matrix") {
@@ -43,10 +42,10 @@ LMER.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	#fit null model & get residuals
 	if(!is.null(X)) {
 		null.resp <- lmer(Y~X+Z+(1|group))
-		null.trt <- lmer(Z~X + (1|group))
+		null.trt  <- lmer(Z~X + (1|group))
 	}else{
 		null.resp <- lmer(Y~Z+(1|group))
-		null.trt <- lmer(Z~1+(1|group))
+		null.trt  <- lmer(Z~1+(1|group))
 	}
 
 	n = length(null.resp@fixef)
@@ -85,7 +84,7 @@ LMER.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 			nz = nz-1
 			rY = rhoY[ny]
 			rZ = rhoZ[nz]
-			fit.sens = fit.LMER.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(g = group, trt.family = trt.family, U.model =U.model, standardize = standardize))
+			fit.sens = fit.LMER.sens(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit = list(g = group, U.model =U.model, standardize = standardize))
 		}
 		rhoY <- seq(grid.range[1,1], rY, length.out = grid.dim[1])
 		rhoZ <- seq(grid.range[2,1], rZ, length.out = grid.dim[2])
@@ -169,10 +168,10 @@ fit.LMER.sens <- function(Y, Z, Y.res, Z.res, X, rY, rZ, control.fit) {
 		if(std) U = std.nonbinary(U)
 		if(!is.null(X)) {
 			fit.resp <- lmer(Y~X+U+Z+(1|g))
-			fit.trt <- lmer(Z~X+U+(1|g))		
+			fit.trt  <- lmer(Z~X+U+(1|g))		
 		}else{
 			fit.resp <- lmer(Y~U+Z+(1|g))
-			fit.trt <- lmer(Z~U+(1|g))		
+			fit.trt  <- lmer(Z~U+(1|g))		
 		}
 		
 		n = length(fit.trt@fixef)

@@ -1,0 +1,34 @@
+PKG_CPPFLAGS=-Iinclude @PTHREAD_CFLAGS@
+PKG_CPPXXFLAGS=-Iinclude @PTHREAD_CFLAGS@
+PKG_LIBS=$(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) glm/libglm.a external/libexternal.a @PTHREAD_LIBS@
+
+
+.PHONY : all glm/libglm.a external/libexternal.a clean
+
+
+all : $(SHLIB)
+
+$(SHLIB) : glm/libglm.a external/libexternal.a
+
+glm/libglm.a :
+	@(cd glm && $(MAKE) libglm.a \
+	  CC="$(CC)" R_XTRA_CPPFLAGS="$(R_XTRA_CPPFLAGS)" \
+	  CPPFLAGS="@PTHREAD_CFLAGS@ $(CPPFLAGS)" \
+	  CFLAGS="$(R_XTRA_CFLAGS) $(CPICFLAGS) $(CFLAGS)" \
+	  AR="$(AR)" ARFLAGS="$(ARFLAGS)" RANLIB="$(RANLIB)" \
+	  INST_DIR="$(INST_DIR)")
+
+
+external/libexternal.a :
+	@(cd external && $(MAKE) libexternal.a \
+	  CC="$(CC)" R_XTRA_CPPFLAGS="$(R_XTRA_CPPFLAGS)" \
+	  CPPFLAGS="@PTHREAD_CFLAGS@ $(CPPFLAGS)" \
+	  CFLAGS="$(R_XTRA_CFLAGS) $(CPICFLAGS) $(CFLAGS)" \
+	  AR="$(AR)" ARFLAGS="$(ARFLAGS)" RANLIB="$(RANLIB)" \
+	  INST_DIR="$(INST_DIR)")
+
+
+clean :
+	@(cd glm && $(MAKE) clean)
+	@(cd external && $(MAKE) clean)
+	rm -f *.so *.dll *.o

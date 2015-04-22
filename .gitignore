@@ -458,4 +458,16 @@ sensitivity_to_confounding.v2.ps
 Research_papers/Ungrouped_case/simulations June 2013/OLS.sens sims - .RData
 .Rhistory
 .Rproj.user
-
+*.o
+*.so
+*.a
+*.dll
+a.out.dSYM
+src/Makevars
+config.log
+config.status
+autom4te.cache
+src/config.hpp
+src/bart/config.hpp
+src/external/config.h
+*.swp
