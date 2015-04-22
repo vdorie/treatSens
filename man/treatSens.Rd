@@ -99,7 +99,7 @@ Matrices and data frames should include only complete cases.
 \code{\link{sensPlot}} \code{\link{summary.sensitivity}} \code{\link{glm}}
 }
 \examples{
-N = 500          #number of observations
+N = 300          #number of observations
 
 zetay = .5             #coefficient on U in the outcome model
 zetaz = .5             #coefficient on U in the treatment model
@@ -111,13 +111,13 @@ X = matrix(rnorm(3*N),N,3)           #covariates
 
 ###################################
 # Example with continuous treatment
-
+set.seed(836)
 U = rnorm(N, 0, 1)         #unmeasured confounder
 Z = rnorm(N,X \%*\% betaz + zetaz*U,1)         #treatment variable
 Y = rnorm(N,X \%*\% betay + zetay*U + tau*Z,2) #outcome variable
 
 # sensitivity analysis
-out.cont <- treatSens(Y~Z+X, grid.dim = c(10,5), nsim = 5,
+out.cont <- treatSens(Y~Z+X, grid.dim = c(8,5), nsim = 5,
                      standardize = FALSE, verbose = TRUE, zero.loc = "full")
 
 summary(out.cont) #Prints average value of tau (trt effect) for each cell in grid.
@@ -127,7 +127,7 @@ sensPlot(out.cont) # draw contour plot
 
 ###############################
 # Example with binary treatment
-
+set.seed(725)
 U = rbinom(N,1,.5)                   #unmeasured confounder
 ps = pnorm(X\%*\%betaz + zetaz*(U-.5)) #propensity score
 Z = rbinom(N,1,ps)                   #treatment variable

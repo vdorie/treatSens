@@ -1,6 +1,6 @@
 Package: treatSens
 Type: Package
-Title: Sensitivity analysis for causal inference
+Title: Sensitivity Analysis for Causal Inference
 Version: 1.1
 Date: 2015-04-20
 Author: Nicole Bohme Carnegie, Masataka Harada, Jennifer Hill

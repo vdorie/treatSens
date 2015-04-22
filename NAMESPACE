@@ -1,1 +1,2 @@
-export(treatSens, sensPlot, summary.sensitivity)
+export(treatSens, sensPlot)
+S3method(summary, sensitivity)
