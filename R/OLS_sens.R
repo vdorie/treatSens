@@ -39,11 +39,11 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 	    if (!any(weights==c("ATE","ATT","ATC"))) {
 	      stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
 	    
-	    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
-	      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
+	    ## if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
+	    ##   stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
 	    
-	    if (identical(trt.family,gaussian) && ((null.trt$fitted<=0) || (null.trt$fitted>=1))) {
-	      stop(paste("The predicted probability of treatment assignment exceeds the bound of (0,1)."))}
+	    ## if (identical(trt.family,gaussian) && ((null.trt$fitted<=0) || (null.trt$fitted>=1))) {
+	    ##   stop(paste("The predicted probability of treatment assignment exceeds the bound of (0,1)."))}
 	    
 	    if (identical(weights,"ATE")) {
 	      wt <- 1/null.trt$fitted
@@ -97,7 +97,7 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 
 	#find ranges for final grid
 	cat("Finding grid range...\n")
-	grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta = 0.5, BzX = NULL,sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = gaussian, trt.family = gaussian, U.model = "normal", standardize = standardize))
+	grid.range = grid.search(extreme.coef, zero.loc, Xcoef, Y,Z, X,Y.res, Z.res,v_Y, v_Z, theta = 0.5, sgnTau0 = sign(null.resp$coef[2]), control.fit = list(resp.family = gaussian, trt.family = gaussian, U.model = "normal", standardize = standardize))
 
 	zetaY <- seq(grid.range[1,1], grid.range[1,2], length.out = grid.dim[1])
 	zetaZ <- seq(grid.range[2,1], grid.range[2,2], length.out = grid.dim[2])
@@ -146,7 +146,9 @@ OLS.sens <- function(formula, 			#formula: assume treatment is 1st term on rhs
 		result <- list(model.type = "GLM", tau = sens.coef, se.tau = sens.se, 
 				alpha = alpha, delta = delta, 
 				se.alpha = alpha.se, se.delta = delta.se, 
-				Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
+				# Y = Y, Z = Z, se.resp = resp.se, se.trt = trt.se,
+                                ## not sure that this is right, but it silences a warning; however, the names in the list have changed as well
+                                Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2, 
 				tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
 				Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]))
 		class(result) <- "sensitivity"

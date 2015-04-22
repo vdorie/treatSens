@@ -1,1 +1,23 @@
-export(treatSens, sensPlot, summary.sensitivity, treatSens.BART)
+useDynLib(treatSens)
+
+export(treatSens, sensPlot)
+export(treatSens.BART)
+
+S3method(summary, sensitivity)
+S3method(plot, sensitivity)
+S3method(print, sensitivity)
+
+
+importFrom(methods, new)
+
+importFrom(stats, cor, var, vcov, sd, dnorm, rnorm, pnorm, rbinom, qnorm)
+importFrom(stats, lm, glm, binomial)
+importFrom(stats, model.frame, model.extract, is.empty.model, model.matrix)
+importFrom(stats, setNames)
+
+importFrom(graphics, par, plot, points, text, abline, legend, contour, box)
+importFrom(grDevices, contourLines)
+
+importFrom(lme4, lmer)
+
+importFrom(dbarts, bart, pdbart, dbarts, dbartsControl)

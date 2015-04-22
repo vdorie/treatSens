@@ -26,7 +26,7 @@ point.GLM.sens <- function(formula,       #formula: assume treatment is 1st term
   zero.loc = NULL
   buffer = NULL
   
-  if (F){
+  if (FALSE) {
     out.warnings <- warnings(formula, resp.family, trt.family, U.model, theta, grid.dim, 
                              standardize, nsim, zero.loc, verbose, buffer, weights, data)
     
@@ -133,11 +133,24 @@ point.GLM.sens <- function(formula,       #formula: assume treatment is 1st term
                      standardize = standardize, weights = weights, iter.j = iter.j,
                      method.contYZU = method.contYZU, method.glm = method.glm)
   
+  #calling necessary packages for multicore processing.
+  if(!is.null(core)){
+    dp = requireNamespace("doParallel", quietly = TRUE)
+    fe = requireNamespace("foreach", quietly = TRUE)
+    if(dp & fe){
+      cl<-parallel::makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
+      doParallel::registerDoParallel(cl)
+    }else{
+      core = NULL
+    } 
+  }
+  
   if(is.null(core)){
     for(i in 1:nsim){    
       #running GLM_sens on single point
       #debug(fit.GLM.sens)
-      out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
+      #out.fit.GLM.sens = fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
+      out.fit.GLM.sens <- fit.treatSens("coef", Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
       #undebug(fit.GLM.sens) 
       #record the output to the results.
       results[i,1] <- out.fit.GLM.sens$sens.coef
@@ -150,12 +163,13 @@ point.GLM.sens <- function(formula,       #formula: assume treatment is 1st term
       results[i,8] <- out.fit.GLM.sens$trt.sigma2  
     }
   }else{
-    out.fit.GLM.sens <- foreach(i=1:nsim,.combine=rbind,.verbose=F)%dopar%{
+    out.fit.GLM.sens <- foreach::"%dopar%"(foreach::foreach(i=1:nsim,.combine=rbind,.verbose=F), {
       #debug(fit.GLM.sens)
-      source("GLM_sens.R")
-      fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
+      #source("GLM_sens.R")
+      #fit.GLM.sens(Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
+      fit.treatSens("coef", Y, Z, Y.res, Z.res, X, rY, rZ, v_Y, v_Z, theta, control.fit)
       #undebug(fit.GLM.sens)
-    }
+    })
     results[,1] <- unlist(out.fit.GLM.sens[,1])
     results[,2] <- unlist(out.fit.GLM.sens[,2])
     results[,3] <- unlist(out.fit.GLM.sens[,3])
@@ -165,5 +179,8 @@ point.GLM.sens <- function(formula,       #formula: assume treatment is 1st term
     results[,7] <- unlist(out.fit.GLM.sens[,7])
     results[,8] <- unlist(out.fit.GLM.sens[,8])
   }
+  
+  if(!is.null(core) && dp) parallel::stopCluster(cl)   # Stop using multicore.
+  
   return(results)
 }
