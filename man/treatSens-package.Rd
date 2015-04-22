@@ -2,7 +2,7 @@
 \alias{treatSens-package}
 \docType{package}
 \title{
-Sensitivity analysis for causal inference
+Sensitivity Analysis for Causal Inference
 }
 \description{
 Utilities to investigate sensitivity to unmeasured confounding in causal models of several types.
