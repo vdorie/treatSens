@@ -23,6 +23,10 @@
 using std::size_t;
 using std::uint32_t;
 
+extern "C" {
+  void R_init_treatSens(DllInfo* info);
+}
+
 namespace {
   SEXP getListElement(SEXP list, const char *str);
     
@@ -40,7 +44,7 @@ namespace {
     const char* className = CHAR(STRING_ELT(classExpr, 0));
     if (strcmp(className, "probitEMTreatmentModel") == 0) {
       *modelType = PROBIT_EM;
-      return new cibart::ProbitEMTreatmentModel(INTEGER(getListElement(modelExpr, "maxIter"))[0]);
+      return new cibart::ProbitEMTreatmentModel(static_cast<size_t>(INTEGER(getListElement(modelExpr, "maxIter"))[0]));
     }
     
     if (strcmp(className, "probitTreatmentModel") == 0) {
@@ -63,13 +67,13 @@ namespace {
       switch(family) {
         case cibart::PROBIT_PRIOR_STUDENT_T:
         prior = new cibart::ProbitStudentTPrior;
-        ((cibart::ProbitStudentTPrior *) prior)->scale = REAL(getListElement(modelExpr, "scale"));
-        ((cibart::ProbitStudentTPrior *) prior)->dof   = REAL(getListElement(modelExpr, "df"))[0];
+        static_cast<cibart::ProbitStudentTPrior *>(prior)->scale = REAL(getListElement(modelExpr, "scale"));
+        static_cast<cibart::ProbitStudentTPrior *>(prior)->dof   = REAL(getListElement(modelExpr, "df"))[0];
         break;
         case cibart::PROBIT_PRIOR_NORMAL:
         prior = new cibart::ProbitNormalPrior;
-        ((cibart::ProbitNormalPrior *) prior)->scale = REAL(getListElement(modelExpr, "scale"));
-        default:
+        static_cast<cibart::ProbitNormalPrior *>(prior)->scale = REAL(getListElement(modelExpr, "scale"));
+        case cibart::PROBIT_PRIOR_FLAT:
         break;
       }
       
@@ -80,8 +84,8 @@ namespace {
       *modelType = BART;
       
       double nodePriorParameter = REAL(getListElement(modelExpr, "k"))[0];
-      size_t numTrees = (size_t) INTEGER(getListElement(modelExpr, "ntree"))[0];
-      size_t numThin  = (size_t) INTEGER(getListElement(modelExpr, "keepevery"))[0];
+      size_t numTrees = static_cast<size_t>(INTEGER(getListElement(modelExpr, "ntree"))[0]);
+      size_t numThin  = static_cast<size_t>(INTEGER(getListElement(modelExpr, "keepevery"))[0]);
      
       return new cibart::BARTTreatmentModel(&R_GetCCallable, numTrees, numThin, nodePriorParameter);
     }
@@ -93,29 +97,27 @@ namespace {
   {
     switch(modelType) {
       case PROBIT_EM:
-      delete (cibart::ProbitEMTreatmentModel*) treatmentModelPtr;
+      delete static_cast<cibart::ProbitEMTreatmentModel*>(treatmentModelPtr);
       break;
       case PROBIT:
       {
-        cibart::ProbitTreatmentModel* treatmentModel = (cibart::ProbitTreatmentModel*) treatmentModelPtr;
+        cibart::ProbitTreatmentModel* treatmentModel = static_cast<cibart::ProbitTreatmentModel*>(treatmentModelPtr);
         delete treatmentModel->prior;
         delete treatmentModel;
       }
       break;
       case BART:
       {
-        delete (cibart::BARTTreatmentModel*) treatmentModelPtr;
+        delete static_cast<cibart::BARTTreatmentModel*>(treatmentModelPtr);
       }
-      default:
       break;
-      
     }
   }
   
   SEXP glmFit(SEXP y, SEXP n, SEXP x, SEXP w, SEXP offset)
   {
     double* yPtr = NULL;
-    size_t numObs = LENGTH(y);
+    size_t numObs = static_cast<size_t>(XLENGTH(y));
     if (!isReal(y)) {
       if (!isInteger(y)) error("y must be of type real or integer");
       yPtr = new double[numObs];
@@ -132,32 +134,32 @@ namespace {
     SEXP dimsExpr = GET_DIM(x);
     if (length(dimsExpr) != 2) error("x must be a matrix");
     dims = INTEGER(dimsExpr);
-    if ((size_t) dims[0] != numObs) error("num rows in x must match length of y");
+    if (static_cast<size_t>(dims[0]) != numObs) error("num rows in x must match length of y");
     
-    size_t numCoefs = (size_t) dims[1];
+    size_t numCoefs = static_cast<size_t>(dims[1]);
     
     double* nPtr = NULL;
     if (!isNull(n)) {
-      if ((size_t) LENGTH(n) != numObs) error("length of n must match that of y");
+      if (static_cast<size_t>(XLENGTH(n)) != numObs) error("length of n must match that of y");
       nPtr = REAL(n);
     }
     
     double* wPtr = NULL;
     if (!isNull(w)) {
-      if ((size_t) LENGTH(w) != numObs) error("length of w must match that of y");
+      if (static_cast<size_t>(XLENGTH(w)) != numObs) error("length of w must match that of y");
       wPtr = REAL(w);
     }
     
     double* offsetPtr = NULL;
     if (!isNull(offset)) {
-      if ((size_t) LENGTH(offset) != numObs) error("length of offset must match that of y");
+      if (static_cast<size_t>(XLENGTH(offset)) != numObs) error("length of offset must match that of y");
       offsetPtr = REAL(offset);
     }
     
     size_t scratchSize = glm_getDoubleScratchSize(numObs, numCoefs);
     double* scratch = new double[scratchSize];
     
-    SEXP result = PROTECT(allocVector(REALSXP, numCoefs));
+    SEXP result = PROTECT(allocVector(REALSXP, static_cast<R_xlen_t>(numCoefs)));
     
     glm_fitGeneralizedLinearModel(yPtr == NULL ? REAL(y) : yPtr, nPtr, numObs, REAL(x), numCoefs, wPtr, offsetPtr,
                                   REAL(result), GLM_FAMILY_BINOMIAL, GLM_LINK_PROBIT, 30, scratch);
@@ -182,18 +184,18 @@ namespace {
     if (!isReal(z)) error("z must be of type real.");
     if (!isReal(xExpr)) error("x must be of type real.");
     
-    size_t numObservations = length(y);
-    if (numObservations == 0) error("y must have positive length.");
-    if (length(z) != (int) numObservations) error("length of z and y must be equal.");
+    size_t numObservations = static_cast<size_t>(XLENGTH(y));
+    if (numObservations == 0) error("y must have positive length");
+    if (static_cast<size_t>(XLENGTH(z)) != numObservations) error("length of z and y must be equal");
     
     size_t numPredictors = 0;
     const double* x = NULL;
-    if (length(xExpr) > 0) {
+    if (XLENGTH(xExpr) > 0) {
       dims = INTEGER(getAttrib(xExpr, R_DimSymbol));
-      if (dims == NULL || length(getAttrib(xExpr, R_DimSymbol)) != 2) error("x must be a matrix.");
-      if (dims[0] != (int) numObservations) error("num rows of x and length of y must be equal.");
+      if (dims == NULL || XLENGTH(getAttrib(xExpr, R_DimSymbol)) != 2) error("x must be a matrix");
+      if (static_cast<size_t>(dims[0]) != numObservations) error("num rows of x and length of y must be equal");
       
-      numPredictors = dims[1];
+      numPredictors = static_cast<size_t>(dims[1]);
       x = REAL(xExpr);
     }
     
@@ -201,22 +203,22 @@ namespace {
     
     size_t numTestObservations = 0;
     const double* x_test = NULL;
-    if (length(x_testExpr) > 0) {
+    if (XLENGTH(x_testExpr) > 0) {
       dims = INTEGER(getAttrib(x_testExpr, R_DimSymbol));
-      if (dims == NULL || length(getAttrib(x_testExpr, R_DimSymbol)) != 2) error("x_test must be a matrix.");
-      if (dims[1] != (int) (numPredictors + 1)) error("num columns of x_test must be equal to that of the column-combined z vector and x matrix.");
+      if (dims == NULL || XLENGTH(getAttrib(x_testExpr, R_DimSymbol)) != 2) error("x_test must be a matrix");
+      if (static_cast<size_t>(dims[1]) != numPredictors + 1) error("num columns of x_test must be equal to that of the column-combined z vector and x matrix");
 
-      numTestObservations = dims[0];
+      numTestObservations = static_cast<size_t>(dims[0]);
       x_test = REAL(x_testExpr);
     }
     
-    if (!isReal(zetaY)) error("zetaY must be of type real.");
-    if (!isReal(zetaZ)) error("zetaZ must be of type real.");
+    if (!isReal(zetaY)) error("zetaY must be of type real");
+    if (!isReal(zetaZ)) error("zetaZ must be of type real");
     
-    size_t numZetaY = length(zetaY);
-    size_t numZetaZ = length(zetaZ);
+    size_t numZetaY = static_cast<size_t>(XLENGTH(zetaY));
+    size_t numZetaZ = static_cast<size_t>(XLENGTH(zetaZ));
     
-    if (!isString(estimandExpr)) error("estimand must be of type char.");
+    if (!isString(estimandExpr)) error("estimand must be of type char");
     
     // turn estimand name into enum
     const char* estimandName = CHAR(STRING_ELT(estimandExpr, 0));
@@ -228,34 +230,34 @@ namespace {
     } else if (strncmp(estimandName, "ATC", 4) == 0) {
       estimand = cibart::ATC;
     } else {
-      error("Illegal estimand type: %s. Must be 'ATE', 'ATT', or 'ATC'.", estimandName);
+      error("Illegal estimand type: %s. Must be 'ATE', 'ATT', or 'ATC'", estimandName);
     }
     
     TreatmentModelType treatmentModelType;
     cibart::TreatmentModel* treatmentModel = createTreatmentModel(treatmentModelExpr, &treatmentModelType);
     
     SEXP sensParameterExpr = getListElement(sensControl, "n.sim");
-    if (sensParameterExpr == R_NilValue) error("n.sim must be specified in iteration control.");
-    size_t numSimsPerCell = INTEGER(sensParameterExpr)[0];
+    if (sensParameterExpr == R_NilValue) error("n.sim must be specified in iteration control");
+    size_t numSimsPerCell = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
     sensParameterExpr = getListElement(sensControl, "n.burn.init");
-    if (sensParameterExpr == R_NilValue) error("n.burn.init must be specified in iteration control.");
-    size_t numInitialBurnIn = INTEGER(sensParameterExpr)[0];
+    if (sensParameterExpr == R_NilValue) error("n.burn.init must be specified in iteration control");
+    size_t numInitialBurnIn = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
     sensParameterExpr = getListElement(sensControl, "n.burn.cell");
-    if (sensParameterExpr == R_NilValue) error("n.burn.cell must be specified in iteration control.");
-    size_t numCellSwitchBurnIn = INTEGER(sensParameterExpr)[0];
+    if (sensParameterExpr == R_NilValue) error("n.burn.cell must be specified in iteration control");
+    size_t numCellSwitchBurnIn = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
     sensParameterExpr = getListElement(sensControl, "n.thin");
-    if (sensParameterExpr == R_NilValue) error("n.thin must be specified in iteration control.");
-    size_t numTreeSamplesToThin = INTEGER(sensParameterExpr)[0];
+    if (sensParameterExpr == R_NilValue) error("n.thin must be specified in iteration control");
+    size_t numTreeSamplesToThin = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
     sensParameterExpr = getListElement(sensControl, "n.thread");
-    if (sensParameterExpr == R_NilValue) error("n.thread must be specified in iteration control.");
-    size_t numThreads = INTEGER(sensParameterExpr)[0];
+    if (sensParameterExpr == R_NilValue) error("n.thread must be specified in iteration control");
+    size_t numThreads = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
-    if (!isLogical(verboseExpr)) error("verbose must be of type logical.");
-    if (length(verboseExpr) == 0) error("verbose must be of length at least 1.");
+    if (!isLogical(verboseExpr)) error("verbose must be of type logical");
+    if (length(verboseExpr) == 0) error("verbose must be of length at least 1");
     bool verbose = LOGICAL(verboseExpr)[0] != 0;
      
     
@@ -263,23 +265,23 @@ namespace {
     SEXP dimsExpr, namesExpr;
     
     SEXP result = PROTECT(allocVector(VECSXP, 2));
-    SET_VECTOR_ELT(result, 0, allocVector(REALSXP, numZetaY * numZetaZ * numSimsPerCell));
-    SET_VECTOR_ELT(result, 1, allocVector(REALSXP, numZetaY * numZetaZ));
+    SET_VECTOR_ELT(result, 0, allocVector(REALSXP, static_cast<R_xlen_t>(numZetaY * numZetaZ * numSimsPerCell)));
+    SET_VECTOR_ELT(result, 1, allocVector(REALSXP, static_cast<R_xlen_t>(numZetaY * numZetaZ)));
     
     SEXP fittedCoefficients = VECTOR_ELT(result, 0);
     dimsExpr = PROTECT(dimsExpr = allocVector(INTSXP, 3));
     dims = INTEGER(dimsExpr);
-    dims[0] = numSimsPerCell;
-    dims[1] = numZetaY;
-    dims[2] = numZetaZ;
+    dims[0] = static_cast<int>(numSimsPerCell);
+    dims[1] = static_cast<int>(numZetaY);
+    dims[2] = static_cast<int>(numZetaZ);
     setAttrib(fittedCoefficients, R_DimSymbol, dimsExpr);
 
     
     SEXP standardErrors = VECTOR_ELT(result, 1);
     dimsExpr = PROTECT(dimsExpr = allocVector(INTSXP, 2));
     dims = INTEGER(dimsExpr);
-    dims[0] = numZetaY;
-    dims[1] = numZetaZ;
+    dims[0] = static_cast<int>(numZetaY);
+    dims[1] = static_cast<int>(numZetaZ);
     setAttrib(standardErrors, R_DimSymbol, dimsExpr);
         
     
@@ -334,8 +336,8 @@ namespace {
     PROTECT(resultExpr);
     int* result = INTEGER(resultExpr);
     
-    result[0] = numPhyiscalProcessors == 0 ? NA_INTEGER : numPhyiscalProcessors;
-    result[1] = numLogicalProcessors  == 0 ? NA_INTEGER : numLogicalProcessors;
+    result[0] = numPhyiscalProcessors == 0 ? NA_INTEGER : static_cast<int>(numPhyiscalProcessors);
+    result[1] = numLogicalProcessors  == 0 ? NA_INTEGER : static_cast<int>(numLogicalProcessors);
     UNPROTECT(1);
     
     return resultExpr;
