@@ -31,30 +31,31 @@ generateData <- function() {
 
 test_that("cibart works with various treatmentModel specification methods", {
   data <- generateData()
-  control <- cibartControl(5L, 20L, n.thin = 3L, n.thread = 1L)
+  control <- treatSens:::cibartControl(5L, 20L, n.thin = 3L, n.thread = 1L)
   
-  result <- tryCatch(cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
-                     probit(family = "normal"), control), error = function(e) e)
+  result <- tryCatch(treatSens:::cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
+                                        probit(family = "normal"), control), error = function(e) e)
   expect_is(result, "list")
   
-  result <- tryCatch(cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
-                     probit, control), error = function(e) e)
+  result <- tryCatch(treatSens:::cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
+                                        probit, control), error = function(e) e)
   expect_is(result, "list")
   
-  result <- tryCatch(cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
-                     "probit(family = 'normal')", control), error = function(e) e)
+  result <- tryCatch(treatSens:::cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
+                                        "probit(family = 'normal')", control), error = function(e) e)
   expect_is(result, "list")
   
-  result <- tryCatch(cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
-                     "probit", control), error = function(e) e)
+  result <- tryCatch(treatSens:::cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
+                                        "probit", control), error = function(e) e)
   expect_is(result, "list")
   
-  trtModelCall <- quote(treatSens::probit(family = "normal"))
-  trtModelCall[[1]][[1]] <- as.symbol(":::")
-  trtModel <- eval(trtModelCall)
-  result <- tryCatch(cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
-                     trtModel, control), error = function(e) e)
+  trtModel <- treatSens:::probit(family = "normal") 
+  result <- tryCatch(treatSens:::cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
+                                        trtModel, control), error = function(e) e)
   expect_is(result, "list")
+  
+  expect_error(treatSens:::cibart(data$y, data$z, data$x, data$x.test, data$zeta.y, data$zeta.z, data$theta, "ATE",
+                                  notAnObject, control))
 })
   
 rm(generateData)

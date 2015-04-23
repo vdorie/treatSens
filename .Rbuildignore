@@ -1,6 +1,6 @@
 \.git$
 \.gitignore$
-data/lalonde\.RData
+^inst/extdata/lalonde\.RData$
 ^README\.md$
-^test\.treatSens\.R$
+^tests/test\.treatSens\.R$
 ^R/LMER_sens\.R$

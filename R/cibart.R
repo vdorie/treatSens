@@ -13,6 +13,33 @@ cibartControl <- function(n.sim = 20L,
             class = c("cibartControl"))
 }
 
+## This assumes that it is 2 frames away from the user, i.e. it has been called by something
+## like treatSens.BART or cibart, which has been called (or evaluated such that) in the user's
+## environment. If you call it directly, you shouldn't.
+evaluateTreatmentModelArgument <- function(arg)
+{
+  isAnyOf <- function(x, classes) any(sapply(classes, function(class) is(x, class)))
+  
+  trtCall <- if (!is.null(arg)) arg else formals(cibart)$treatmentModel
+  
+  if (is.character(trtCall)) trtCall <- parse(text = trtCall)[[1]]
+  if (is.call(trtCall)) {
+    result <- eval(trtCall, getNamespace("treatSens"), parent.frame(2))
+  } else if (is.list(trtCall) && isAnyOf(trtCall, c("probitTreatmentModel", "probitEMTreatmentModel", "bartTreatmentModel"))) {
+    result <- trtCall
+  } else {
+    ## could be that an object was specified, could be just "probit" or "bart" which should be
+    ## evaluated in namespace; check the latter first
+    result <- tryCatch(eval(call(as.character(trtCall)), getNamespace("treatSens"), parent.frame(2)), error = function(e) e)
+    if (is(result, "error"))
+      result <- tryCatch(get(as.character(trtCall), parent.frame(2)), error = function(e) e)
+    
+    if (is(result, "error") || !isAnyOf(result, c("probitTreatmentModel", "probitEMTreatmentModel", "bartTreatmentModel")))
+      stop("treatment model of unrecognized type")
+  }
+  result
+}
+
 cibart <- function(Y, Z, X, X.test,
                    zetaY, zetaZ, theta,
                    est.type, treatmentModel = probitEM(),
@@ -22,28 +49,8 @@ cibart <- function(Y, Z, X, X.test,
   
   if (!is(control, "cibartControl")) stop("control must be of class cibartControl; call cibartControl() to create");
 
-  treatmentCall <-
-    if (!missing(treatmentModel))
-      matchedCall$treatmentModel else formals(cibart)$treatmentModel
-
-  if (is.character(treatmentCall)) treatmentCall <- parse(text = treatmentCall)[[1]]
-  
-  if (is.call(treatmentCall)) {
-    treatmentModel <- eval(treatmentCall, getNamespace("treatSens"), parent.frame(1))
-  } else {
-    ## could be that an object was specified, could be just "probit" which should be
-    ## evaluated in namespace; check the latter first
-    callResult <- tryCatch(eval(call(as.character(treatmentCall)), getNamespace("treatSens"), parent.frame(1)), error = function(e) e)
-    if (!is(callResult, "error")) {
-      treatmentModel <- callResult
-    } else if (!is(treatmentModel, "probitTreatmentModel") &&
-               !is(treatmentModel, "probitEMTreatmentModel") &&
-               !is(treatmentModel, "bartTreatmentModel"))
-    {
-      stop("treatment model of unrecognized type")
-    }
-  }
-  
+  treatmentModel <- evaluateTreatmentModelArgument(matchedCall$treatmentModel)
+    
   if (is(treatmentModel, "probitTreatmentModel") && !identical(treatmentModel$family, "flat")) {
     treatmentModel$scale <- rep_len(treatmentModel$scale, ncol(X) + 1L)
   }

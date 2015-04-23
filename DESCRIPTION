@@ -22,7 +22,6 @@ Suggests:
 LinkingTo:
   dbarts (>= 0.8-5)
 Description: Utilities to investigate sensitivity to unmeasured confounding in parametric models with either binary or continuous treatment.
-LazyData: yes
 NeedsCompilation: yes
 Biarch: yes
 License: GPL (>= 2)
