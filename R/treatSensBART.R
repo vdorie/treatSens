@@ -126,15 +126,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   ## fit null model for treatment models & get residuals
   n.obs <- length(Y)
   
-  treatmentCall <- matchedCall$trt.model
-  if (is.null(treatmentCall)) treatmentCall <- formals(treatSens.BART)$treatmentModel
-  if (is.character(treatmentCall)) treatmentCall <- parse(text = treatmentCall)
-  if (is.call(treatmentCall)) {
-    trt.model <- eval(treatmentCall, getNamespace("treatSens"), parent.frame(1))
-  } else {
-    callResult <- tryCatch(eval(call(as.character(treatmentCall)), getNamespace("treatSens"), parent.frame(1)), error = function(e) e)
-    if (!is(callResult, "error")) trt.model <- callResult
-  }
+  trt.model <- evaluateTreatmentModelArgument(matchedCall$trt.model)
   
   if (is(trt.model, "bartTreatmentModel")) {
     if (!is.null(X)) {

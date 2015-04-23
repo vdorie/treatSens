@@ -1,4 +1,4 @@
-data(lalonde)
+load(file.path(find.package("treatSens"), "extdata", "lalonde.RData"))
 
 re74per <- with(lalonde,re74/1000)
 re75per <- with(lalonde,re75/1000)
