@@ -4,11 +4,11 @@
 AC_PREREQ(2.61)
 AC_INIT(treatSens, 1.2, vjd4@nyu.edu)
 AC_CONFIG_SRCDIR([src/R_interface.cpp])
-AC_CONFIG_AUX_DIR([build-aux])
+AC_CONFIG_AUX_DIR([tools/build-aux])
 AC_CONFIG_HEADER([src/config.hpp])
 AC_CONFIG_HEADER([src/external/config.h])
 
-m4_include([m4/m4_ax_pthread.m4])
+m4_include([tools/m4/m4_ax_pthread.m4])
 
 # Checks for programs.
 : ${R_HOME=`R RHOME`}
