@@ -3,3 +3,4 @@
 data/lalonde\.RData
 ^README\.md$
 ^test\.treatSens\.R$
+^R/LMER_sens\.R$
