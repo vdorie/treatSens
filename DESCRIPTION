@@ -14,7 +14,7 @@ Imports:
   graphics,
   grDevices,
   lme4,
-  dbarts (>= 0.8-5),
+  dbarts (>= 0.8-5)
 Suggests:
   doParallel,
   foreach,
