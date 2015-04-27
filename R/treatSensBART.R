@@ -1,6 +1,8 @@
 getWeights.BART <- function(Z, est.type, trim.wt, null.trt)
 {
   n.obs <- length(Z)
+  nt <- sum(Z==1)
+  nc <- sum(Z==0)
   
   if (identical(est.type, "ATE")) {
     wts <- 1/null.trt$fitted
