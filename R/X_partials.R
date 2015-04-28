@@ -62,7 +62,7 @@ X.partials.LMER <- function(Y, Z, X, resp.family, trt.family) {
 		return(NULL)
 	if(nX == 1) {
 		XcorZ = cor(X, Z-mean(Z))
-		fit.resp <- bart(y.train = Y, x.train = Z, verbose = F)
+		fit.resp <- dbarts::bart(y.train = Y, x.train = Z, verbose = F)
 		Yr <- Y-fit.resp$yhat.train.mean
 		XcorY <- cor(X, Yr)
 	}else{

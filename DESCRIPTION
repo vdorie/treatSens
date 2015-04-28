@@ -1,13 +1,29 @@
 Package: treatSens
-Type: Package
+Version: 1.2
+Date: 2015-04-28
 Title: Sensitivity Analysis for Causal Inference
-Version: 1.1
-Date: 2015-04-20
-Author: Nicole Bohme Carnegie, Masataka Harada, Jennifer Hill
-Maintainer: "Nicole Bohme Carnegie" <carnegin@uwm.edu>
-Depends: R (>= 3.1.0), lme4, cibart, dbarts
-Suggests: doParallel, foreach
+Authors@R: c(person("Nicole Bohme Carnegie", "Developer",              role = c("aut", "cre"), email = "carnegin@uwm.edu"),
+             person("Masataka Harada",       "Developer",              role = "aut",           email = "masatakaharada@gmail.com"),
+             person("Vincent Dorie",         "Developer",              role = "aut",           email = "vjd4@nyu.edu"),
+             person("Jennifer Hill",         "Principal Investigator", role = "ctb",           email = "jennifer.hill@nyu.edu"))
+Depends:
+  R (>= 3.1-0)
+Imports:
+  methods,
+  stats,
+  graphics,
+  grDevices,
+  lme4,
+  dbarts (>= 0.8-5)
+Suggests:
+  doParallel,
+  foreach,
+  testthat (>= 0.9-0)
+LinkingTo:
+  dbarts (>= 0.8-5)
 Description: Utilities to investigate sensitivity to unmeasured confounding in parametric models with either binary or continuous treatment.
-License: GPL-2
-LazyLoad: yes
-LazyData: yes
+NeedsCompilation: yes
+Biarch: yes
+License: GPL (>= 2)
+URL: https://github.com/vdorie/causalSA
+BugReports: https://github.com/vdorie/causalSA/issues

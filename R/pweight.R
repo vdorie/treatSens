@@ -10,7 +10,7 @@ pweight <- function(Z,X,r,wt,program=3){ # Z:treat, X:X, r:residual (from (g)lm 
   # create blank matrices
   XWeeWX = XWX = matrix(0,k,k)
   
-  # calculate meat of sandwitch
+  # calculate meat of sandwich
   
   if (program==3){
     r.wt = r*wt
@@ -40,7 +40,7 @@ pweight <- function(Z,X,r,wt,program=3){ # Z:treat, X:X, r:residual (from (g)lm 
     XWeeWX = matrix(as.numeric(apply(apply(r*wt*ZX1,1,tcrossprod),1,sum)),k,k)
   }
   
-  # calculate buns of sandwitch
+  # calculate buns of sandwich
   XWX = t(ZX1)%*%diag(wt,N,N)%*%ZX1
   inv.XWX = solve(XWX)
   
