@@ -188,12 +188,12 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
 #################
 
 warningsBART <- function(formula,     #formula: assume treatment is 1st term on rhs
-                     grid.dim,    #final dimensions of output grid
-                     verbose,
-                     zetay.range,  	#custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
-                     zetaz.range,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
-                     weights,     #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
-                     data) {
+                         grid.dim,    #final dimensions of output grid
+                         verbose,
+                         zetay.range,  	#custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
+                         zetaz.range,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
+                         weights,     #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
+                         data) {
   
   if(is.null(data)) stop(paste("Either a matrix or data.frame object must be specified in data field."))
   

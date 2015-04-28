@@ -232,7 +232,6 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     if(dp & fe){
       cl<-parallel::makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
       doParallel::registerDoParallel(cl)
-      h = NULL #included for R CMD check
     }else{
       core = NULL
     } 
@@ -240,6 +239,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
 
   if(!is.null(core) & U.model=="binomial"){
     ngrid = grid.dim[2]*grid.dim[1]
+    h = NULL #included for R CMD check
     out.foreach <- foreach::"%dopar%"(foreach::foreach(h=ngrid:1,.combine=cbind,.verbose=F),{
       j=grid.dim[1]-(h-1)%%grid.dim[1]
       i=grid.dim[2]-((h-1)-(h-1)%%grid.dim[1])/grid.dim[1]
@@ -334,12 +334,12 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
                    tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-                   Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)]),
+                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
                    varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z, XpartCor = Xpartials)
     class(result) <- "sensitivity"
   }
   
-  if(!is.null(core)) parallel::stopCluster(cl)   # Stop using multicore.
+  if(!is.null(core) && dp) parallel::stopCluster(cl)   # Stop using multicore.
   
   return(result)
 }

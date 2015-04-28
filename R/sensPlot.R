@@ -19,7 +19,7 @@ sensPlot = function(x,
   #note in help: if contours are too rough, up nsim in sens fn
   if(class(x) == "sensitivity"){  
     sensPlotMain(x, contour.levels, col.zero, lty.zero, col.insig, lty.insig, data.line, X.pch, signif.level, labcex, limit.Xplot, txtlab, which.txtlab,...)
-  }else if(class(x) == "sensitivity.combo"){
+  }else if(class(x) == "sensitivityCombo"){
     sensPlotCombo(x, contour.levels, col.zero, lty.zero, col.insig, lty.insig, data.line, X.pch, signif.level, labcex, limit.Xplot, txtlab, which.txtlab,...)
   }else{
     stop("x must be of class sensitivity or sensitivity.combo")
@@ -82,7 +82,7 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   
   dimnames(taus)[[1]] = Zcors
   dimnames(taus)[[2]] = Ycors
-  taus <<- taus
+  taus <<- taus ## is this right? it potentially changes the value of tau in a parent environment
   dimnames(se.taus)[[1]] = Zcors
   dimnames(se.taus)[[2]] = Ycors
   se.taus <<- se.taus
@@ -241,24 +241,53 @@ sensPlotCombo = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.i
   }  
   
   taus = x$tau
-  taus[Zcors==0,] = null.tau
-  taus[,Ycors==0] = null.tau
+  taus[Zcors==0] = null.tau
+  taus[Ycors==0] = null.tau
   taus.est = tapply(taus, list(Zcors, Ycors), mean, na.rm = T)
   W = tapply(x$se.tau^2, list(Zcors, Ycors), mean, na.rm = T)
   K = length(W)/length(Ycors)
   B = tapply(x$tau, list(Zcors, Ycors), sd, na.rm = T)^2
-  se.est = t(sqrt(W+(1+1/K)*B))
+  se.est = sqrt(W+(1+1/K)*B)
   taus = taus.est
   se.taus = se.est
   
-######modified to here for combo object (not tested yet)  
-  dimnames(taus)[[1]] = Zcors
-  dimnames(taus)[[2]] = Ycors
   taus <<- taus
-  dimnames(se.taus)[[1]] = Zcors
-  dimnames(se.taus)[[2]] = Ycors
   se.taus <<- se.taus
-  
+  Zcors = as.numeric(dimnames(taus)[[1]])
+  Ycors = as.numeric(dimnames(taus)[[2]])
+
+  if(sum(is.na(taus)) > 0){
+    empty.cells = which(is.na(taus))
+    colno = empty.cells%/%dim(taus)[1]+1
+    ylow = Ycors[colno-1]
+    ymis = Ycors[colno]
+    yhigh = Ycors[colno+1]
+    rowno = empty.cells%%dim(taus)[1]
+    zlow = Zcors[rowno-1]
+    zmis = Zcors[rowno]
+    zhigh = Zcors[rowno+1]
+    for(i in 1:length(empty.cells)){
+      if(rowno[i] %in% 1:length(Zcors)){
+        zinterp = (zhigh[i]-zmis[i])/(zhigh[i]-zlow[i])*taus[rowno[i]-1, colno[i]]+(zmis[i]-zlow[i])/(zhigh[i]-zlow[i])*taus[rowno[i]+1, colno[i]]
+        #zseinterp = (zhigh[i]-zmis[i])/(zhigh[i]-zlow[i])*se.taus[rowno[i]-1, colno[i]]+(zmis[i]-zlow[i])/(zhigh[i]-zlow[i])*se.taus[rowno[i]+1, colno[i]]
+      }else{
+        zinterp <- zseinterp <- NA
+      }
+      
+      if(colno[i] %in% 1:length(Ycors)){
+        yinterp = (yhigh[i]-ymis[i])/(yhigh[i]-ylow[i])*taus[rowno[i], colno[i]-1]+(ymis[i]-ylow[i])/(yhigh[i]-ylow[i])*taus[rowno[i], colno[i]+1]
+        #yseinterp = (yhigh[i]-ymis[i])/(yhigh[i]-ylow[i])*se.taus[rowno[i], colno[i]-1]+(ymis[i]-ylow[i])/(yhigh[i]-ylow[i])*se.taus[rowno[i], colno[i]+1]
+      }else{
+        yinterp <- yseinterp <- NA
+      }
+      interp = mean(c(zinterp,yinterp), na.rm = T)
+      taus[rowno[i],colno[i]] = interp
+      
+      #seinterp = mean(c(zseinterp,yseinterp), na.rm = T)
+      #se.taus[rowno[i],colno[i]] = seinterp
+    }
+    warning("Standard errors not interpolated; N.S. line will be fragmented")
+  }
   if(is.null(contour.levels)){
     exTau = c(taus[dim(taus)[1], dim(taus)[2]], taus[1,dim(taus)[2]]) #extreme values of tau at right end
     clevels = round(seq(exTau[2]*.8, exTau[1]*.8, length.out = 14), 2) #vals at which contours are drawn
@@ -316,7 +345,7 @@ sensPlotCombo = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.i
   contour(Zcors, Ycors, taus, levels = 0, lwd = 2,
           add = T, col = col.zero,lty = lty.zero,labcex = labcex,...)
   
-  contour(as.numeric(dimnames(x$sp.z)[[2]]), as.numeric(dimnames(x$sp.y)[[1]]), taus.est/se.est, labels = "N.S.",
+  contour(Zcors, Ycors, taus/se.taus, labels = "N.S.",
           levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = col.insig,
           lty = lty.insig, labcex = labcex, lwd = 2,...)
   
