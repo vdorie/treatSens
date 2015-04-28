@@ -5,6 +5,9 @@ export(treatSens.BART)
 
 S3method(summary, sensitivity)
 S3method(plot, sensitivity)
+S3method(summary, sensitivityCombo)
+S3method(plot, sensitivity)
+S3method(plot, sensitivityCombo)
 S3method(print, sensitivity)
 
 

@@ -252,7 +252,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   zetaY <- range$zetaY
   grid.dim <- c(length(zetaZ), length(zetaY))
   
-  sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- resp.s2 <- trt.s2 <-
+  sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- 
     array(NA, dim = c(grid.dim[2], grid.dim[1], nsim), dimnames = list(round(zetaY, 3), round(zetaZ, 3), NULL))
   
   #######################
@@ -286,7 +286,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
     result <- list(model.type = "BART", sensParam = sensParam, tau = sens.coef, se.tau = sens.se, 
                    sp.z = zeta.z, sp.y = zeta.y, 
                    se.spz = zz.se, se.spy = zy.se, 
-                   Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
+                   Y = Y, Z = Z, X = X, sig2.resp = NULL, sig2.trt = NULL,
                    tau0 = tau0, se.tau0 = se.tau0,
                    Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
                    varnames = all.vars(formula), var_ytilde = v_Y, var_ztilde = v_Z)
@@ -295,10 +295,10 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
     result <- list(model.type = "BART", sensParam = sensParam, tau = sens.coef, se.tau = sens.se, 
                    sp.z = zeta.z, sp.y = zeta.y, 
                    se.spz = zz.se, se.spy = zy.se, 
-                   Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
+                   Y = Y, Z = Z, sig2.resp = NULL, sig2.trt = NULL,
                    tau0 = tau0, se.tau0 = se.tau0,
                    Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
-                   varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z, XpartCor = NULL)
+                   varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z)
     class(result) <- "sensitivity"
   }
   
