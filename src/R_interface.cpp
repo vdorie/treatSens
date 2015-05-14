@@ -336,8 +336,8 @@ namespace {
     PROTECT(resultExpr);
     int* result = INTEGER(resultExpr);
     
-    result[0] = numPhyiscalProcessors == 0 ? NA_INTEGER : static_cast<int>(numPhyiscalProcessors);
-    result[1] = numLogicalProcessors  == 0 ? NA_INTEGER : static_cast<int>(numLogicalProcessors);
+    result[0] = numPhyiscalProcessors <= 0 ? NA_INTEGER : static_cast<int>(numPhyiscalProcessors);
+    result[1] = numLogicalProcessors  <= 0 ? NA_INTEGER : static_cast<int>(numLogicalProcessors);
     UNPROTECT(1);
     
     return resultExpr;
