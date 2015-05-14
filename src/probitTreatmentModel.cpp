@@ -9,6 +9,8 @@
 
 // #include <external/io.h>
 
+using std::size_t;
+
 namespace {
   struct Scratch;
   

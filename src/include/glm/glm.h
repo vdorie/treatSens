@@ -2,11 +2,11 @@
 #define GLM_GLM_H
 
 #ifdef __cplusplus
-#include <cstddef>
-#define glm_size_t std::size_t
+#  include <cstddef>
+#  define glm_size_t std::size_t
 #else
-#include <stddef.h>
-#define glm_size_t size_t
+#  include <stddef.h>
+#  define glm_size_t size_t
 #endif
 
 #include <stdint.h>  // uint32_t
@@ -46,7 +46,7 @@ extern "C" {
                                      glm_family_t family, glm_link_t link, uint32_t maxIterations,
                                      double* scratch);
   
-  size_t glm_getDoubleScratchSize(glm_size_t numObs, glm_size_t numCoefs);
+  glm_size_t glm_getDoubleScratchSize(glm_size_t numObs, glm_size_t numCoefs);
   
 #ifdef __cplusplus
 }

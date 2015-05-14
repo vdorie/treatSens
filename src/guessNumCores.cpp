@@ -24,8 +24,8 @@ using std::size_t;
 typedef BOOL (WINAPI* glpiFunction)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
 
 namespace cibart {
-  void guessNumCores(uint32_t* numPhyiscalProcessorsPtr, uint32_t* numLogicalProcessorsPtr) {
-    *numPhyiscalProcessorsPtr = 0;
+  void guessNumCores(uint32_t* numPhysicalProcessorsPtr, uint32_t* numLogicalProcessorsPtr) {
+    *numPhysicalProcessorsPtr = 0;
     *numLogicalProcessorsPtr  = 0;
     
     glpiFunction getLogicalProcessorInformation = (glpiFunction) GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
@@ -56,7 +56,7 @@ namespace cibart {
     for (size_t i = 0; i < numElements; ++i) {
       if (buffer[i].Relationship != RelationProcessorCore) continue;
       
-      *numPhyiscalProcessorsPtr += 1;
+      *numPhysicalProcessorsPtr += 1;
       
       if (buffer[i].ProcessorCore.Flags == 1) {
         ULONG mask = 0x1;
@@ -77,8 +77,8 @@ namespace cibart {
 #  include <sys/sysctl.h>
 
 namespace cibart {
-  void guessNumCores(uint32_t* numPhyiscalProcessorsPtr, uint32_t* numLogicalProcessorsPtr) {
-    *numPhyiscalProcessorsPtr = 0;
+  void guessNumCores(uint32_t* numPhysicalProcessorsPtr, uint32_t* numLogicalProcessorsPtr) {
+    *numPhysicalProcessorsPtr = 0;
     *numLogicalProcessorsPtr  = 0;
     
     int query[2];
@@ -88,7 +88,7 @@ namespace cibart {
     
     // these have apparently been around since 2003 so I'm not sure when/if they could fail
     if (sysctlnametomib("hw.physicalcpu", query, &queryLength) != -1) {
-      sysctl(query, queryLength, numPhyiscalProcessorsPtr, &bufferLength, NULL, 0);
+      sysctl(query, queryLength, numPhysicalProcessorsPtr, &bufferLength, NULL, 0);
     }
     
     queryLength = 2;
@@ -379,8 +379,8 @@ namespace cibart {
 
 
 namespace cibart {
-  void guessNumCores(uint32_t* numPhyiscalProcessorsPtr, uint32_t* numLogicalProcessorsPtr) {
-    *numPhyiscalProcessorsPtr = 0;
+  void guessNumCores(uint32_t* numPhysicalProcessorsPtr, uint32_t* numLogicalProcessorsPtr) {
+    *numPhysicalProcessorsPtr = 0;
     *numLogicalProcessorsPtr  = 0;
     
     
@@ -389,9 +389,9 @@ namespace cibart {
     if (*numLogicalProcessorsPtr < 1) {
 #    ifdef _SC_NPROCESSORS_CONF
       *numLogicalProcessorsPtr = sysconf(_SC_NPROCESSORS_CONF);
-      if (result < 1) result = -1;
+      if (*numLogicalProcessorsPtr < 1) *numLogicalProcessorsPtr = -1;
 #    else
-      result = -1;
+      *numLogicalProcessorsPtr = -1;
 #    endif
     }
     

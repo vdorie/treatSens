@@ -124,8 +124,13 @@ namespace {
   void estimateTreatmentEffect(const Control& control, const Data& data,
                                const double* trainingSamples, const double* testSamples, double* estimates);
   void lookupBARTFunctions(Control& control);
-  void sensitivityAnalysisTask(void* v_data);
-  
+}
+
+extern "C" {
+  static void sensitivityAnalysisTask(void* v_data);
+}
+
+namespace {
 #ifdef HAVE_GETTIMEOFDAY
   double subtractTimes(struct timeval end, struct timeval start);
 #else
@@ -320,8 +325,10 @@ namespace {
     Scratch& scratch;
     double zetaY, zetaZ;
   };
-  
-  void sensitivityAnalysisTask(void* v_data)
+}
+
+extern "C" {
+  static void sensitivityAnalysisTask(void* v_data)
   {
     ThreadData& threadData(*static_cast<ThreadData*>(v_data));
     
@@ -429,7 +436,9 @@ namespace {
     delete [] maxNumCuts;
     delete [] variableTypes;
   }
-  
+}
+
+namespace {
   // this gets called after BART has new samples for us
   void bartCallbackFunction(void* v_callbackData, dbarts::BARTFit& fit, bool,
                             const double* trainingSamples, const double*, double sigma)
@@ -603,10 +612,10 @@ namespace {
     }
   }
   
-  Data::Data(const double* y, const double* z, const double* x,
-             size_t numObservations, size_t numPredictors, const double* x_test,
+  Data::Data(const double* y, const double* _z, const double* _x,
+             size_t _numObservations, size_t _numPredictors, const double* x_test,
              size_t numTestObservations) :
-    y(y), z(z), x(x), numObservations(numObservations), numPredictors(numPredictors),
+    y(y), z(_z), x(_x), numObservations(_numObservations), numPredictors(_numPredictors),
     x_test(x_test), numTestObservations(numTestObservations),
     x_train(NULL), bart_x_train(NULL), numBartPredictors(numPredictors + 1)
   {
