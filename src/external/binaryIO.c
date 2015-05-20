@@ -3,6 +3,9 @@
 #include <sys/stat.h> // file permissions
 #include <fcntl.h>    // open
 #include <unistd.h>   // close, write, sysconf
+#if !defined(__STRICT_ANSI__) || (__STDC_VERSION__ >= 199901L)
+#  define __USE_XOPEN2K 1 // gets posix_memalign when strict ANSI
+#endif
 #include <stdlib.h>   // malloc, posix_memalign
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>   // __mingw_aligned_malloc
@@ -12,7 +15,7 @@
 #include <limits.h>
 
 #ifdef _WIN32
-#  define WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN 1
 #  include <windows.h>
 #endif
 
