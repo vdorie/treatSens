@@ -25,6 +25,4 @@ Steps to install from source:
 
     `install_github("vdorie/treatSens")`
 
-Prior dependencies may have to be installed separately. A simple way to do this is to run the command:
-
-    `install.packages(c("lme4", "dbarts"))`
+Prior dependencies may have to be installed separately. A simple way to do this is to run the command: `install.packages(c("lme4", "dbarts"))`.
