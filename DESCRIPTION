@@ -1,6 +1,6 @@
 Package: treatSens
 Version: 1.2
-Date: 2015-04-28
+Date: 2015-05-31
 Title: Sensitivity Analysis for Causal Inference
 Authors@R: c(person("Nicole Bohme Carnegie", "Developer",              role = c("aut", "cre"), email = "carnegin@uwm.edu"),
              person("Masataka Harada",       "Developer",              role = "aut",           email = "masatakaharada@gmail.com"),
@@ -25,5 +25,5 @@ Description: Utilities to investigate sensitivity to unmeasured confounding in p
 NeedsCompilation: yes
 Biarch: yes
 License: GPL (>= 2)
-URL: https://github.com/vdorie/causalSA
-BugReports: https://github.com/vdorie/causalSA/issues
+URL: https://github.com/vdorie/treatSens
+BugReports: https://github.com/vdorie/treatSens/issues
