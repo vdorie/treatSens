@@ -65,7 +65,7 @@ namespace {
   void* createScratch(cibart::TreatmentModel* restrict modelPtr, ext_rng* restrict generator, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
     Scratch* scratch = new Scratch;
-    cibart::ProbitTreatmentModel& model(*((cibart::ProbitTreatmentModel*) modelPtr));
+    cibart::ProbitTreatmentModel& model(*static_cast<cibart::ProbitTreatmentModel*>(modelPtr));
     
     scratch->generator = generator;
     
@@ -106,7 +106,7 @@ namespace {
     double* xCrossproduct = scratch->posteriorCovarianceInverseRightFactor;
     
     if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
-      cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+      const cibart::ProbitStudentTPrior& prior(*static_cast<const cibart::ProbitStudentTPrior*>(model.prior));
       
       // this only needs to be cached for T priors, and is otherwise computed where the factor goes
       scratch->xCrossproduct = new double[numPredictors * numPredictors];
@@ -124,7 +124,7 @@ namespace {
   }
   
   void destroyScratch(cibart::TreatmentModel*, void* scratchPtr) {
-    Scratch* scratch = (Scratch*) scratchPtr;
+    Scratch* scratch = static_cast<Scratch*>(scratchPtr);
     
     if (scratch != NULL) {
       delete [] scratch->xCrossproduct;
@@ -137,22 +137,22 @@ namespace {
   
   void updateParameters(cibart::TreatmentModel* restrict modelPtr, void* restrict scratchPtr, const double* restrict offset)
   {
-    cibart::ProbitTreatmentModel& model(*((cibart::ProbitTreatmentModel*) modelPtr));
-    Scratch& restrict scratch(*(Scratch*) scratchPtr);
+    cibart::ProbitTreatmentModel& model(*static_cast<cibart::ProbitTreatmentModel*>(modelPtr));
+    Scratch& restrict scratch(*static_cast<Scratch*>(scratchPtr));
     
     sampleCoefficients(model, scratch, offset);
   }
   
   void updateLatentVariables(cibart::TreatmentModel* restrict, void* restrict scratchPtr, const double* restrict offset)
   {
-    Scratch& restrict scratch(*(Scratch*) scratchPtr);
+    Scratch& restrict scratch(*static_cast<Scratch*>(scratchPtr));
     
     sampleLatents(scratch, offset);
   }
   
   void getConditionalProbabilities(cibart::TreatmentModel* restrict, void* restrict scratchPtr, double zetaZ, double* restrict probZForU0, double* restrict probZForU1)
   {
-    Scratch& restrict scratch(*(Scratch*) scratchPtr);
+    Scratch& restrict scratch(*static_cast<Scratch*>(scratchPtr));
     
     double* restrict& temp(probZForU0);
     ext_leftMultiplyMatrixAndVector(scratch.x, scratch.numObservations, scratch.numPredictors,
@@ -170,7 +170,7 @@ namespace {
   void sampleCoefficients(cibart::ProbitTreatmentModel& restrict model, Scratch& restrict scratch, const double* restrict offset)
   {
     if (model.priorType == cibart::PROBIT_PRIOR_STUDENT_T) {
-      cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+      const cibart::ProbitStudentTPrior& prior(*static_cast<const cibart::ProbitStudentTPrior*>(model.prior));
       
       const double* restrict scales = prior.scale;
       // sample sigma_sq first:
@@ -179,7 +179,7 @@ namespace {
         sigmaScale += ((scratch.coefficients[i] / scales[i]) * (scratch.coefficients[i] / scales[i])) / prior.dof;
       }
       
-      scratch.sigma_sq = sigmaScale / ext_rng_simulateChiSquared(scratch.generator, prior.dof + (double) scratch.numPredictors);
+      scratch.sigma_sq = sigmaScale / ext_rng_simulateChiSquared(scratch.generator, prior.dof + static_cast<double>(scratch.numPredictors));
       
       updatePosteriorCovarianceFactor(model, scratch);
     }
@@ -224,7 +224,7 @@ namespace {
     switch (model.priorType) {
       case cibart::PROBIT_PRIOR_STUDENT_T:
       {
-        cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+        const cibart::ProbitStudentTPrior& prior(*static_cast<const cibart::ProbitStudentTPrior*>(model.prior));
         
         // std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));
         // just copy in upper-right triangle and not garbage in lower left
@@ -243,14 +243,14 @@ namespace {
       break;
       case cibart::PROBIT_PRIOR_NORMAL:
       {
-        cibart::ProbitNormalPrior& prior(*((cibart::ProbitNormalPrior*) model.prior));
+        const cibart::ProbitNormalPrior& prior(*static_cast<const cibart::ProbitNormalPrior*>(model.prior));
 
         for (size_t i = 0; i < numPredictors; ++i) {
           factor[i * (1 + numPredictors)] += 1.0 / (prior.scale[i] * prior.scale[i]);
         }
       }
       break;
-      default:
+      case cibart::PROBIT_PRIOR_FLAT:
       break;
     }
     
@@ -269,7 +269,7 @@ namespace {
     double* restrict factor = scratch.posteriorCovarianceInverseRightFactor;
     size_t numPredictors = scratch.numPredictors;
     
-    cibart::ProbitStudentTPrior& prior(*((cibart::ProbitStudentTPrior*) model.prior));
+    const cibart::ProbitStudentTPrior& prior(*static_cast<const cibart::ProbitStudentTPrior*>(model.prior));
     const double* restrict scales = prior.scale;
     
     // std::memcpy(factor, xCrossproduct, numPredictors * numPredictors * sizeof(double));

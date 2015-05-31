@@ -38,6 +38,12 @@
 
 #define DEFAULT_BART_MAX_NUM_CUTS 100u
 
+#if defined(__GNUC__) && (\
+  (!defined(__clang__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6))) || \
+  ( defined(__clang__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 7))))
+#  define SUPPRESS_DIAGNOSTIC 1
+#endif
+
 using std::size_t;
 using std::uint32_t;
 using std::uint_least32_t;
@@ -360,7 +366,7 @@ extern "C" {
     bartControl.numSamples = control.numSimsPerCell;
     bartControl.numBurnIn = control.numInitialBurnIn;
     bartControl.numThreads = 1;
-    bartControl.treeThinningRate = control.numTreeSamplesToThin;
+    bartControl.treeThinningRate = static_cast<uint32_t>(control.numTreeSamplesToThin);
     bartControl.rng = scratch.rng;
     
     dbarts::Model bartModel;
@@ -380,7 +386,7 @@ extern "C" {
     
     CallbackData callbackData = { control, data, scratch, gridCells[0].zetaY, gridCells[0].zetaZ };
     bartControl.callback = control.treatmentModel.includesLatentVariables? &bartCallbackFunctionForLatents : &bartCallbackFunction;
-    bartControl.callbackData = (void*) &callbackData;
+    bartControl.callbackData = static_cast<void*>(&callbackData);
     
     dbarts::BARTFit* fit = ext_stackAllocate(1, dbarts::BARTFit);
     control.initializeFit(fit, &bartControl, &bartModel, &bartData);
@@ -443,7 +449,7 @@ namespace {
   void bartCallbackFunction(void* v_callbackData, dbarts::BARTFit& fit, bool,
                             const double* trainingSamples, const double*, double sigma)
   {
-    CallbackData& callbackData(*((CallbackData*) v_callbackData));
+    CallbackData& callbackData(*static_cast<CallbackData*>(v_callbackData));
     
     const Control& control(callbackData.control);
     const Data& data(callbackData.data);
@@ -462,7 +468,7 @@ namespace {
   void bartCallbackFunctionForLatents(void* v_callbackData, dbarts::BARTFit& fit, bool,
                                       const double* trainingSamples, const double*, double sigma)
   {
-    CallbackData& callbackData(*((CallbackData*) v_callbackData));
+    CallbackData& callbackData(*static_cast<CallbackData*>(v_callbackData));
     
     const Control& control(callbackData.control);
     const Data& data(callbackData.data);
@@ -480,12 +486,12 @@ namespace {
   
   void sampleConfounders(const Data& data, Scratch& scratch)
   {
-    for (size_t i = 0; i < data.numObservations; ++i) scratch.u[i] = (double) ext_rng_simulateBernoulli(scratch.rng, scratch.p[i]);
+    for (size_t i = 0; i < data.numObservations; ++i) scratch.u[i] = static_cast<double>(ext_rng_simulateBernoulli(scratch.rng, scratch.p[i]));
   }
   
   void subtractConfounderFromResponse(const Data& data, Scratch& scratch, double zetaY)
   {
-    ext_addVectors((const double*) scratch.u, data.numObservations, -zetaY, data.y, scratch.yMinusZetaU);
+    ext_addVectors(static_cast<const double*>(scratch.u), data.numObservations, -zetaY, data.y, scratch.yMinusZetaU);
   }
   
   double estimateSigma(const Data& data, Scratch& scratch)
@@ -508,7 +514,7 @@ namespace {
     ext_stackFree(residuals);
     ext_stackFree(lsSolution);
     
-    return std::sqrt(sumOfSquaredResiduals / (double) (data.numObservations - numPredictors));
+    return std::sqrt(sumOfSquaredResiduals / static_cast<double>(data.numObservations - numPredictors));
   }
   
   void estimateTreatmentEffect(const Control& control, const Data& data,
@@ -526,13 +532,13 @@ namespace {
             
             ate += (data.z[j] == 1.0 ? diff : -diff);
           }
-          estimates[i] = ate / (double) data.numObservations;
+          estimates[i] = ate / static_cast<double>(data.numObservations);
           
           trainingSamples += data.numObservations;
           testSamples     += data.numObservations;
         }
       }
-        break;
+      break;
       case ATT:
       {
         for (size_t i = 0; i < control.numSimsPerCell; ++i) {
@@ -543,12 +549,12 @@ namespace {
             
             att += trainingSamples[j] - testSamples[testIndex++];
           }
-          estimates[i] = att / (double) data.numTestObservations;
+          estimates[i] = att / static_cast<double>(data.numTestObservations);
           
           trainingSamples += data.numObservations;
         }
       }
-        break;
+      break;
       case ATC:
       {
         for (size_t i = 0; i < control.numSimsPerCell; ++i) {
@@ -559,23 +565,19 @@ namespace {
             
             atc += testSamples[testIndex++] - trainingSamples[j];
           }
-          estimates[i] = atc / (double) data.numTestObservations;
+          estimates[i] = atc / static_cast<double>(data.numTestObservations);
           
           trainingSamples += data.numObservations;
         }
       }
-        break;
-        
-      default:
-        ext_throwError("unrecognized estimand type.");
-        break;
+      break;
     }
   }
   
   void updateTreatmentModelParameters(const Control& control, const Data& data, Scratch& scratch, double zetaZ)
   {
     double*& offset(scratch.temp_numObs_1);
-    ext_scalarMultiplyVector((const double*) scratch.u, data.numObservations, zetaZ, offset);
+    ext_scalarMultiplyVector(const_cast<const double*>(scratch.u), data.numObservations, zetaZ, offset);
     
     control.treatmentModel.updateParameters(&control.treatmentModel, scratch.treatmentScratch, offset);
   }
@@ -583,7 +585,7 @@ namespace {
   void updateTreatmentModelLatentVariables(const Control& control, const Data& data, Scratch& scratch, double zetaZ)
   {
     double*& offset(scratch.temp_numObs_1);
-    ext_scalarMultiplyVector((const double*) scratch.u, data.numObservations, zetaZ, offset);
+    ext_scalarMultiplyVector(const_cast<const double*>(scratch.u), data.numObservations, zetaZ, offset);
     
     control.treatmentModel.updateLatentVariables(&control.treatmentModel, scratch.treatmentScratch, offset);
   }
@@ -643,7 +645,7 @@ namespace {
   {
     if (control.numThreads > 1) {
       rng = createRNG(false);
-      ext_rng_setSeed(rng, (uint_least32_t) (unif_rand() * (double) (UINT_LEAST32_MAX)));
+      ext_rng_setSeed(rng, static_cast<uint_least32_t>(unif_rand() * static_cast<double>(UINT_LEAST32_MAX)));
     } else {
       rng = createRNG(true);
     }
@@ -684,17 +686,17 @@ namespace {
   
   void lookupBARTFunctions(Control& control)
   {
-    control.initializeFit             = (void (*)(dbarts::BARTFit*, dbarts::Control*, dbarts::Model*, dbarts::Data*)) R_GetCCallable("dbarts", "initializeFit");
-    control.invalidateFit             = (void (*)(dbarts::BARTFit*)) R_GetCCallable("dbarts", "invalidateFit");
-    control.runSampler                = (dbarts::Results* (*)(dbarts::BARTFit*)) R_GetCCallable("dbarts", "runSampler");
-    control.runSamplerForIterations   = (dbarts::Results* (*)(dbarts::BARTFit*, size_t, size_t)) R_GetCCallable("dbarts", "runSamplerForIterations");
-    control.setResponse               = (void (*)(dbarts::BARTFit*, const double*)) R_GetCCallable("dbarts", "setResponse");
-    control.initializeCGMPrior        = (void (*)(dbarts::CGMPrior*, double, double)) R_GetCCallable("dbarts", "initializeCGMPriorFromOptions");
-    control.invalidateCGMPrior        = (void (*)(dbarts::CGMPrior*)) R_GetCCallable("dbarts", "invalidateCGMPrior");
-    control.initializeNormalPrior     = (void (*)(dbarts::NormalPrior*, const dbarts::Control*, double)) R_GetCCallable("dbarts", "initializeNormalPriorFromOptions");
-    control.invalidateNormalPrior     = (void (*)(dbarts::NormalPrior*)) R_GetCCallable("dbarts", "invalidateNormalPrior");
-    control.initializeChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*, double, double)) R_GetCCallable("dbarts", "initializeChiSquaredPriorFromOptions");
-    control.invalidateChiSquaredPrior = (void (*)(dbarts::ChiSquaredPrior*)) R_GetCCallable("dbarts", "invalidateChiSquaredPrior");
+    control.initializeFit             = reinterpret_cast<void (*)(dbarts::BARTFit*, dbarts::Control*, dbarts::Model*, dbarts::Data*)>(R_GetCCallable("dbarts", "initializeFit"));
+    control.invalidateFit             = reinterpret_cast<void (*)(dbarts::BARTFit*)>(R_GetCCallable("dbarts", "invalidateFit"));
+    control.runSampler                = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*)>(R_GetCCallable("dbarts", "runSampler"));
+    control.runSamplerForIterations   = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*, size_t, size_t)>(R_GetCCallable("dbarts", "runSamplerForIterations"));
+    control.setResponse               = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*)>(R_GetCCallable("dbarts", "setResponse"));
+    control.initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double)>(R_GetCCallable("dbarts", "initializeCGMPriorFromOptions"));
+    control.invalidateCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*)>(R_GetCCallable("dbarts", "invalidateCGMPrior"));
+    control.initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, double)>(R_GetCCallable("dbarts", "initializeNormalPriorFromOptions"));
+    control.invalidateNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*)>(R_GetCCallable("dbarts", "invalidateNormalPrior"));
+    control.initializeChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*, double, double)>(R_GetCCallable("dbarts", "initializeChiSquaredPriorFromOptions"));
+    control.invalidateChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*)>(R_GetCCallable("dbarts", "invalidateChiSquaredPrior"));
   }
   
   static ext_rng* createRNG(bool useNativeGenerator)
@@ -717,17 +719,21 @@ namespace {
       if (seedsExpr == R_UnboundValue) GetRNGstate();
       if (TYPEOF(seedsExpr) == PROMSXP) seedsExpr = eval(R_SeedsSymbol, R_GlobalEnv);
     
-      uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
+      uint_least32_t seed0 = static_cast<uint_least32_t>(INTEGER(seedsExpr)[0]);
     
-      ext_rng_algorithm_t algorithmType = (ext_rng_algorithm_t) (seed0 % 100);
-      ext_rng_standardNormal_t stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
+      ext_rng_algorithm_t algorithmType = static_cast<ext_rng_algorithm_t>(seed0 % 100);
+      ext_rng_standardNormal_t stdNormalType = static_cast<ext_rng_standardNormal_t>(seed0 / 100);
     
-      void* state = (void*) (1 + INTEGER(seedsExpr));
+      void* state = static_cast<void*>(1 + INTEGER(seedsExpr));
+#ifdef SUPPRESS_DIAGNOSTIC
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wswitch-enum"
+#endif
       switch (algorithmType) {
         case EXT_RNG_ALGORITHM_KNUTH_TAOCP:
         case EXT_RNG_ALGORITHM_KNUTH_TAOCP2:
         {
-          ext_rng_knuthState* kt = (ext_rng_knuthState*) std::malloc(sizeof(ext_rng_knuthState));
+          ext_rng_knuthState* kt = static_cast<ext_rng_knuthState*>(std::malloc(sizeof(ext_rng_knuthState)));
           std::memcpy(kt->state1, state, EXT_RNG_KNUTH_NUM_RANDOM * sizeof(uint_least32_t));
           kt->info = EXT_RNG_KNUTH_NUM_RANDOM; // this is a static var which we cannot access
           for (size_t i = 0; i < EXT_RNG_KNUTH_QUALITY; ++i) kt->state2[i] = 0; // also static
@@ -736,7 +742,7 @@ namespace {
         break;
         case EXT_RNG_ALGORITHM_USER_UNIFORM:
         {
-          ext_rng_userFunction* uniformFunction = (ext_rng_userFunction*) std::malloc(sizeof(ext_rng_userFunction));
+          ext_rng_userFunction* uniformFunction = static_cast<ext_rng_userFunction*>(std::malloc(sizeof(ext_rng_userFunction)));
           uniformFunction->f.stateless = &unif_rand;
           uniformFunction->state = NULL;
           state = uniformFunction;
@@ -744,8 +750,7 @@ namespace {
         break;
         default:
         break;
-      }
-    
+      }    
       result = ext_rng_create(algorithmType, state);
       if (algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP || algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP2 || algorithmType == EXT_RNG_ALGORITHM_USER_UNIFORM) std::free(state);
       if (result == NULL) return NULL; 
@@ -754,11 +759,11 @@ namespace {
       switch (stdNormalType) {
         case EXT_RNG_STANDARD_NORMAL_BOX_MULLER:
         normalState = malloc(sizeof(double));
-        *((double*) normalState) = 0.0; // static var, again
+        *static_cast<double*>(normalState) = 0.0; // static var, again
         break;
         case EXT_RNG_STANDARD_NORMAL_USER_NORM:
         {
-          ext_rng_userFunction* normalFunction = (ext_rng_userFunction*) std::malloc(sizeof(ext_rng_userFunction));
+          ext_rng_userFunction* normalFunction = static_cast<ext_rng_userFunction*>(std::malloc(sizeof(ext_rng_userFunction)));
           normalFunction->f.stateless = &norm_rand;
           normalFunction->state = NULL;
           normalState = normalFunction;
@@ -767,6 +772,10 @@ namespace {
         default:
         break;
       }
+
+#ifdef SUPPRESS_DIAGNOSTIC
+#  pragma GCC diagnostic pop
+#endif
     
       int errorCode = ext_rng_setStandardNormalAlgorithm(result, stdNormalType, normalState);
       if (stdNormalType == EXT_RNG_STANDARD_NORMAL_BOX_MULLER || stdNormalType == EXT_RNG_STANDARD_NORMAL_USER_NORM) std::free(normalState);
@@ -782,9 +791,9 @@ namespace {
   
 #ifdef HAVE_GETTIMEOFDAY
   double subtractTimes(struct timeval end, struct timeval start) {
-    return (1.0e6 * ((double) (end.tv_sec - start.tv_sec)) + (double) (end.tv_usec - start.tv_usec)) / 1.0e6;
+    return (1.0e6 * static_cast<double>(end.tv_sec - start.tv_sec) + static_cast<double>(end.tv_usec - start.tv_usec)) / 1.0e6;
   }
 #else
-  double subtractTimes(time_t end, time_t start) { return (double) (end - start); }
+  double subtractTimes(time_t end, time_t start) { return static_cast<double>(end - start); }
 #endif
 }

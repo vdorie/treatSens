@@ -58,7 +58,7 @@ namespace {
   }
   
   void destroyScratch(cibart::TreatmentModel*, void* scratchPtr) {
-    Scratch* scratch = (Scratch*) scratchPtr;
+    Scratch* scratch = static_cast<Scratch*>(scratchPtr);
     
     if (scratch != NULL) {
       delete [] scratch->glmScratch;
@@ -69,19 +69,19 @@ namespace {
   
   void updateParameters(cibart::TreatmentModel* restrict modelPtr, void* restrict scratchPtr, const double* restrict offset)
   {
-    cibart::ProbitEMTreatmentModel* model = (cibart::ProbitEMTreatmentModel*) modelPtr;
-    Scratch& restrict scratch(*(Scratch*) scratchPtr);
+    cibart::ProbitEMTreatmentModel* model = static_cast<cibart::ProbitEMTreatmentModel*>(modelPtr);
+    Scratch& restrict scratch(*static_cast<Scratch*>(scratchPtr));
     
     glm_fitGeneralizedLinearModel(scratch.z, NULL /* sets n = 1 for all obs */, scratch.numObservations,
                                   scratch.x, scratch.numPredictors,
                                   NULL /* weights = 1 */, offset, scratch.coefficients,
-                                  GLM_FAMILY_BINOMIAL, GLM_LINK_PROBIT, model->maxIterations,
+                                  GLM_FAMILY_BINOMIAL, GLM_LINK_PROBIT, static_cast<uint32_t>(model->maxIterations),
                                   scratch.glmScratch);
   }
   
   void getConditionalProbabilities(cibart::TreatmentModel* restrict, void* restrict scratchPtr, double zetaZ, double* restrict probZForU0, double* restrict probZForU1)
   {
-    Scratch& restrict scratch(*(Scratch*) scratchPtr);
+    Scratch& restrict scratch(*static_cast<Scratch*>(scratchPtr));
     
     double* restrict& temp(probZForU0);
     ext_leftMultiplyMatrixAndVector(scratch.x, scratch.numObservations, scratch.numPredictors,
