@@ -5,11 +5,9 @@
 
 #include <cstddef> // size_t
 
-// this unusual set of double declarations solves a rather obscure warning on Solaris
-extern "C" {
-  typedef void* (*C_voidPtrFunction)(void);
-  typedef C_voidPtrFunction (*C_voidPtrFunctionLookup)(const char* _namespace, const char* name);
-}
+// this unusual set of declarations solves a rather obscure warning on Solaris
+typedef void* (*C_voidPtrFunction)(void);
+extern "C" typedef C_voidPtrFunction (*C_voidPtrFunctionLookup)(const char* _namespace, const char* name);
 
 namespace cibart {
   struct BARTTreatmentModelFunctionTable;
@@ -30,3 +28,4 @@ namespace cibart {
 }
 
 #endif // CIBART_BART_TREATMENT_MODEL_HPP
+

@@ -88,14 +88,14 @@ namespace cibart {
     
     // these have apparently been around since 2003 so I'm not sure when/if they could fail
     if (sysctlnametomib("hw.physicalcpu", query, &queryLength) != -1) {
-      sysctl(query, queryLength, numPhysicalProcessorsPtr, &bufferLength, NULL, 0);
+      sysctl(query, static_cast<u_int>(queryLength), numPhysicalProcessorsPtr, &bufferLength, NULL, 0);
     }
     
     queryLength = 2;
     bufferLength = sizeof(uint32_t);
     
     if (sysctlnametomib("hw.logicalcpu", query, &queryLength) != -1) {
-      sysctl(query, queryLength, numLogicalProcessorsPtr, &bufferLength, NULL, 0);
+      sysctl(query, static_cast<u_int>(queryLength), numLogicalProcessorsPtr, &bufferLength, NULL, 0);
     }
     
     bufferLength = sizeof(uint32_t);
