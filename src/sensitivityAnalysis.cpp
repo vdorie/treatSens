@@ -9,12 +9,12 @@
 #include <cmath>
 #include <dbarts/cstdint.hpp>
 #if !defined(HAVE_SYS_TIME_H) && defined(HAVE_GETTIMEOFDAY)
-#undef HAVE_GETTIMEOFDAY
+#  undef HAVE_GETTIMEOFDAY
 #endif
 #ifdef HAVE_SYS_TIME_H
-#include <sys/time.h> // gettimeofday
+#  include <sys/time.h> // gettimeofday
 #else
-#include <time.h>
+#  include <time.h>
 #endif
 
 #include <dbarts/bartFit.hpp>
@@ -27,6 +27,7 @@
 #include <external/linearAlgebra.h>
 #include <external/random.h>
 #include <external/stats.h>
+#include <external/thread.h>
 
 #include <R.h>
 #include <Rdefines.h>
