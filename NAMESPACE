@@ -23,6 +23,4 @@ importFrom(stats, na.omit, setNames)
 importFrom(graphics, par, plot, points, text, abline, legend, contour, box)
 importFrom(grDevices, contourLines)
 
-importFrom(lme4, lmer)
-
 importFrom(dbarts, bart, pdbart, dbarts, dbartsControl)
