@@ -1,6 +1,6 @@
 PKG_CPPFLAGS=-Iinclude -pthread
 PKG_CPPXXFLAGS=-Iinclude -pthread
-PKG_LIBS=$(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) glm/libglm.a external/libexternal.a -lpthread
+PKG_LIBS=glm/libglm.a external/libexternal.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) -lpthread
 
 .PHONY : all glm/libglm.a external/libexternal.a clean
 
