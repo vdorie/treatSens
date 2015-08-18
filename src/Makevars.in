@@ -1,6 +1,6 @@
 PKG_CPPFLAGS=-Iinclude @PTHREAD_CFLAGS@
 PKG_CPPXXFLAGS=-Iinclude @PTHREAD_CFLAGS@
-PKG_LIBS=$(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) glm/libglm.a external/libexternal.a @PTHREAD_LIBS@
+PKG_LIBS=glm/libglm.a external/libexternal.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) @PTHREAD_LIBS@
 
 
 .PHONY : all glm/libglm.a external/libexternal.a clean
