@@ -1,3 +1,5 @@
+#include "config.hpp"
+
 #include "bartTreatmentModel.hpp"
 
 #include <new>
