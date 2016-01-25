@@ -1,6 +1,6 @@
 Package: treatSens
 Version: 2.0.1
-Date: 2015-08-18
+Date: 2016-01-25
 Title: Sensitivity Analysis for Causal Inference
 Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = "carnegin@uwm.edu"),
              person("Masataka",       "Harada", role = "aut",           email = "masatakaharada@gmail.com"),
