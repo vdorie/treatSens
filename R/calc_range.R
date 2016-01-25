@@ -195,4 +195,4 @@ calc.range.cor = function(grid.dim, zetaz.range, zetay.range, U.model, zero.loc,
 	    
 	  }
 	return(list(zetaZ = zetaZ, zetaY = zetaY))
-}		
+}
