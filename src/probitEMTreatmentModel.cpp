@@ -1,3 +1,5 @@
+#include "config.hpp"
+
 #include "probitEMTreatmentModel.hpp"
 
 #include <external/stddef.h>

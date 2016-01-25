@@ -1,3 +1,5 @@
+#include "config.hpp"
+
 #include "probitTreatmentModel.hpp"
 
 #include <cstring>

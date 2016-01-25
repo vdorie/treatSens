@@ -134,9 +134,9 @@ grid.search <- function(extreme.cors, zero.loc, Xcoef.plot, Y, Z, X,
     
     #update Zmin so that it include all plots.
     if(!is.null(X)){
-      if ((sgnTau0 == 1) && (all(Xcoef.plot[,1])>extreme.cors[2,1]*.95)) {
+      if ((sgnTau0 == 1) && all(Xcoef.plot[,1]>extreme.cors[2,1]*.95)) {
         Zmin = ifelse(Zmin<min(Xcoef.plot[,1]),Zmin,min(Xcoef.plot[,1]))}
-      if ((sgnTau0 == -1) && (all(Xcoef.plot[,1])<extreme.cors[2,2]*.95)) {
+      if ((sgnTau0 == -1) && all(Xcoef.plot[,1]<extreme.cors[2,2]*.95)) {
         Zmin = ifelse(Zmin>min(Xcoef.plot[,1]),Zmin,min(Xcoef.plot[,1]))}
     }
     Ymin = max(rY[3],sqrt(v_Y)/(1-Zmin^2/v_Z))
