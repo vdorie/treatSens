@@ -18,6 +18,7 @@ is.binary <- function(x) {
 #  return(sum(unique(x) == c(1,0)) + sum(unique(x) == c(0,1)) ==2)
 #}
 
+
 ###
 #Parses out response, treatment and covariates from formula
 #arguments:
@@ -55,6 +56,33 @@ parse.formula <- function(form, data) {
   }
   
   return(list(resp = resp, trt = trt, covars = covars))
+}
+
+###
+#Parses out response, treatment, covariates and group from formula
+#arguments:
+#form: formula object.  1st variable on RHS assumed to be treatment
+#data: data object containing variables (may be NULL)
+###
+
+parse.formula.mlm <- function(form, data) {
+  
+  if(missing(data))
+    data = environment(form)
+  
+  formexp = lFormula(form, data = data)
+  resp <- formexp$fr[,1]    	#response from LHS
+  group <- formexp$fr[,dim(formexp$fr)[2]]
+  
+  #extract variables from formula & data
+  trt <- formexp$fr[,2]				#assume treatment is 1st var on RHS
+  if(dim(formexp$fr)[2] > 3) {
+    covars <- formexp$fr[,-c(1,2,dim(formexp$fr)[2])]			#variables on RHS, less the intercept, treatment
+  }else{
+    covars = NULL
+  }
+  
+  return(list(resp = resp, trt = trt, covars = covars, group = group))
 }
 
 ###

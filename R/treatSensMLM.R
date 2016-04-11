@@ -1,9 +1,8 @@
 ###############
 #Main function call
 ###############
-treatSens <- function(formula,         #formula: assume treatment is 1st term on rhs
-                     sensParam = "coef",	    #type of sensitivity parameter: accepts "coef" for model coefficients and "cor" for partial correlations
-				             resp.family = gaussian,  #family for GLM of model for response
+treatSens.MLM <- function(formula,         #formula: assume treatment is 1st term on rhs
+                     resp.family = gaussian,  #family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
                      theta = 0.5, 		#Pr(U=1) for binomial model
                      grid.dim = c(8,4),  #1st dimension specifies zeta.z, 2nd dimension specifies zeta.y.
@@ -22,19 +21,10 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                      spz.range = NULL,  	#custom range for sensitivity parameter on Z, e.g.(-2,2), zero.loc will be overridden.
                      trim.wt = 10     	#the maximum size of weight is set at "trim.wt"% of the inferential group. type NULL to turn off.
 ){
-  #this code let R issue warnings as they occur.
+  #this code lets R issue warnings as they occur.
   options(warn=1)
   
-  #return error if sensitivity parameter type is illegal
-  if(!(sensParam == "coef" | sensParam == "cor")){
-	stop(cat("Illegal value for sensParam.  Use 'coef' for model coefficients or 'cor' for partial correlations"))
-  }
-
-  #change offset to FALSE and print warning if sensParam = "cor"
-  if(sensParam == "cor" & offset){
-	offset = FALSE
-	warning("Changed to offset = FALSE. Cannot use offset method with partial correlations.")
-  }
+  sensParam = "coef"	    #type of sensitivity parameter: "coef" for model coefficients
 
   #return error if only either spy.range or spz.range is specified.
   if((is.null(spy.range) & !is.null(spz.range))|(!is.null(spy.range) & is.null(spz.range))){
@@ -45,21 +35,21 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   set.seed(seed)
   
   #extract variables from formula
-  form.vars <- parse.formula(formula, data)
+  form.vars <- suppressWarnings(parse.formula.mlm(formula, data))  #can return warning about scale of variables, which is not an issue when standardizing
   
   Y = form.vars$resp
   Z = form.vars$trt
   X = as.matrix(form.vars$covars)
+  group = form.vars$group
   
   Z = as.numeric(Z)  	#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
 
-  if(is.null(data))   data = data.frame(Y,Z,X)
+  if(is.null(data))   data = data.frame(Y,Z,X,group)
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warnings(formula, resp.family, trt.family, theta, grid.dim, 
                            standardize,	nsim,	zero.loc,	verbose, buffer, spy.range, spz.range, weights, Y, Z, X, data)
   
-  formula=out.warnings$formula
   resp.family=out.warnings$resp.family
   trt.family=out.warnings$trt.family
   theta=out.warnings$theta
@@ -96,21 +86,20 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     Z = as.numeric(Z)
   }
 
-  if(sensParam == "cor" && is.binary(Z))
-	stop("Partial correlations are not available for binary treatment")
-  
   n.obs = length(Y)
+
+  cat("Fitting null models...\n")
   
   #fit null model for treatment model & get residuals
   if(!is.null(X)) {
-    null.trt <- glm(Z~X, family=trt.family)
-    Z.res <- Z-null.trt$fitted.values
-    v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
+    null.trt <- suppressWarnings(glmer(Z~X + (1|group), family=trt.family))
   }else{
-    null.trt <- glm(Z~1, trt.family)
-    Z.res <- Z-null.trt$fitted.values
-    v_Z <- var(Z.res)*(n.obs-1)/(n.obs-1)
+    null.trt <- suppressWarnings(glmer(Z~1 + (1|group), family=trt.family))
   }  
+
+  Z.res <- Z-residuals(null.trt)
+  v_Z <- summary(null.trt)$sigma^2
+  v_phi <- VarCorr(null.trt)$g[1]
   
   #####WEIGHTED ESTIMATES
   #create weights if the user specifies either ATE, ATT, or ATC.
@@ -164,24 +153,24 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   }
   
   ##########
-  
-  cat("Fitting null models...\n")
+
   #fit null model for the outcome & get residuals
   if(!is.null(X)) {
-    null.resp <- glm(Y~Z+X, family=resp.family, weights=weights)
+    null.resp <- suppressWarnings(glmer(Y~Z+X+(1|group), family=resp.family, weights=weights))
   }else{
-    null.resp <- glm(Y~Z, resp.family)
+    null.resp <- suppressWarnings(glmer(Y~Z+(1|group), family=resp.family, weights=weights, data = data))
   }
-  sgnTau0 = sign(null.resp$coef[2])
+  sgnTau0 = sign(null.resp@beta[2])
 
-  n = length(null.resp$coef)
-  Y.res <- Y-null.resp$fitted.values
+  #n = length(Y)
+  Y.res <- Y-residuals(null.resp)
+  v_Y <- summary(null.resp)$sigma^2
+  v_alpha <- VarCorr(null.resp)$g[1]
+  
   if(!is.null(X)) {
-    v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
-    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
+    Xcoef = cbind(fixef(null.trt)[-1], fixef(null.resp)[-c(1,2)])
     Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
   }else{
-    v_Y <- var(Y.res)*(n.obs-1)/(n.obs-2)
     Xcoef <- NULL
     Xpartials <- NULL
   }
@@ -193,26 +182,19 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   }
    
   
-  if(!is.null(X) & sensParam == "coef") {
+  if(!is.null(X)) {
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
-    null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
-    Xcoef.plot = cbind(null.trt$coef[-1], null.resp.plot$coef[-c(1,2)])
+    null.resp.plot <- suppressWarnings(glmer(Y~Z+X.positive+(1|group), family=resp.family, weights=weights))
+    Xcoef.plot = cbind(fixef(null.trt)[-1], fixef(null.resp.plot)[-c(1,2)])
   }
-  if(!is.null(X) & sensParam == "cor") {
-    #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
-    Xcoef.flg =  as.vector(ifelse(Xpartials[,2]>=0,1,-1))
-    X.positive = t(t(X)*Xcoef.flg)
-    Xcoef.plot <- cbind(X.partials[,1], X.partials(Y, Z, X.positive, resp.family, trt.family)[,2])
-    Xcoef <- Xpartials
-  }
-  
+    
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
-                     offset = offset, p = NULL)
-  
+                     offset = offset, p = NULL, g=group)
+
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
   zetaZ = range$zetaZ
   zetaY = range$zetaY
@@ -249,7 +231,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
       control.fit$p = NULL
       out <- matrix(NA,8,nsim)
       for(k in 1:nsim){
-        fit.sens <- fit.treatSens(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+        fit.sens <- fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
         control.fit$p = fit.sens$p
         out[1,k] <- fit.sens$sens.coef
         out[2,k] <- fit.sens$sens.se
@@ -290,7 +272,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
         
         if(is.null(core)){
           for(k in 1:nsim){
-            fit.sens = fit.treatSens(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+            fit.sens = fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
             control.fit$p = fit.sens$p
             sens.coef[i,j,k] <- fit.sens$sens.coef
             sens.se[i,j,k] <- fit.sens$sens.se
@@ -303,7 +285,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
           }        
         }else{ #code for multicore below. For debug change %dopar% to %do%.
           fit.sens <- foreach::"%dopar%"(foreach::foreach(k=1:nsim,.combine=rbind,.verbose=F),{
-            fit.treatSens(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
+            fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, zY, zZ, v_Y, v_Z, theta, control.fit)
           })
           sens.coef[i,j,] <- unlist(fit.sens[,1])
           sens.se[i,j,] <- unlist(fit.sens[,2])
@@ -324,7 +306,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                    sp.z = zeta.z, sp.y = zeta.y, 
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
-                   tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
+                   tau0 = fixef(null.resp)[2], se.tau0 = summary(null.resp)$coefficients[2,2],
                    Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
                    varnames = all.vars(formula), var_ytilde = v_Y, var_ztilde = v_Z)
     class(result) <- "sensitivity"
@@ -333,7 +315,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                    sp.z = zeta.z, sp.y = zeta.y, 
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
-                   tau0 = null.resp$coef[2], se.tau0 = summary(null.resp)$coefficients[2,2],
+                   tau0 = fixef(null.resp)[2], se.tau0 = summary(null.resp)$coefficients[2,2],
                    Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
                    varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z, XpartCor = Xpartials)
     class(result) <- "sensitivity"
@@ -348,7 +330,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
 #fit.treatSens
 ###########
 
-fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
+fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
   U.model = control.fit$U.model
@@ -357,6 +339,7 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
   iter.j = control.fit$iter.j
   offset = control.fit$offset
   p = control.fit$p
+  g = control.fit$g
 
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
@@ -384,34 +367,34 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
     #Do we want to return a warning/the error message/our own error message if try fails?
     #fit models with U
     if(std) U = std.nonbinary(U)
-    
+
     if(!is.null(X)) {
       fit.glm <- switch(offset+1,
-                        "FALSE" = glm(Y~Z+U+X, family=resp.family, weights=weights),
-                        "TRUE" = glm(Y~Z+X, family=resp.family, weights=weights, offset=zetaY*U))   
-      
+                        "FALSE" = suppressWarnings(glmer(Y~Z+U+X+(1|g), family=resp.family, weights=weights)),
+                        "TRUE" = suppressWarnings(glmer(Y~Z+X+(1|g), family=resp.family, weights=weights, offset=zetaY*U)))   
+    
       sens.se <- switch(class(weights),
                         "NULL" = summary(fit.glm)$coefficients[2,2],
                         "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
                         "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
-      fit.trt <- glm(Z~U+X, family=trt.family)
+      fit.trt <- suppressWarnings(glmer(Z~U+X+(1|g), family=trt.family))
     }else{
       fit.glm <- switch(offset+1,
-                        "FALSE" = glm(Y~Z+U, family=resp.family, weights=weights),
-                        "TRUE" = glm(Y~Z, family=resp.family, weights=weights, offset=zetaY*U))   
+                        "FALSE" = suppressWarnings(glmer(Y~Z+U+(1|g), family=resp.family, weights=weights)),
+                        "TRUE" = suppressWarnings(glmer(Y~Z+(1|g), family=resp.family, weights=weights, offset=zetaY*U)))   
       sens.se = summary(fit.glm)$coefficients[2,2]
-      fit.trt <- glm(Z~U, family=trt.family)		
+      fit.trt <- suppressWarnings(glmer(Z~U+(1|g), family=trt.family))		
     }
     
     return(list(
-      sens.coef = fit.glm$coef[2],
+      sens.coef = fixef(fit.glm)[2],
       sens.se = sens.se, 	#SE of Z coef
-      zeta.y = ifelse(offset==1,zetaY,fit.glm$coef[3]),     		#estimated coefficient of U in response model
-      zeta.z = fit.trt$coef[2],                                 #estimated coef of U in trt model
+      zeta.y = ifelse(offset==1,zetaY,fixef(fit.glm)[3]),     		#estimated coefficient of U in response model
+      zeta.z = fixef(fit.trt)[2],                                 #estimated coef of U in trt model
       zy.se = ifelse(offset==1,NA,summary(fit.glm)$coefficients[3,2]),   #SE of U coef in response model
       zz.se = summary(fit.trt)$coefficients[2,2], 	            #SE of U coef in trt model
-      resp.sigma2 = sum(fit.glm$resid^2)/fit.glm$df.residual,
-      trt.sigma2 = sum(fit.trt$resid^2)/fit.trt$df.residual,
+      resp.sigma2 = summary(fit.glm)$sigma^2,
+      trt.sigma2 = summary(fit.trt)$sigma^2,
       p = p
     ))
   }else{

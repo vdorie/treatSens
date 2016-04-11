@@ -25,23 +25,47 @@ maxCor <- function(Y,Z) {
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam) {
-  
+contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_phi = 0, gp = NULL) {
+  require(mvtnorm)
   n <- length(Y)
+  if(!is.null(gp)){
+    n.gp <- table(gp)
+    gps <- names(n.gp)    
+  }else{
+    n.gp = n
+    gps = ""
+  }
   
   if(sensParam == "coef"){
   	delta = zeta_z/v_Z
   	gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) 
   	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z	
+  	var.UgZ.diag = v_Z/(v_Z-zeta_z^2)
+  	var.UgZ.mat = -v_phi/((v_Z-zeta_z^2)*(v_Z-zeta_z^2+n.gp*v_phi))
+  	
+  	eps.u = rep(NA, n)
+  	for(i in 1:length(gps)){
+  	  var.UgZ = matrix(var.UgZ.mat[i], nrow = n.gp[i], ncol = n.gp[i])
+  	  diag(var.UgZ) = diag(var.UgZ)+var.UgZ.diag
+  	  var.Ymat = -zeta_y^2*solve(var.UgZ)+v_alpha
+  	  diag(var.Ymat) = diag(var.Ymat) + v_Y
+  	  var.U = solve(zeta_y^2*solve(var.Ymat)+var.UgZ)
+  	  if(length(gps) == 1){
+  	    eps.u = rmvnorm(1, rep(0, n), var.U)
+  	  }else{
+  	    eps.u[gp == gps[i]] = rmvnorm(1, rep(0, n.gp[i]), var.U)
+  	  }
+  	}
   }else{
    	delta = zeta_z/sqrt(v_Z)
-	gamma = zeta_y/sqrt(v_Y)
-	var.U = 1-zeta_z^2-zeta_y^2
+	  gamma = zeta_y/sqrt(v_Y)
+	  var.U = 1-zeta_z^2-zeta_y^2
+	  eps.u = rnorm(n, 0, sqrt(var.U))
   }	
-  eps.u = rnorm(n, 0, sqrt(var.U))
+  
   U = Y*gamma + Z*delta + eps.u
   
-  return(U)
+  return(U[1,])
 }
 
 ###############
