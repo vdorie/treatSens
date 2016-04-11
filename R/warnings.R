@@ -14,6 +14,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
                      zetay.range,  	#custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
                      zetaz.range,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
                      weights,     #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
+                     Y, Z, X,
                      data) {
   
   if(is.null(data)) stop(paste("Either a matrix or data.frame object must be specified in data field."))
@@ -32,12 +33,6 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
   nobs.deleted = dim(data)[1] - dim(postdata)[1]
   if ((verbose) & nobs.deleted>0) warning(nobs.deleted, " observations were deleted listwise.\n") 
   
-  #extract variables from formula
-  form.vars <- parse.formula(formula, data)
-  Y = form.vars$resp
-  Z = form.vars$trt
-  X = form.vars$covars 
-   
   #check trt.family
   if(is.binary(Z)){ #binary treatment
     
@@ -70,7 +65,7 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
         if(verbose) cat("Binomial family with probit link function is assumed in the treatment model.\n")
         trt.family = binomial(link="probit")
       }else if(identical(trt.family,"logit")||identical(trt.family,"logistic")){
-        warning("GLM.sens is not compatible with logistic link. Binomial family with probit link function is assumed in the treatment model.")
+        warning("treatSens is not compatible with logistic link. Binomial family with probit link function is assumed in the treatment model.")
         trt.family = binomial(link="probit")        
       }else{
         stop(paste("binomial(link=\"probit\") is the only available option with a binary treatment."))

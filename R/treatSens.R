@@ -49,7 +49,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
   Y = form.vars$resp
   Z = form.vars$trt
-  X = form.vars$covars
+  X = as.matrix(form.vars$covars)
   
   Z = as.numeric(Z)  	#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
 
@@ -57,7 +57,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warnings(formula, resp.family, trt.family, theta, grid.dim, 
-                           standardize,	nsim,	zero.loc,	verbose, buffer, spy.range, spz.range, weights, data)
+                           standardize,	nsim,	zero.loc,	verbose, buffer, spy.range, spz.range, weights, Y, Z, X, data)
   
   formula=out.warnings$formula
   resp.family=out.warnings$resp.family
