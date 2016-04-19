@@ -80,6 +80,10 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   }
   
   # set seed
+  if (!is.numeric(seed))
+    stop("seed must be an integer")
+  if (!is.integer(seed) && as.double(as.integer(seed)) != seed)
+    warning("seed changed by coercion from double; supply an integer to be precise")
   set.seed(seed)
   
   #extract variables from formula
@@ -97,11 +101,12 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
     stop("currently only binary treatments are supported")
  
   # Check whether data, options, and etc. conform to the format in "warnings.R"
-  out.warnings <- warningsBART(formula, grid.dim, 
+  out.warnings <- warningsBART(formula, theta, grid.dim, nsim,
                                verbose, spy.range, spz.range, est.type, data)
   
   formula   <- out.warnings$formula
   grid.dim  <- out.warnings$grid.dim
+  nsim      <- out.warnings$nsim
   data      <- out.warnings$data
   spy.range <- out.warnings$zetay.range
   spz.range <- out.warnings$zetaz.range
