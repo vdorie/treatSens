@@ -17,32 +17,47 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                      seed = 1234,     	#default seed is 1234.
                      iter.j = 10,     	#number of iteration in trt.family=binomial(link="probit")
                      offset = TRUE, 		#Logical: fit models with zeta*U fixed at target value, or with zeta fitted
-                     core = NULL, 		#number of CPU cores used (Max=8). Compatibility with Mac is unknown.
+                     core = NULL, 		#number of CPU cores used.
                      spy.range = NULL,  	#custom range for sensitivity parameter on Y, e.g.(0,10), zero.loc will be overridden.
                      spz.range = NULL,  	#custom range for sensitivity parameter on Z, e.g.(-2,2), zero.loc will be overridden.
                      trim.wt = 10     	#the maximum size of weight is set at "trim.wt"% of the inferential group. type NULL to turn off.
 ){
+  matchedCall <- match.call()
+  
   #this code let R issue warnings as they occur.
+  oldWarnings <- options()$warn
   options(warn=1)
   
   #return error if sensitivity parameter type is illegal
-  if(!(sensParam == "coef" | sensParam == "cor")){
-	stop(cat("Illegal value for sensParam.  Use 'coef' for model coefficients or 'cor' for partial correlations"))
+  if (!(sensParam == "coef" | sensParam == "cor")){
+    stop("illegal value for sensParam - use 'coef' for model coefficients or 'cor' for partial correlations")
   }
 
   #change offset to FALSE and print warning if sensParam = "cor"
   if(sensParam == "cor" & offset){
-	offset = FALSE
-	warning("Changed to offset = FALSE. Cannot use offset method with partial correlations.")
+    offset = FALSE
+    warning("changed to offset = FALSE; cannot use offset method with partial correlations")
   }
 
   #return error if only either spy.range or spz.range is specified.
   if((is.null(spy.range) & !is.null(spz.range))|(!is.null(spy.range) & is.null(spz.range))){
-    stop(paste("Either spy.range or spz.range is missing."))
+    stop("either spy.range or spz.range is missing")
   }
   
    # set seed
+  if (!is.numeric(seed) || is.na(seed))
+    stop("seed must be an integer")
+  if (!is.integer(seed) && any(as.double(as.integer(seed)) != seed))
+    warning("seed changed by coercion from double; supply an integer to be precise")
   set.seed(seed)
+  
+  ## not really sure what happens with length(core) > 1, but no error is raised by package
+  if (!is.null(core)) {
+    if (!is.numeric(core) || is.na(core) || any(core <= 0))
+      stop("core must be a positive integer or NULL")
+    if (!is.integer(core) && any(as.double(as.integer(core)) != core))
+      warning("core changed by coercion from double; supply an integer to be precise")
+  }
   
   #extract variables from formula
   form.vars <- parse.formula(formula, data)
@@ -53,7 +68,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
   Z = as.numeric(Z)  	#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
 
-  if(is.null(data))   data = data.frame(Y,Z,X)
+  if (is.null(data))   data = data.frame(Y,Z,X)
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warnings(formula, resp.family, trt.family, theta, grid.dim, 
@@ -76,12 +91,23 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
   #check and change U.model
   
-  if(identical(trt.family, gaussian)) {
-    if(verbose) cat("Normally distributed continous U is assumed.\n")
+  if (identical(trt.family, gaussian)) {
+    if (verbose) cat("Normally distributed continous U is assumed.\n")
     U.model = "normal"
-  } else if(identical(trt.family$link,"probit")) {
-    if(verbose) cat("Binary U with binomial distribution is assumed.\n")
+  } else if (identical(trt.family$link,"probit")) {
+    if (verbose) cat("Binary U with binomial distribution is assumed.\n")
     U.model = "binomial"    
+  }
+  
+  
+  if ((!identical(trt.family, binomial) || !identical(trt.family$link, "probit")) && !is.null(matchedCall[["iter.j"]])) {
+    warning("iter.j option is meaningless unless trt.family = binomial(link=\"probit\")")
+  } else {
+    if (!is.numeric(iter.j) || is.na(iter.j) || length(iter.j) != 1 || iter.j < 1)
+    stop("iter.j must be an integer greater than or equal to 1")
+    if (!is.integer(iter.j) && as.double(as.integer(iter.j)) != iter.j)
+      warning("iter.j changed by coercion from double; supply an integer to be precise")
+    iter.j <- as.integer(iter.j)
   }
   
   
@@ -96,8 +122,8 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     Z = as.numeric(Z)
   }
 
-  if(sensParam == "cor" && is.binary(Z))
-	stop("Partial correlations are not available for binary treatment")
+  if (sensParam == "cor" && is.binary(Z))
+    stop("partial correlations are not available for binary treatment")
   
   n.obs = length(Y)
   
@@ -121,8 +147,8 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   if (!is.null(weights)) {
     if (identical(class(weights),"character")) {
       
-      if (!any(weights==c("ATE","ATT","ATC"))) {
-        stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
+      if (!any(weights==c("ATE","ATT","ATC")))
+        stop("weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector")
       
       #    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
       #      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
@@ -131,41 +157,45 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
         wts <- 1/null.trt$fitted
         wts[Z==0] <-1/(1-null.trt$fitted[Z==0])
         wts = wts*n.obs/sum(wts) #normalizing weight
-        cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect.","\n")}
+        if (verbose) cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect.\n")}
       
       if (identical(weights,"ATT")) {
         wts <- null.trt$fitted/(1-null.trt$fitted)
         wts[Z==1] <-1
         wts[Z==0] = wts[Z==0]*(nc/sum(wts[Z==0])) #normalizing weight
-        cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the treated.","\n")}
+        if (verbose) cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect in the treated.","\n")}
       
       if (identical(weights,"ATC")) {
         wts <- (1-null.trt$fitted)/null.trt$fitted
         wts[Z==0] <- 1
         wts[Z==1] = wts[Z==1]*(nt/sum(wts[Z==1])) #normalizing weight
-        cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")}
+        if (verbose) cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect in the controls","\n")}
       
       #   trim.weight option
       if (!is.null(trim.wt)) {
         if (is.numeric(trim.wt) & length(trim.wt)==1) {
+          if (trim.wt > 100)
+            stop("trim.wt must be a number greater than 0 and less or equal to 100")
           if (identical(weights,"ATE")) max.wt = trim.wt/100*n.obs
           if (identical(weights,"ATT")) max.wt = trim.wt/100*nt
           if (identical(weights,"ATC")) max.wt = trim.wt/100*nc
           wts[wts>max.wt] = max.wt
-          cat("Weight trimming is applied.  The maximum size of weights is set to", max.wt,", which is", trim.wt,"% of the size of the inferential group.","\n")
+          if (verbose) cat("Weight trimming is applied. The maximum size of weights is set to", max.wt,", which is", trim.wt,"% of the size of the inferential group.\n")
         } else {
-          stop(paste("trim.wt must be a number greater than 0."))}
+          stop("trim.wt must be a number greater than 0 and less or equal to 100")
+        }
       }
       weights <- wts
     } else if (identical(class(weights),"numeric") & length(weights)==n.obs) {
-      cat("User-supplied weight is used.","\n")
+      if (verbose) cat("User-supplied weight are being used.\n")
     } else {
-      stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
+      stop("weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector")
+    }
   }
   
   ##########
   
-  cat("Fitting null models...\n")
+  if (verbose) cat("Fitting null models...\n")
   #fit null model for the outcome & get residuals
   if(!is.null(X)) {
     null.resp <- glm(Y~Z+X, family=resp.family, weights=weights)
@@ -189,7 +219,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   # change buffer = 0 when v_Y or v_Z is small.
   if ((v_Y-buffer<=0)||(v_Z-buffer<=0)||(v_Z/(theta*(1-theta))-buffer<=0)) {
     buffer = 0
-    warning("Buffer is set to 0 because some of residual variances are too small.")
+    warning("buffer is set to 0 because some of residual variances are too small")
   }
    
   
@@ -213,14 +243,14 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                      standardize=standardize, weights=weights, iter.j=iter.j, 
                      offset = offset, p = NULL)
   
-  range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
+  range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, verbose)
   zetaZ = range$zetaZ
   zetaY = range$zetaY
   grid.dim = c(length(zetaZ), length(zetaY))
 
   sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[2], grid.dim[1], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
-  cat("Computing final grid...\n")
+  if (verbose) cat("Computing final grid...\n")
   
   #fill in grid
   cell = 0
@@ -341,6 +371,8 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
   if(!is.null(core) && dp) parallel::stopCluster(cl)   # Stop using multicore.
   
+  options(warn = oldWarnings)
+  
   return(result)
 }
 
@@ -372,7 +404,7 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
         out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
       }
     }else{
-      stop(paste("Only probit link is allowed."))
+      stop("only probit link is allowed")
     }
 
     U = out.contYbinaryZU$U
