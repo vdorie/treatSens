@@ -4,6 +4,7 @@
 treatSens.MLM <- function(formula,         #formula: assume treatment is 1st term on rhs
                      resp.family = gaussian,  #family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
+                     trt.level = "indiv", #treatment level - individual ("indiv") or group ("group")
                      theta = 0.5, 		#Pr(U=1) for binomial model
                      grid.dim = c(8,4),  #1st dimension specifies zeta.z, 2nd dimension specifies zeta.y.
                      standardize = TRUE,	#Logical: should variables be standardized?
@@ -87,19 +88,34 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   }
 
   n.obs = length(Y)
-
+  
   cat("Fitting null models...\n")
   
   #fit null model for treatment model & get residuals
-  if(!is.null(X)) {
-    null.trt <- suppressWarnings(glmer(Z~X + (1|group), family=trt.family))
-  }else{
-    null.trt <- suppressWarnings(glmer(Z~1 + (1|group), family=trt.family))
-  }  
+  if(trt.level == "indiv"){
+    if(!is.null(X)) {
+      null.trt <- suppressWarnings(glmer(Z~X + (1|group), family=trt.family))
+    }else{
+      null.trt <- suppressWarnings(glmer(Z~1 + (1|group), family=trt.family))
+    } 
+    Z.res <- Z-residuals(null.trt)
+    v_Z <- summary(null.trt)$sigma^2
+    v_phi <- VarCorr(null.trt)$g[1]
+  }else if(trt.level == "group"){
+    if(!is.null(X)) {
+      null.trt <- suppressWarnings(glm(Z~X, family=trt.family))
+      Z.res <- Z-residuals(null.trt)
+      v_Z <- var(Z.res)*(n.obs-1)/(n.obs-dim(X)[2]-1)
+    }else{
+      null.trt <- suppressWarnings(glm(Z~1, family=trt.family))
+      Z.res <- Z-residuals(null.trt)
+      v_Z <- var(Z.res)*(n.obs-1)/(n.obs-1)
+    }
+    v_phi <- 0
+  }
 
-  Z.res <- Z-residuals(null.trt)
-  v_Z <- summary(null.trt)$sigma^2
-  v_phi <- VarCorr(null.trt)$g[1]
+  
+
   
   #####WEIGHTED ESTIMATES
   #create weights if the user specifies either ATE, ATT, or ATC.
@@ -158,7 +174,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   if(!is.null(X)) {
     null.resp <- suppressWarnings(glmer(Y~Z+X+(1|group), family=resp.family, weights=weights))
   }else{
-    null.resp <- suppressWarnings(glmer(Y~Z+(1|group), family=resp.family, weights=weights, data = data))
+    null.resp <- suppressWarnings(glmer(Y~Z+(1|group), family=resp.family, weights=weights))
   }
   sgnTau0 = sign(null.resp@beta[2])
 
@@ -168,7 +184,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   v_alpha <- VarCorr(null.resp)$g[1]
   
   if(!is.null(X)) {
-    Xcoef = cbind(fixef(null.trt)[-1], fixef(null.resp)[-c(1,2)])
+    Xcoef = cbind(switch(class(null.trt)[1]=="glm", coef(null.trt)[-1], fixef(null.trt)[-1]), fixef(null.resp)[-c(1,2)])
     Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
   }else{
     Xcoef <- NULL
@@ -187,13 +203,13 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
     null.resp.plot <- suppressWarnings(glmer(Y~Z+X.positive+(1|group), family=resp.family, weights=weights))
-    Xcoef.plot = cbind(fixef(null.trt)[-1], fixef(null.resp.plot)[-c(1,2)])
+    Xcoef.plot = cbind(switch(class(null.trt)[1]=="glm", coef(null.trt)[-1], fixef(null.trt)[-1]), fixef(null.resp.plot)[-c(1,2)])
   }
     
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
-                     offset = offset, p = NULL, g=group)
+                     offset = offset, p = NULL, g=group, trt.level = trt.level, v_alpha = v_alpha, v_phi = v_phi)
 
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
   zetaZ = range$zetaZ
@@ -330,9 +346,10 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
 #fit.treatSens
 ###########
 
-fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
+fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ, v_Y, v_Z, theta, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
+  trt.level = control.fit$trt.level
   U.model = control.fit$U.model
   std = control.fit$standardize
   weights = control.fit$weights
@@ -340,19 +357,30 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y
   offset = control.fit$offset
   p = control.fit$p
   g = control.fit$g
+  v_alpha = control.fit$v_alpha
+  v_phi = control.fit$v_phi
 
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
-    U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, sensParam))      
+    U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, sensParam, gp = g, v_alpha = v_alpha, v_phi = v_phi, trt.lev = trt.level))      
   }
   
   if(U.model == "binomial"){
     if(identical(trt.family$link,"probit")){
-      if(!is.null(X)) {
-        #debug(contYbinaryZU)
-        out.contYbinaryZU <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p))
-      } else {
-        out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+      if(trt.level == "indiv"){
+        if(!is.null(X)) {
+          #debug(contYbinaryZU)
+          out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+        } else {
+          stop("Need to write Binary MLM code with no X") #out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+        }
+      }else if(trt.level == "group"){
+        if(!is.null(X)) {
+          #debug(contYbinaryZU)
+          out.contYbinaryZU <- try(contYbinaryZU.mlm.gp(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+        } else {
+          stop("Need to write Binary MLM code with no X") #out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+        }
       }
     }else{
       stop(paste("Only probit link is allowed."))

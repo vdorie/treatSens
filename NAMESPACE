@@ -2,6 +2,7 @@ useDynLib(treatSens)
 
 export(treatSens, sensPlot)
 export(treatSens.BART)
+export(treatSens.MLM)
 
 S3method(summary, sensitivity)
 S3method(plot, sensitivity)
@@ -23,6 +24,8 @@ importFrom(stats, na.omit, setNames)
 importFrom(graphics, par, plot, points, text, abline, legend, contour, box)
 importFrom(grDevices, contourLines)
 
-importFrom(lme4, lmer)
+importFrom(lme4, glmer, fixef, VarCorr)
 
 importFrom(dbarts, bart, pdbart, dbarts, dbartsControl)
+
+importFrom(mvtnorm, dmvnorm, pmvnorm)
