@@ -93,7 +93,7 @@ parse.formula.mlm <- function(form, data) {
 
 std.nonbinary <- function(X) {
   #returns standardized values of vector not consisting of only 0s and 1s
-  if(class(X) == "factor")
+  if(class(X) == "factor" | class(X) == "character")
     return(X)
   if(length(unique(X))!=2)
     X = (X - mean(X, na.rm = T))/sd(X, na.rm = T)

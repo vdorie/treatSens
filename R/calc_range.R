@@ -22,7 +22,7 @@ calc.range.coef = function(grid.dim, zetaz.range, zetay.range, buffer, U.model, 
 	    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), -sqrt(v_Z/(theta*(1-theta))-buffer), sqrt(4*v_Y-buffer), sqrt(v_Z/(theta*(1-theta))-buffer)), nrow = 2) 
 	  }
 	  if(U.model == "binomial" & is.binary(Z)){ 
-	    lp.quant = quantile(null.trt$linear.predictors, 0.25)
+	    lp.quant = quantile(qnorm(fitted.values(null.trt)), 0.25)
 	    zetaz.min = max(-(2-lp.quant), -3) 
 	    zetaz.max = min((2-lp.quant), 3)   
 	    extreme.coef = matrix(c(-sqrt(4*v_Y-buffer), zetaz.min, sqrt(4*v_Y-buffer), zetaz.max), nrow = 2)
