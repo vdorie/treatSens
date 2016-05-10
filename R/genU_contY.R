@@ -396,16 +396,16 @@ contYbinaryZU.mlm.gp <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL
       
       y.g = y[g == gps[i]]
       z.g = z[g == gps[i]][1]
-      x.g = apply(x[g == gps[i],],2,mean, na.rm = T)
-      w.g = x[g == gps[i],]
+      x.g = switch(is.null(dim(x[g==gps[i],]))+1, apply(x[g == gps[i],],2,mean, na.rm = T), x[g == gps[i],])
+      w.g = switch(is.null(dim(x[g==gps[i],]))+1, x[g == gps[i],], matrix(x[g == gps[i],], nrow = 1))
       
       y1prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
-      z1prob = log(pnorm(cbind(1,x.g,1)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(cbind(1,x.g,1)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
-      y0prob = dnvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
-      z0prob = log(pnorm(cbind(1,x.g,0)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(cbind(1,x.g,0)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
+      z1prob = log(pnorm(c(1,x.g,1)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,x.g,1)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
+      y0prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
+      z0prob = log(pnorm(c(1,x.g,0)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,x.g,0)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
       
       pyzu[i] = exp(y1prob+z1prob+log(theta))  
-      pyz[i] = exp(y0prob+z0prob+log(1-theta)) + pyzu[g == gps[i]]
+      pyz[i] = exp(y0prob+z0prob+log(1-theta)) + pyzu[i]
     }
     
     p = pyzu/pyz
