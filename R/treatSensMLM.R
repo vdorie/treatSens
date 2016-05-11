@@ -184,7 +184,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   v_alpha <- VarCorr(null.resp)$g[1]
   
   if(!is.null(X)) {
-    Xcoef = cbind(switch(class(null.trt)[1]=="glm", coef(null.trt)[-1], fixef(null.trt)[-1]), fixef(null.resp)[-c(1,2)])
+    Xcoef = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), fixef(null.resp)[-c(1,2)])
     Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
   }else{
     Xcoef <- NULL
@@ -203,7 +203,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
     null.resp.plot <- suppressWarnings(glmer(Y~Z+X.positive+(1|group), family=resp.family, weights=weights))
-    Xcoef.plot = cbind(switch(class(null.trt)[1]=="glm", coef(null.trt)[-1], fixef(null.trt)[-1]), fixef(null.resp.plot)[-c(1,2)])
+    Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), fixef(null.resp.plot)[-c(1,2)])
   }
     
   #register control.fit
@@ -211,7 +211,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
                      standardize=standardize, weights=weights, iter.j=iter.j, 
                      offset = offset, p = NULL, g=group, trt.level = trt.level, v_alpha = v_alpha, v_phi = v_phi)
 
-  range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
+  range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, verbose = verbose)
   zetaZ = range$zetaZ
   zetaY = range$zetaY
   grid.dim = c(length(zetaZ), length(zetaY))

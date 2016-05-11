@@ -26,7 +26,6 @@ maxCor <- function(Y,Z) {
 ###############
 
 contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_phi = 0, gp = NULL, trt.lev = "indiv") {
-  require(mvtnorm)
   n <- length(Y)
   if(!is.null(gp)){
     n.gp <- table(gp)
@@ -44,18 +43,18 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_ph
   	delta = zeta_z/v_Z
   	gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) 
   #	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z	
-  	var.UgZ.diag = v_Z/(v_Z-zeta_z^2)
-  	var.UgZ.mat = -v_phi/((v_Z-zeta_z^2)*(v_Z-zeta_z^2+n.gp*v_phi))
+  	var.UgZinv.diag = v_Z/(v_Z-zeta_z^2)
+  	var.UgZinv.mat = -zeta_z^2*v_phi/((v_Z-zeta_z^2)*(v_Z-zeta_z^2+n.gp*v_phi))
   	
-  	eps.u = rep(NA, n)
+    eps.u = rep(NA, n)
   	for(i in 1:length(gps)){
-  	  var.UgZ = matrix(var.UgZ.mat[i], nrow = n.gp[i], ncol = n.gp[i])
-  	  diag(var.UgZ) = diag(var.UgZ)+var.UgZ.diag
-  	  var.Ymat = -zeta_y^2*solve(var.UgZ)+v_alpha
+  	  var.UgZinv = matrix(var.UgZinv.mat[i], nrow = n.gp[i], ncol = n.gp[i])
+  	  diag(var.UgZinv) = diag(var.UgZinv)+var.UgZinv.diag
+  	  var.Ymat = -zeta_y^2*solve(var.UgZinv)+v_alpha
   	  diag(var.Ymat) = diag(var.Ymat) + v_Y
-  	  var.U = solve(zeta_y^2*solve(var.Ymat)+var.UgZ)
+  	  var.U = solve(zeta_y^2*solve(var.Ymat)+var.UgZinv)
   	  if(length(gps) == 1){
-  	    eps.u = rmvnorm(1, rep(0, n), var.U)
+  	    eps.u = as.vector(rmvnorm(1, rep(0, n), var.U))
   	  }else{
   	    eps.u[gp == gps[i]] = rmvnorm(1, rep(0, n.gp[i]), var.U)
   	  }
@@ -69,7 +68,7 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_ph
   
   U = Y*gamma + Z*delta + eps.u
   
-  return(U[1,])
+  return(U)
 }
 
 ###############

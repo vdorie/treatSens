@@ -141,6 +141,18 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
     }
   }
   
+  if (!is.numeric(theta) || is.na(theta) || length(theta) != 1 || theta <= 0 || theta >= 1)
+    stop("theta must be a single number in (0, 1)")
+  
+  if (!is.numeric(nsim) || is.na(nsim) || length(nsim) != 1 || nsim < 1)
+    stop("nsim must be an integer greater than or equal to 1")
+  if (!is.integer(nsim) && as.double(as.integer(nsim)) != nsim)
+    warning("nsim changed by coercion from double; supply an integer to be precise")
+  nsim <- as.integer(nsim)
+  
+  if (length(zero.loc) != 1 || (is.character(zero.loc) && zero.loc != "full") ||
+      (is.numeric(zero.loc) && (is.na(zero.loc) || zero.loc <= 0 || zero.loc >= 1)))
+    stop("zero.loc must be \"full\" or a single number in (0, 1)")
   
   #check whether the dimentions of grid are at least 2.
   if(!is.null(grid.dim) && (length(grid.dim) != 2)) {
@@ -183,7 +195,9 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
 #################
 
 warningsBART <- function(formula,     #formula: assume treatment is 1st term on rhs
+                         theta,       #Pr(U=1) for binomial model
                          grid.dim,    #final dimensions of output grid
+                         nsim,
                          verbose,
                          zetay.range,  	#custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
                          zetaz.range,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
@@ -212,6 +226,15 @@ warningsBART <- function(formula,     #formula: assume treatment is 1st term on 
   Z = form.vars$trt
   X = form.vars$covars 
   
+  if (!is.numeric(theta) || is.na(theta) || length(theta) != 1 || theta <= 0 || theta >= 1)
+    stop("theta must be a single number in (0, 1)")
+  
+  if (!is.numeric(nsim) || is.na(nsim) || length(nsim) != 1 || nsim < 1)
+    stop("nsim must be an integer greater than or equal to 1")
+  if (!is.integer(nsim) && as.double(as.integer(nsim)) != nsim)
+    warning("nsim changed by coercion from double; supply an integer to be precise")
+  nsim <- as.integer(nsim)
+  
   #check whether the dimentions of grid are at least 2.
   if(!is.null(grid.dim) && (length(grid.dim) != 2)) {
     stop(paste("Error: grid dimenstions must a vector of length 2"))
@@ -233,6 +256,7 @@ warningsBART <- function(formula,     #formula: assume treatment is 1st term on 
   
   return(list(formula=formula,
               grid.dim=grid.dim,
+              nsim = nsim,
               zetay.range=zetay.range,
               zetaz.range=zetaz.range,
               data=postdata))
