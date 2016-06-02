@@ -98,7 +98,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     }else{
       null.trt <- suppressWarnings(glmer(Z~1 + (1|group), family=trt.family))
     } 
-    Z.res <- Z-residuals(null.trt)
+    Z.res <- residuals(null.trt)
     v_Z <- summary(null.trt)$sigma^2
     v_phi <- VarCorr(null.trt)$g[1]
   }else if(trt.level == "group"){
@@ -179,7 +179,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   sgnTau0 = sign(null.resp@beta[2])
 
   #n = length(Y)
-  Y.res <- Y-residuals(null.resp)
+  Y.res <- residuals(null.resp)
   v_Y <- summary(null.resp)$sigma^2
   v_alpha <- VarCorr(null.resp)$g[1]
   
@@ -362,7 +362,8 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ, v_
 
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
-    U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, sensParam, gp = g, v_alpha = v_alpha, v_phi = v_phi, trt.lev = trt.level))      
+    U <- try(contYZU(Y = Y.res, Z = Z.res, zeta_y = zetaY, zeta_z = zetaZ, v_Y = v_Y, v_Z = v_Z, 
+                     sensParam = sensParam, gp = g, v_alpha = v_alpha, v_phi = v_phi, trt.lev = trt.level))
   }
   
   if(U.model == "binomial"){
