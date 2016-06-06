@@ -44,8 +44,8 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     stop("either spy.range or spz.range is missing")
   }
   
-   # set seed
-  if (!is.numeric(seed) || is.na(seed))
+  ## set seed
+  if (!is.numeric(seed) || anyNA(seed))
     stop("seed must be an integer")
   if (!is.integer(seed) && any(as.double(as.integer(seed)) != seed))
     warning("seed changed by coercion from double; supply an integer to be precise")
@@ -53,7 +53,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
   ## not really sure what happens with length(core) > 1, but no error is raised by package
   if (!is.null(core)) {
-    if (!is.numeric(core) || is.na(core) || any(core <= 0))
+    if (!is.numeric(core) || anyNA(core) || any(core <= 0))
       stop("core must be a positive integer or NULL")
     if (!is.integer(core) && any(as.double(as.integer(core)) != core))
       warning("core changed by coercion from double; supply an integer to be precise")

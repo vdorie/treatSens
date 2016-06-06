@@ -28,4 +28,4 @@ importFrom(lme4, glmer, fixef, VarCorr, lFormula)
 
 importFrom(dbarts, bart, pdbart, dbarts, dbartsControl)
 
-importFrom(mvtnorm, dmvnorm, pmvnorm)
+importFrom(mvtnorm, dmvnorm, pmvnorm, rmvnorm)

@@ -141,16 +141,16 @@ warnings <- function(formula,     #formula: assume treatment is 1st term on rhs
     }
   }
   
-  if (!is.numeric(theta) || is.na(theta) || length(theta) != 1 || theta <= 0 || theta >= 1)
+  if (!is.numeric(theta) || length(theta) != 1L || is.na(theta) || theta <= 0 || theta >= 1)
     stop("theta must be a single number in (0, 1)")
   
-  if (!is.numeric(nsim) || is.na(nsim) || length(nsim) != 1 || nsim < 1)
+  if (!is.numeric(nsim) || length(nsim) != 1L || is.na(nsim) || nsim < 1)
     stop("nsim must be an integer greater than or equal to 1")
   if (!is.integer(nsim) && as.double(as.integer(nsim)) != nsim)
     warning("nsim changed by coercion from double; supply an integer to be precise")
   nsim <- as.integer(nsim)
   
-  if (length(zero.loc) != 1 || (is.character(zero.loc) && zero.loc != "full") ||
+  if (length(zero.loc) != 1L || (is.character(zero.loc) && zero.loc != "full") ||
       (is.numeric(zero.loc) && (is.na(zero.loc) || zero.loc <= 0 || zero.loc >= 1)))
     stop("zero.loc must be \"full\" or a single number in (0, 1)")
   
