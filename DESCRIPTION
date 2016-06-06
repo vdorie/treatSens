@@ -13,6 +13,7 @@ Imports:
   stats,
   graphics,
   grDevices,
+  mvtnorm,
   dbarts (>= 0.8-5)
 Suggests:
   doParallel,
