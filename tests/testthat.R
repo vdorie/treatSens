@@ -1,3 +1,4 @@
+Sys.setenv("R_TESTS" = "")
 if (require(testthat, quietly = TRUE)) {
   require(treatSens)
   test_check("treatSens")
