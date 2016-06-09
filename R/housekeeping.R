@@ -3,6 +3,25 @@
 #################
 
 ###
+#Differentiate between group-level and individual-level variables when treatment is group level
+###
+getColumnsAtTreatmentLevel <- function(x, treatment)
+{
+  if(is.null(x)) return(NULL)
+  
+  treatmentLevels <- unique(treatment)
+  treatmentIndices <- match(treatment, treatmentLevels)
+  
+  sapply(seq_len(ncol(x)), function(j) {
+    col <- x[,j]
+    all(sapply(seq_along(treatmentLevels), function(k) {
+      col.trt <- col[treatmentIndices == k]
+      all(col.trt == col.trt[1L])
+    }))
+  })
+}
+
+###
 #Determine if a vector consists entirely of zeroes and ones
 ###
 
@@ -77,7 +96,7 @@ parse.formula.mlm <- function(form, data) {
   #extract variables from formula & data
   trt <- formexp$fr[,2]				#assume treatment is 1st var on RHS
   if(dim(formexp$fr)[2] > 3) {
-    covars <- formexp$fr[,-c(1,2,dim(formexp$fr)[2])]			#variables on RHS, less the intercept, treatment
+    covars <- formexp$X[,-c(1,2)]			#variables on RHS, less the intercept, treatment
   }else{
     covars = NULL
   }
