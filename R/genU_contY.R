@@ -37,40 +37,53 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_ph
   if(trt.lev == "group"){
     Y = tapply(Y, gp, sum, na.rm = T)
     Z = tapply(Z, gp, mean, na.rm = T)
+    n = length(Y)
   }
   
   if(sensParam == "coef"){
-  	delta = zeta_z/v_Z
-  	gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) 
-  #	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z	
-  	var.UgZinv.diag = v_Z/(v_Z-zeta_z^2)
-  	var.UgZinv.mat = -zeta_z^2*v_phi/((v_Z-zeta_z^2)*(v_Z-zeta_z^2+n.gp*v_phi))
-  	
+    delta = zeta_z/v_Z
+    gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) 
+    #	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z	
+    var.UgZinv.diag = v_Z/(v_Z-zeta_z^2)
+    var.UgZinv.mat = -zeta_z^2*v_phi/((v_Z-zeta_z^2)*(v_Z-zeta_z^2+n.gp*v_phi))
+    
     eps.u = rep(NA, n)
-  	for(i in 1:length(gps)){
-  	  var.UgZinv = matrix(var.UgZinv.mat[i], nrow = n.gp[i], ncol = n.gp[i])
-  	  diag(var.UgZinv) = diag(var.UgZinv)+var.UgZinv.diag
-  	  var.Ymat = -zeta_y^2*solve(var.UgZinv)+v_alpha
-  	  diag(var.Ymat) = diag(var.Ymat) + v_Y
-  	  var.U = solve(zeta_y^2*solve(var.Ymat)+var.UgZinv)
-  	  if(length(gps) == 1){
-  	    eps.u = as.vector(rmvnorm(1, rep(0, n), var.U))
-  	  }else{
-  	    eps.u[gp == gps[i]] = rmvnorm(1, rep(0, n.gp[i]), var.U)
-  	  }
-  	}
+    for(i in 1:length(gps)){
+      var.UgZinv = matrix(var.UgZinv.mat[i], nrow = n.gp[i], ncol = n.gp[i])
+      diag(var.UgZinv) = diag(var.UgZinv)+var.UgZinv.diag
+      var.Ymat = -zeta_y^2*solve(var.UgZinv)+v_alpha
+      diag(var.Ymat) = diag(var.Ymat) + v_Y
+      if(trt.lev == "indiv"){
+        var.U = solve(zeta_y^2*solve(var.Ymat)+var.UgZinv)
+      }else if(trt.lev == "group"){
+        var.U = solve(diag(n.gp[i]*zeta_y^2/apply(var.Ymat,1,sum))+var.UgZinv)[1,1]
+      }
+      if(length(gps) == 1){
+        eps.u = as.vector(rmvnorm(1, rep(0, n), var.U))
+      }else if(trt.lev == "indiv"){
+        eps.u[gp == gps[i]] = rmvnorm(1, rep(0, n.gp[i]), var.U)
+      }else if(trt.lev == "group"){
+        eps.u[i] = rnorm(1, 0, sqrt(var.U))
+      }
+    }
   }else{
-   	delta = zeta_z/sqrt(v_Z)
-	  gamma = zeta_y/sqrt(v_Y)
-	  var.U = 1-zeta_z^2-zeta_y^2
-	  eps.u = rnorm(n, 0, sqrt(var.U))
+    delta = zeta_z/sqrt(v_Z)
+    gamma = zeta_y/sqrt(v_Y)
+    var.U = 1-zeta_z^2-zeta_y^2
+    eps.u = rnorm(n, 0, sqrt(var.U))
   }	
   
   U = Y*gamma + Z*delta + eps.u
+  if(trt.lev == "group"){
+    ng <- length(gps)
+    gpind = matrix(NA, nrow = n, ncol = ng)
+    for(i in 1:ng)
+      gpind[,i] = (g==gps[i])
+    U = gpind%*%matrix(U, ncol = 1)
+  }
   
   return(U)
 }
-
 ###############
 #Generate binary U 
 #Y: continuous response variable
@@ -337,7 +350,7 @@ contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, o
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU.mlm.gp <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
+contYbinaryZU.mlm.gp <- function(y, z, x, w, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
   n = length(y)
   if(!is.null(g)){
     n.gp <- table(g)
@@ -348,6 +361,12 @@ contYbinaryZU.mlm.gp <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL
       gpind[,i] = (g==gps[i])
   }else{
     stop("No groups specified for group-level U and treatment")
+  }
+  
+  if(!is.null(w)){
+    xw = cbind(x,w)
+  }else{
+    xw = x
   }
   
   if(is.null(p)) {
@@ -396,7 +415,7 @@ contYbinaryZU.mlm.gp <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL
       y.g = y[g == gps[i]]
       z.g = z[g == gps[i]][1]
       x.g = switch(is.null(dim(x[g==gps[i],]))+1, apply(x[g == gps[i],],2,mean, na.rm = T), x[g == gps[i],])
-      w.g = switch(is.null(dim(x[g==gps[i],]))+1, x[g == gps[i],], matrix(x[g == gps[i],], nrow = 1))
+      w.g = switch(is.null(dim(xw[g==gps[i],]))+1, xw[g == gps[i],], matrix(xw[g == gps[i],], nrow = 1))
       
       y1prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
       z1prob = log(pnorm(c(1,x.g,1)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,x.g,1)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
@@ -418,3 +437,103 @@ contYbinaryZU.mlm.gp <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL
     p = p
   ))
 }
+
+
+###############
+#Generate binary U 
+#Y: continuous response variable
+#Z: binary treatment variable
+#rho_y, rho_z: desired correlations between U and Y or Z
+###############
+
+contYbinaryZU.mlm.gp.noX <- function(y, z, w, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
+  n = length(y)
+  if(!is.null(g)){
+    n.gp <- table(g)
+    gps <- names(n.gp)
+    ng <- length(gps)
+    gpind = matrix(NA, nrow = n, ncol = ng)
+    for(i in 1:ng)
+      gpind[,i] = (g==gps[i])
+  }else{
+    stop("No groups specified for group-level U and treatment")
+  }
+  
+  if(is.null(p)) {
+    j2 = iter.j
+    p = 0.5
+  } else {
+    j2 = 1
+  }
+  
+  for(j in 1:j2) {
+    U = gpind%*%matrix(rbinom(ng,1,p), ncol =1)
+    
+    if (!offset) { 
+      if(j == 1 | cy != 0){
+        U.fit = switch(is.null(w)+1,
+                       suppressWarnings(glmer(y~z+U+w+(1|g), weights=weights)),
+                       suppressWarnings(glmer(y~z+U+(1|g), weights=weights)))
+        y.coef = fixef(U.fit)
+        y.coef[length(y.coef)]  = cy
+        v_Y = summary(U.fit)$sigma^2
+        v_alpha <- VarCorr(U.fit)$g[1]
+      }
+      if(j==1 | cz != 0){
+        UZ.fit = glm(z~U, family=binomial(link="probit"))
+        z.coef = coef(UZ.fit)
+        z.coef[length(z.coef)] = cz
+      }
+    } else {
+      if(j==1 | cy != 0){
+        U.fit = switch(is.null(w)+1,
+                       suppressWarnings(glmer(y~z+w+(1|g), offset=cy*U, weights=weights)),
+                       suppressWarnings(glmer(y~z+(1|g), offset=cy*U, weights=weights)))
+        y.coef = c(fixef(U.fit), cy)
+        v_Y = summary(U.fit)$sigma^2
+        v_alpha <- VarCorr(U.fit)$g[1]
+      }
+      if(j == 1 | cz != 0){
+        UZ.fit = glm(z~1, family=binomial(link="probit"), offset=cz*U)
+        z.coef = c(coef(UZ.fit), cz)
+      }
+    }
+    
+    pyzu = rep(NA, ng)
+    pyz = rep(NA, ng)
+    
+    for(i in 1:ng){
+      var.Ymat = matrix(v_alpha, nrow = n.gp[i], ncol = n.gp[i])
+      diag(var.Ymat) = diag(var.Ymat)+v_Y
+      
+      y.g = y[g == gps[i]]
+      z.g = z[g == gps[i]][1]
+      
+      if(!is.null(w)){
+        w.g = switch(is.null(dim(w[g==gps[i],]))+1, w[g == gps[i],], matrix(w[g == gps[i],], nrow = 1))  
+        y1prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
+        y0prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
+      }else{
+        y1prob = dmvnorm(as.vector(y.g-cbind(1,z.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE)   
+        y0prob = dmvnorm(as.vector(y.g-cbind(1,z.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
+      }
+    
+      z1prob = log(pnorm(c(1,1)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,1)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
+      z0prob = log(pnorm(c(1,0)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,0)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
+      
+      pyzu[i] = exp(y1prob+z1prob+log(theta))  
+      pyz[i] = exp(y0prob+z0prob+log(1-theta)) + pyzu[i]
+    }
+    
+    p = pyzu/pyz
+    p[pyz==0] = 0
+    if(cy == 0 & cz == 0) break
+  }
+  U = gpind%*%matrix(rbinom(ng,1,p), ncol =1)
+  
+  return(list(
+    U = U,
+    p = p
+  ))
+}
+

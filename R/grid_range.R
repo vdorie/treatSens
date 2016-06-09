@@ -45,14 +45,14 @@ DandCsearch <- function(x1, x2, y1, y2, tau1, tau2, fn.call) {
 ###
 
 grid.search <- function(extreme.cors, zero.loc, Xcoef.plot, Y, Z, X, 
-                        Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, sensParam) {
+                        Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, sensParam, W = NULL) {
   if(!is.null(control.fit$resp.family)){
     fname <- ifelse(is.null(control.fit$g), "fit.treatSens", "fit.treatSens.mlm")
   }else{
     fname <- "fit.treatSens.BART"
   }
   fn.call <- call(fname, sensParam = sensParam, Y=Y, Z=Z, Y.res=Y.res, Z.res=Z.res, X=X, zetaY=NA, zetaZ=NA, v_Y = v_Y, v_Z = v_Z,
-                  control.fit = control.fit, theta = theta)
+                  control.fit = control.fit, theta = theta, W = W)
   
   tau = rep(NA, 3)
   #  calculate new tau for (extreme Y)*(0, midpoint, extreme Z) to see if 0 is crossed (and in which half)

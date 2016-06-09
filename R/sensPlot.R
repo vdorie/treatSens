@@ -48,7 +48,7 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   }
   
   ##############  
-  #######Only inclue X on the plot for GLM-style
+  #######Only include X on the plot for GLM-style
   ############
   Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
   Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
