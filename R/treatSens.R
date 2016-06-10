@@ -99,8 +99,8 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     U.model = "binomial"    
   }
   
-  
-  if ((!identical(trt.family, binomial) || !identical(trt.family$link, "probit")) && !is.null(matchedCall[["iter.j"]])) {
+  if (!is.null(matchedCall[["iter.j"]]) && (
+    class(trt.family) != "family" || trt.family$family != "binomial" || trt.family$link != "probit")) {
     warning("iter.j option is meaningless unless trt.family = binomial(link=\"probit\")")
   } else {
     if (!is.numeric(iter.j) || is.na(iter.j) || length(iter.j) != 1 || iter.j < 1)
@@ -141,56 +141,56 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   #####WEIGHTED ESTIMATES
   #create weights if the user specifies either ATE, ATT, or ATC.
   
-  nt = sum(Z==1)
-  nc = sum(Z==0)
+  nt = sum(Z == 1)
+  nc = sum(Z == 0)
   
   if (!is.null(weights)) {
-    if (identical(class(weights),"character")) {
-      
-      if (!any(weights==c("ATE","ATT","ATC")))
+    if (is.numeric(weights)) {
+      if (length(weights) != n.obs || anyNA(weights) || any(weights < 0))
+        stop("numeric weights must be of length equal to the number of observations and greater than equal to 0")
+      if (verbose) cat("User-supplied weight are being used.\n")
+    } else if (is.character(weights)) {
+      if (length(weights) != 1L || is.na(weights) || weights %not_in% c("ATE", "ATT", "ATC"))
         stop("weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector")
       
       #    if (!identical(trt.family,binomial) && !identical(trt.family,gaussian)) {
       #      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
       
-      if (identical(weights,"ATE")) {
+      if (weights == "ATE") {
         wts <- 1/null.trt$fitted
         wts[Z==0] <-1/(1-null.trt$fitted[Z==0])
         wts = wts*n.obs/sum(wts) #normalizing weight
-        if (verbose) cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect.\n")}
-      
-      if (identical(weights,"ATT")) {
+        if (verbose) cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect.\n")
+      } else if (weights == "ATT") {
         wts <- null.trt$fitted/(1-null.trt$fitted)
         wts[Z==1] <-1
         wts[Z==0] = wts[Z==0]*(nc/sum(wts[Z==0])) #normalizing weight
-        if (verbose) cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect in the treated.","\n")}
-      
-      if (identical(weights,"ATC")) {
+        if (verbose) cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect in the treated.","\n")
+      } else if (weights == "ATC") {
         wts <- (1-null.trt$fitted)/null.trt$fitted
         wts[Z==0] <- 1
         wts[Z==1] = wts[Z==1]*(nt/sum(wts[Z==1])) #normalizing weight
-        if (verbose) cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect in the controls","\n")}
+        if (verbose) cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default weights for the average treatment effect in the controls","\n")
+      }
       
       #   trim.weight option
       if (!is.null(trim.wt)) {
-        if (is.numeric(trim.wt) & length(trim.wt)==1) {
-          if (trim.wt > 100)
-            stop("trim.wt must be a number greater than 0 and less or equal to 100")
-          if (identical(weights,"ATE")) max.wt = trim.wt/100*n.obs
-          if (identical(weights,"ATT")) max.wt = trim.wt/100*nt
-          if (identical(weights,"ATC")) max.wt = trim.wt/100*nc
-          wts[wts>max.wt] = max.wt
-          if (verbose) cat("Weight trimming is applied. The maximum size of weights is set to", max.wt,", which is", trim.wt,"% of the size of the inferential group.\n")
-        } else {
-          stop("trim.wt must be a number greater than 0 and less or equal to 100")
-        }
+        if (!is.numeric(trim.wt) || length(trim.wt) != 1L || is.na(trim.wt) || trim.wt <= 0 || trim.wt > 100)
+          stop("trim.wt must be a single number greater than 0 and less or equal to 100")
+        
+        if (identical(weights, "ATE")) max.wt = trim.wt / 100 * n.obs
+        if (identical(weights, "ATT")) max.wt = trim.wt / 100 * nt
+        if (identical(weights, "ATC")) max.wt = trim.wt / 100 * nc
+        wts[wts > max.wt] = max.wt
+        if (verbose) cat("Weight trimming is applied. The maximum size of weights is set to", max.wt,", which is", trim.wt,"% of the size of the inferential group.\n")
       }
       weights <- wts
-    } else if (identical(class(weights),"numeric") & length(weights)==n.obs) {
-      if (verbose) cat("User-supplied weight are being used.\n")
     } else {
-      stop("weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector")
+      stop("weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified numeric vector")
     }
+  } else {
+    if (!missing(trim.wt))
+      warning("trim.wt argument meaningless unless weights = \"ATE\", \"ATT\", or \"ATC\"; will be ignored")
   }
   
   ##########
