@@ -25,59 +25,48 @@ Z <- data$Z
 Y <- data$Y
 
 rm(data)
+
+## pull out utility functions from within package
+namedList <- treatSens:::namedList
+"%not_in%" <- treatSens:::"%not_in%"
+"%w/o%" <- treatSens:::"%w/o%"
+setInList <- treatSens:::setInList
+
 test_that("treatSens runs correctly on example data", {
-  fit.bin <-  treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim = 3,
-                        spy.range = c(0,4), spz.range = c(-2,2),grid.dim = c(5,3),
-                        standardize = FALSE, verbose = TRUE)
+  fit.bin <-  treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim = 2,
+                        spy.range = c(0, 2), spz.range = c(-2, 2),grid.dim = c(2, 2),
+                        standardize = FALSE)
   expect_is(fit.bin, "sensitivity")
 })
 
 test_that("treatSens fails with an invalid number of iterations", {
+  baseArgs <- namedList(formula = Y ~ Z + X, trt.family = binomial(link = "probit"),
+                        grid.dim = c(2, 2), nsim = 1, standardize = FALSE)
+  ## check for rounding error
+  expect_warning(
+    do.call(treatSens, setInList(baseArgs, iter.j = 1.5)))
   expect_error(
-<<<<<<< HEAD
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,iter.j=1.5,standardize = FALSE)
+    do.call(treatSens, setInList(baseArgs, iter.j = "not-a-number")))
   expect_error(
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,iter.j="not-a-number",standardize = FALSE)
+    do.call(treatSens, setInList(baseArgs, iter.j = NA_integer_)))
   expect_error(
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,iter.j=NA_integer_,standardize = FALSE)
-  expect_error(
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,iter.j=c(2,10),standardize = FALSE)   
-=======
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,iter.j=1.5,standardize = FALSE))
-  expect_error(
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,iter.j="not-a-number",standardize = FALSE))
-  expect_error(
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,iter.j=NA_integer_,standardize = FALSE))
-  expect_error(
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,iter.j=c(2,10),standardize = FALSE))   
->>>>>>> origin/master
+    do.call(treatSens, setInList(baseArgs, iter.j = c(2, 10))))
 })    
 
-test_that("treatSens fails with an invalid size of weight parameter", {
+test_that("treatSens fails with an invalid trim weight parameter", {
+  baseArgs <- namedList(formula = Y ~ Z + X, trt.family = binomial(link = "probit"),
+                        grid.dim = c(2, 2), nsim = 1, weights = "ATE", standardize = FALSE)
+  # trim.wt is only used when weights option is specified.
   expect_warning(
-<<<<<<< HEAD
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt= 30,standardize = FALSE)
-    # trim.wt is only used when weights option is specified.
+    do.call(treatSens, setInList(baseArgs, weights = NULL, trim.wt = 30)))
   expect_error(
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt= 150,standardize = FALSE)
+    do.call(treatSens, setInList(baseArgs, trim.wt = 150)))
   expect_error(
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt="not-a-number",standardize = FALSE)
+    do.call(treatSens, setInList(baseArgs, trim.wt = "not-a-number")))
   expect_error(
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt=NA_integer_,standardize = FALSE)
+    do.call(treatSens, setInList(baseArgs, trim.wt = NA_integer_)))
   expect_error(
-    treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt=c(2,10),standardize = FALSE)   
-=======
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt= 30,standardize = FALSE))
-    # trim.wt is only used when weights option is specified.
-  expect_error(
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt= 150,standardize = FALSE))
-  expect_error(
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt="not-a-number",standardize = FALSE))
-  expect_error(
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt=NA_integer_,standardize = FALSE))
-  expect_error(
-    treatSens(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim=3,trim.wt=c(2,10),standardize = FALSE))   
->>>>>>> origin/master
+    do.call(treatSens, setInList(baseArgs, trim.wt = c(2, 10))))
 })    
 
 test_that("treatSens fails with overridden zero.loc parameter", {
