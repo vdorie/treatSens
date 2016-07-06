@@ -26,7 +26,7 @@ maxCor <- function(Y,Z) {
 ###############
 
 contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_phi = 0, gp = NULL, trt.lev = "indiv") {
-  n <- length(Y)
+  n <- nall <- length(Y)
   if(!is.null(gp)){
     n.gp <- table(gp)
     gps <- names(n.gp)    
@@ -76,9 +76,9 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_ph
   U = Y*gamma + Z*delta + eps.u
   if(trt.lev == "group"){
     ng <- length(gps)
-    gpind = matrix(NA, nrow = n, ncol = ng)
+    gpind = matrix(NA, nrow = nall, ncol = ng)
     for(i in 1:ng)
-      gpind[,i] = (g==gps[i])
+      gpind[,i] = (gp==gps[i])
     U = gpind%*%matrix(U, ncol = 1)
   }
   

@@ -55,6 +55,16 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     X = allX[,colsAtTrtLev]
     if(dim(W)[[2]]==0) W = NULL
     if(dim(X)[[2]]==0) X = NULL
+    if(!is.null(W)){
+      gps <- names(table(group))
+      ng <- length(gps)
+      gpind = matrix(NA, nrow = length(Y), ncol = ng)
+      for(i in 1:ng)
+        gpind[,i] = (group==gps[i])
+      Xstar = gpind%*%(t(gpind)%*%W)
+    }else{
+      Xstar = NULL
+    }
   }
   
   if(is.null(data))   data = data.frame(Y,Z,W,X,group)
@@ -94,6 +104,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     Z = std.nonbinary(Z)
     if(!is.null(X))
       X = apply(X, 2, std.nonbinary)
+    if(!is.null(Xstar))
+      Xstar = apply(Xstar, 2, std.nonbinary)
     if(!is.null(W))
       W = apply(W, 2, std.nonbinary)
   } else { #MH: following two lines are added to avoid error in contYZU
@@ -116,11 +128,12 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     v_Z <- summary(null.trt)$sigma^2
     v_phi <- VarCorr(null.trt)$g[1]
   }else if(trt.level == "group"){
-    if(!is.null(X)) {
-      null.trt <- suppressWarnings(glm(Z~X, family=trt.family))
+    if(!is.null(cbind(X, Xstar))) {
+      X.temp = cbind(Xstar,X)
+      null.trt <- suppressWarnings(glm(Z~X.temp, family=trt.family))
       Z.res <- residuals(null.trt)
       Z.res.gp <- tapply(Z.res, group, mean)
-      v_Z <- var(Z.res.gp)*(length(Z.res.gp)-1)/(length(Z.res.gp)-dim(X)[2]-1)
+      v_Z <- var(Z.res.gp)*(length(Z.res.gp)-1)/(length(Z.res.gp)-dim(X.temp)[2]-1)
     }else{
       null.trt <- suppressWarnings(glm(Z~1, family=trt.family))
       Z.res <- residuals(null.trt)
@@ -205,9 +218,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   v_Y <- summary(null.resp)$sigma^2
   v_alpha <- VarCorr(null.resp)$g[1]
   
-  if(!is.null(X)) {
+  if(!is.null(allX)) {
     Xcoef = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), 
-                  switch(is.null(W)+1, fixef(null.resp)[-c(1,2,(1:dim(W)[[2]])+2)], fixef(null.resp)[-c(1,2)]))
+                  fixef(null.resp)[-c(1,2)])
   }else{
     Xcoef <- Xcoef.plot<- NULL
   }
@@ -219,12 +232,12 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   }
    
   
-  if(!is.null(X)) {
-    #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
+  if(!is.null(allX)) {
+    #Transform covars with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
-    X.positive = t(t(X)*Xcoef.flg)
-    null.resp.plot <- suppressWarnings(switch(is.null(W)+1, glmer(Y~Z+W+X.positive+(1|group), family=resp.family, weights=weights), glmer(Y~Z+X.positive+(1|group), family=resp.family, weights=weights)))
-    Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), switch(is.null(W)+1, fixef(null.resp)[-c(1,2,(1:dim(W)[[2]])+2)], fixef(null.resp)[-c(1,2)]))
+    X.positive = t(t(cbind(W,X))*Xcoef.flg)
+    null.resp.plot <- suppressWarnings(glmer(Y~Z+X.positive+(1|group), family=resp.family, weights=weights))
+    Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), fixef(null.resp.plot)[-c(1,2)])
   }
     
   #register control.fit
