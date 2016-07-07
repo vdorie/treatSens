@@ -48,6 +48,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   if(trt.level == "indiv"){
     W = NULL
     X = allX
+    Xstar = NULL
   }
   if(trt.level == "group"){
     colsAtTrtLev = getColumnsAtTreatmentLevel(allX, Z)
@@ -120,9 +121,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   #fit null model for treatment model & get residuals
   if(trt.level == "indiv"){
     if(!is.null(X)) {
-      null.trt <- suppressWarnings(glmer(Z~X + (1|group), family=trt.family))
+      null.trt <- glmer(Z~X + (1|group), family=trt.family)
     }else{
-      null.trt <- suppressWarnings(glmer(Z~1 + (1|group), family=trt.family))
+      null.trt <- glmer(Z~1 + (1|group), family=trt.family)
     } 
     Z.res <- residuals(null.trt)
     v_Z <- summary(null.trt)$sigma^2
@@ -243,7 +244,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
-                     offset = offset, p = NULL, g=group, trt.level = trt.level, v_alpha = v_alpha, v_phi = v_phi)
+                     offset = offset, p = NULL, g=group, trt.level = trt.level, v_alpha = v_alpha, v_phi = v_phi, Xstar = Xstar)
 
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, verbose = verbose, W = W)
   zetaZ = range$zetaZ
@@ -393,6 +394,7 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
   g = control.fit$g
   v_alpha = control.fit$v_alpha
   v_phi = control.fit$v_phi
+  Xstar = control.fit$Xstar
 
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
@@ -412,9 +414,9 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
       }else if(trt.level == "group"){
         if(!is.null(X)) {
           #debug(contYbinaryZU)
-          out.contYbinaryZU <- try(contYbinaryZU.mlm.gp(Y, Z, X, W, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+          out.contYbinaryZU <- try(contYbinaryZU.mlm.gp(Y, Z, X, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
         } else {
-          out.contYbinaryZU <- try(contYbinaryZU.mlm.gp.noX(Y, Z, W, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+          out.contYbinaryZU <- try(contYbinaryZU.mlm.gp.noX(Y, Z, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
         }
       }
     }else{

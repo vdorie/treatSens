@@ -350,7 +350,7 @@ contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, o
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU.mlm.gp <- function(y, z, x, w, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
+contYbinaryZU.mlm.gp <- function(y, z, x, w, xs, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
   n = length(y)
   if(!is.null(g)){
     n.gp <- table(g)
@@ -369,6 +369,12 @@ contYbinaryZU.mlm.gp <- function(y, z, x, w, cy, cz, theta, iter.j=10, weights=N
     xw = x
   }
   
+  if(!is.null(xs)){
+    xstar = cbind(x,xs)
+  }else{
+    xstar = x
+  }
+  
   if(is.null(p)) {
     j2 = iter.j
     p = 0.5
@@ -381,26 +387,26 @@ contYbinaryZU.mlm.gp <- function(y, z, x, w, cy, cz, theta, iter.j=10, weights=N
     
     if (!offset) { 
       if(j == 1 | cy != 0){
-        U.fit = suppressWarnings(glmer(y~z+x+U+(1|g), weights=weights))
+        U.fit = suppressWarnings(glmer(y~z+xw+U+(1|g), weights=weights))
         y.coef = fixef(U.fit)
         y.coef[length(y.coef)]  = cy
         v_Y = summary(U.fit)$sigma^2
         v_alpha <- VarCorr(U.fit)$g[1]
       }
       if(j==1 | cz != 0){
-        UZ.fit = glm(z~x+U, family=binomial(link="probit"))
+        UZ.fit = suppressWarnings(glm(z~xstar+U, family=binomial(link="probit"), control = glm.control(epsilon = 1e-6, maxit = 50)))
         z.coef = coef(UZ.fit)
         z.coef[length(z.coef)] = cz
       }
     } else {
       if(j==1 | cy != 0){
-        U.fit = suppressWarnings(glmer(y~z+x+(1|g), offset=cy*U, weights=weights))
+        U.fit = suppressWarnings(glmer(y~z+xw+(1|g), offset=cy*U, weights=weights))
         y.coef = c(fixef(U.fit), cy)
         v_Y = summary(U.fit)$sigma^2
         v_alpha <- VarCorr(U.fit)$g[1]
       }
       if(j == 1 | cz != 0){
-        UZ.fit = glm(z~x, family=binomial(link="probit"), offset=cz*U)
+        UZ.fit = suppressWarnings(glm(z~xstar, family=binomial(link="probit"), offset=cz*U, control = glm.control(epsilon = 1e-6, maxit = 50)))
         z.coef = c(coef(UZ.fit), cz)
       }
     }
@@ -414,7 +420,7 @@ contYbinaryZU.mlm.gp <- function(y, z, x, w, cy, cz, theta, iter.j=10, weights=N
       
       y.g = y[g == gps[i]]
       z.g = z[g == gps[i]][1]
-      x.g = switch(is.null(dim(x[g==gps[i],]))+1, apply(x[g == gps[i],],2,mean, na.rm = T), x[g == gps[i],])
+      x.g = switch(is.null(dim(xstar[g==gps[i],]))+1, apply(xstar[g == gps[i],],2,mean, na.rm = T), xstar[g == gps[i],])
       w.g = switch(is.null(dim(xw[g==gps[i],]))+1, xw[g == gps[i],], matrix(xw[g == gps[i],], nrow = 1))
       
       y1prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
@@ -446,7 +452,7 @@ contYbinaryZU.mlm.gp <- function(y, z, x, w, cy, cz, theta, iter.j=10, weights=N
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU.mlm.gp.noX <- function(y, z, w, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
+contYbinaryZU.mlm.gp.noX <- function(y, z, w, xs, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
   n = length(y)
   if(!is.null(g)){
     n.gp <- table(g)
@@ -465,6 +471,12 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, cy, cz, theta, iter.j=10, weights=
   } else {
     j2 = 1
   }
+
+  if(!is.null(xs)){
+    xstar = xs
+  }else{
+    xstar = NULL
+  }
   
   for(j in 1:j2) {
     U = gpind%*%matrix(rbinom(ng,1,p), ncol =1)
@@ -480,7 +492,9 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, cy, cz, theta, iter.j=10, weights=
         v_alpha <- VarCorr(U.fit)$g[1]
       }
       if(j==1 | cz != 0){
-        UZ.fit = glm(z~U, family=binomial(link="probit"))
+        UZ.fit = switch(is.null(xstar)+1,
+                        suppressWarnings(glm(z~xstar+U, family=binomial(link="probit"), control = glm.control(epsilon = 1e-6, maxit = 50))),
+                        suppressWarnings(glm(z~U, family=binomial(link="probit"), control = glm.control(epsilon = 1e-6, maxit = 50))))
         z.coef = coef(UZ.fit)
         z.coef[length(z.coef)] = cz
       }
@@ -494,7 +508,9 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, cy, cz, theta, iter.j=10, weights=
         v_alpha <- VarCorr(U.fit)$g[1]
       }
       if(j == 1 | cz != 0){
-        UZ.fit = glm(z~1, family=binomial(link="probit"), offset=cz*U)
+        UZ.fit = switch(is.null(xstar)+1,
+                        suppressWarnings(glm(z~xstar, family=binomial(link="probit"), offset=cz*U, control = glm.control(epsilon = 1e-6, maxit = 40))),
+                        suppressWarnings(glm(z~1, family=binomial(link="probit"), offset=cz*U, control = glm.control(epsilon = 1e-6, maxit = 40))))
         z.coef = c(coef(UZ.fit), cz)
       }
     }
@@ -508,6 +524,11 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, cy, cz, theta, iter.j=10, weights=
       
       y.g = y[g == gps[i]]
       z.g = z[g == gps[i]][1]
+      if(!is.null(xstar)){
+        x.g = switch(is.null(dim(xstar[g==gps[i],]))+1, apply(xstar[g == gps[i],],2,mean, na.rm = T), xstar[g == gps[i],])
+      }else{
+        x.g = NULL
+      }
       
       if(!is.null(w)){
         w.g = switch(is.null(dim(w[g==gps[i],]))+1, w[g == gps[i],], matrix(w[g == gps[i],], nrow = 1))  
@@ -518,8 +539,8 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, cy, cz, theta, iter.j=10, weights=
         y0prob = dmvnorm(as.vector(y.g-cbind(1,z.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
       }
     
-      z1prob = log(pnorm(c(1,1)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,1)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
-      z0prob = log(pnorm(c(1,0)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,0)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
+      z1prob = log(pnorm(c(1,x.g,1)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,x.g,1)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
+      z0prob = log(pnorm(c(1,x.g,0)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,x.g,0)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
       
       pyzu[i] = exp(y1prob+z1prob+log(theta))  
       pyz[i] = exp(y0prob+z0prob+log(1-theta)) + pyzu[i]
