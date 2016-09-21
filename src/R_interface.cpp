@@ -22,6 +22,7 @@
 
 using std::size_t;
 using std::uint32_t;
+using std::strcmp;
 
 extern "C" {
   void R_init_treatSens(DllInfo* info);
