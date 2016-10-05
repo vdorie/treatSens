@@ -87,7 +87,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   set.seed(seed)
   
   #extract variables from formula
-  form.vars <- parse.formula(formula, data)
+  form.vars <- parse.formula(formula, resp.cov = NULL, data)
   
   Y <- form.vars$resp
   Z <- form.vars$trt

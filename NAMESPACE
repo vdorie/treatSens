@@ -20,6 +20,8 @@ importFrom(stats, lm, glm, binomial, gaussian)
 importFrom(stats, model.frame, model.extract, model.response , is.empty.model, model.matrix)
 importFrom(stats, contrasts)
 importFrom(stats, na.omit, setNames)
+ importFrom("stats", "coef", "fitted.values", "glm.control",
+             "residuals")
 
 importFrom(graphics, par, plot, points, text, abline, legend, contour, box)
 importFrom(grDevices, contourLines)

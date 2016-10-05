@@ -13,32 +13,40 @@
 #trt.family: GLM family or "LMER" for LMER fit in treatment model
 ####
 
-X.partials <- function(Y, Z, X, resp.family, trt.family) {
+X.partials <- function(Y, Z, X, XY, resp.family, trt.family) {
 	if(class(resp.family) == "function"){
 		fname = "X.partials.GLM"
 	}else{
 		fname <- "X.partials.GLM"
 	}
-	do.call(fname, list(Y, Z, X, resp.family, trt.family))
+	do.call(fname, list(Y, Z, X, XY, resp.family, trt.family))
 }
 
 ####
 #Calculate partials for GLM
 ####
 
-X.partials.GLM <- function(Y, Z, X, resp.family, trt.family) {
+X.partials.GLM <- function(Y, Z, X, XY, resp.family, trt.family) {
 	nX <- dim(X)[2]
 	if(is.null(nX))
 		return(NULL)
 	if(nX == 1) {
 		XcorZ = cor(X, Z-mean(Z))
-		fit.resp <- glm(Y~Z, resp.family)
+		if(!is.null(XY)){
+		  fit.resp <- glm(Y~Z+XY, resp.family)
+		}else{
+		  fit.resp <- glm(Y~Z, resp.family)
+		}
 		Yr <- Y-fit.resp$fitted.values
 		XcorY <- cor(X, Yr)
 	}else{
 		XcorY <- XcorZ <- vector()
 		for(i in 1:nX) {
-			fit.resp <- glm(Y~X[,-i]+Z, resp.family)
+		  if(!is.null(XY)){
+		    fit.resp <- glm(Y~X[,-i]+XY+Z, resp.family)
+		  }else{
+		    fit.resp <- glm(Y~X[,-i]+Z, resp.family)
+		  }
 			fit.trt <- glm(Z~X[,-i], trt.family)
 
 			Yr <- Y-fit.resp$fitted.values
