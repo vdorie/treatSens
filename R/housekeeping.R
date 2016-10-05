@@ -8,6 +8,7 @@
 getColumnsAtTreatmentLevel <- function(x, treatment)
 {
   if(is.null(x)) return(NULL)
+  if(is.null(dim(x))) x = matrix(x, ncol = 1)
   
   treatmentLevels <- unique(treatment)
   treatmentIndices <- match(treatment, treatmentLevels)
@@ -45,36 +46,52 @@ is.binary <- function(x) {
 #data: data object containing variables (may be NULL)
 ###
 
-parse.formula <- function(form, data) {
+parse.formula <- function(formula, resp.cov, data) {
+  
+  allVarsRec <- function(object){
+    if (is.list(object)) {
+      unlist(lapply(object, allVarsRec))
+    }
+    else {
+      all.vars(object)
+    }
+  }
   
   if(missing(data))
-    data = environment(form)
+    data = environment(formula)
+
+  names = c(allVarsRec(resp.cov), allVarsRec(formula[[3]]))
+  rc.exp = dim(eval(parse(text =paste('cbind(',paste(allVarsRec(resp.cov), collapse =","),')'))))[2]
+  nrc = switch(is.null(rc.exp)+1, rc.exp[2],0) #length(allVarsRec(resp.cov))
+  form = eval(parse(text = paste(formula[[2]], "~", paste(names, collapse = "+")))[[1]])
   
-  cl <- match.call()
-  mf <- match.call(expand.dots = FALSE)
-  m <- match(c("form", "data"), names(mf), 0L)
-  mf <- mf[c(1L, m)]
-  mf$drop.unused.levels <- TRUE
-  mf[[1L]] <- quote(stats::model.frame)
-  mf <- eval(mf, parent.frame())
+  mf <- model.frame(form)
   mt <- attr(mf, "terms")
   resp <- model.response(mf, "numeric")    	#response from LHS
   if (is.empty.model(mt)) {
-    stop("Formula RHS empty; at least need treatment variable")
+    stop("Formula RHS empty")
   }
   else {
     x <- model.matrix(mt, mf, contrasts)
   }
   
   #extract variables from formula & data
-  trt <- x[,2]				#assume treatment is 1st var on RHS
-  if(dim(x)[2] > 2) {
-    covars <- x[,-c(1,2)]			#variables on RHS, less the intercept, treatment
-  }else{
-    covars = NULL
-  }
   
-  return(list(resp = resp, trt = trt, covars = covars))
+    trt <- x[,2]				#assume treatment is 1st var on RHS
+    if(dim(x)[2] > 2) {
+      if(!is.null(resp.cov)){
+        covars <- x[,-c(1:(nrc+2))]			#variables on RHS, less the intercept, treatment, response covariates
+        RespX <- x[,(3:(nrc+2))]  		#response-only variables on RHS
+      }else{
+        covars <- x[,-c(1,2)]			#variables on RHS, less the intercept, treatment, response covariates
+        RespX <- NULL
+      } 
+    }else{
+      covars <- NULL
+      RespX <-NULL
+    }
+  
+  return(list(resp = resp, trt = trt, covars = covars, RespX = RespX))
 }
 
 ###
@@ -84,24 +101,44 @@ parse.formula <- function(form, data) {
 #data: data object containing variables (may be NULL)
 ###
 
-parse.formula.mlm <- function(form, data) {
+parse.formula.mlm <- function(formula, resp.cov, data) {
   
+  allVarsRec <- function(object){
+    if (is.list(object)) {
+      unlist(lapply(object, allVarsRec))
+    }
+    else {
+      all.vars(object)
+    }
+  }
   if(missing(data))
-    data = environment(form)
+    data = environment(formula)
+  
+  names = c(allVarsRec(resp.cov), allVarsRec(formula[[3]]))
+  nrc = length(allVarsRec(resp.cov))
+  form = eval(parse(text = paste(formula[[2]], "~", paste(names[-length(names)], collapse = "+"), paste("+(1|", names[length(names)],")")))[[1]])
   
   formexp = lFormula(form, data = data)
   resp <- formexp$fr[,1]    	#response from LHS
   group <- formexp$fr[,dim(formexp$fr)[2]]
   
   #extract variables from formula & data
-  trt <- formexp$fr[,2]				#assume treatment is 1st var on RHS
+  trt <- formexp$fr[,(2+nrc)]				#assume treatment is 1st var on RHS
+  
   if(dim(formexp$fr)[2] > 3) {
-    covars <- formexp$X[,-c(1,2)]			#variables on RHS, less the intercept, treatment
+    if(!is.null(resp.cov)){
+      covars <- formexp$X[,-c(1:(nrc+2))]			#variables on RHS, less the intercept, treatment, response covariates
+      RespX <- formexp$X[,(2:(nrc+1))]  		#response-only variables on RHS
+    }else{
+      covars <- formexp$X[,-c(1:2)]			#variables on RHS, less the intercept, treatment, response covariates
+      RespX <- NULL
+    }
   }else{
     covars = NULL
+    RespX = NULL
   }
   
-  return(list(resp = resp, trt = trt, covars = covars, group = group))
+  return(list(resp = resp, trt = trt, covars = covars, RespX = RespX, group = group))
 }
 
 ###
