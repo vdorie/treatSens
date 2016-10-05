@@ -60,6 +60,10 @@ Unique options to \code{treatSens.BART} are given by the argument \code{trt.mode
 \value{
   \code{treatSens.BART} returns an object of class "\code{sensitivity}". See \link{treatSens} for details.
 }
+\references{Dorie V, Harada M, Carnegie NB, and Hill J. (2016) A Flexible, Interpretable Framework for Assessing Sensitivity to Unmeasured Confounding. Statistics in Medicine 35(20):3453-3470
+}
+\author{Vincent Dorie, Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
+}
 \seealso{
   \code{\link{treatSens}}
 }
