@@ -68,7 +68,10 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     }
   }
   
-  if(is.null(data))   data = data.frame(Y,Z,W,X,group)
+  if (is.null(data)) {
+    data <- if (is.null(X)) data.frame(Y,Z,group) else data.frame(Y,Z,X,group)
+    if (!is.null(W)) data$W <- W
+  }
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warnings(formula, resp.family, trt.family, theta, grid.dim, 
@@ -245,7 +248,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
                      offset = offset, p = NULL, g=group, trt.level = trt.level, v_alpha = v_alpha, v_phi = v_phi, Xstar = Xstar)
-
+  
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, verbose = verbose, W = W)
   zetaZ = range$zetaZ
   zetaY = range$zetaY
@@ -407,7 +410,8 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
       if(trt.level == "indiv"){
         if(!is.null(X)) {
           #debug(contYbinaryZU)
-          out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+          ## results are n.samp - n.warm in length, so this gives us 1 sample but I've added a bit of warm up
+          out.contYbinaryZU <- try(contYbinaryZU.mlm.stan(Y, Z, X, zetaY, zetaZ, theta, g, n.chain = 1L, n.samp = 21L, n.warm = 20L, n.thin = iter.j))
         } else {
           stop("Need to write Binary MLM code with no X") #out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
         }
