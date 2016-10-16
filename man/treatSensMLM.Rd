@@ -1,14 +1,14 @@
-\name{treatSens}
-\alias{treatSens}
+\name{treatSens.MLM}
+\alias{treatSens.MLM}
 \title{
-Performing Dual-Parameter Sensitivity Analysis
+Performing Dual-Parameter Sensitivity Analysis in Multi-level Models
 }
 \description{
-\code{treatSens} performs dual-parameter sensitivity analysis for unobserved confounding for both continuous and binary treatment variables.
+\code{treatSens.MLM} performs dual-parameter sensitivity analysis for unobserved confounding for both continuous and binary treatment variables in multi-level models.
 }
 \usage{
-treatSens(formula, response.covariates = NULL, sensParam = "coef", resp.family = gaussian, trt.family = gaussian, 
-theta = 0.5, grid.dim = c(8,4), standardize = TRUE, 
+treatSens.MLM(formula, response.covariates=NULL, resp.family = gaussian, trt.family = gaussian, 
+trt.level = "indiv", theta = 0.5, grid.dim = c(8,4), standardize = TRUE, 
 nsim = 20, zero.loc = 1/3, verbose = FALSE, 
 buffer = 0.1, weights = NULL, data = NULL, seed = 1234, 
 iter.j = 10, offset = TRUE, core = NULL, spy.range = NULL, 
@@ -17,13 +17,13 @@ spz.range = NULL, trim.wt = 10)
 \arguments{
   \item{formula}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a symbolic description of the model to be fitted.
 }
-\item{response.covariates}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a one-sided formula giving additional predictors to be included in the response model but not the treatment model.
+  \item{response.covariates}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a one-sided formula giving additional predictors to be included in the response model but not the treatment model.
 }
-\item{sensParam}{a string giving the choice of the form of the sensitivity parameters.  Supports "coef" for model coefficient and "cor" for partial correlations (with continuous treatment only)
+  \item{trt.level}{The level at which treatment is assigned.  Can be individual ("indiv") or group ("group").
 }
-  \item{resp.family}{an assumed family for GLM of the response model. Currently only supports \code{gaussian}. 
+  \item{resp.family}{an assumed family for GLMM of the response model. Currently only supports \code{gaussian}. 
 }
-  \item{trt.family}{an assumed family for GLM of the treatment model. The default is \code{gaussian}. \code{binomial(link="probit")} can be also specified.
+  \item{trt.family}{an assumed family for GLMM of the treatment model. The default is \code{gaussian}. \code{binomial(link="probit")} can be also specified.
 }
   \item{theta}{this option specifies the marginal probability that a binary unobserved confounder takes one \code{(i.e Pr(U=1))}. The default is \code{0.5}.
 }
@@ -68,7 +68,7 @@ Weights are calculated for any of three different estimands.  The weights for th
 An object of class "\code{sensitivity}" is a list containing the following components:
 \item{model.type}{estimation methods used (i.e. "\code{GLM}"").  Currently only GLM methods are available, but in future other types of models may be added. 
 }
-\item{sensParam}{type of sensitivity parameter used (model coefficient or partial correlation).
+\item{sensParam}{type of sensitivity parameter used (always model coefficient in this case).
 }
 \item{tau}{individual estimated treatment effects corresponding to each grid point (combination of sensitivity parameters) and each drawing of simulated U.
 }
@@ -98,7 +98,7 @@ Matrices and data frames should include only complete cases.
 \author{Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
 }
 \seealso{
-\code{\link{sensPlot}} \code{\link{summary.sensitivity}} \code{\link{glm}}
+\code{\link{treatSens}} \code{\link{sensPlot}} \code{\link{summary.sensitivity}} \code{\link{glmer}}
 }
 \examples{
 N = 300          #number of observations
@@ -108,6 +108,7 @@ zetaz = .5             #coefficient on U in the treatment model
 betaz = c(.75,-.5,.25) #coefficients of X in the treatment model
 betay = c(.5,1,-1.5)   #coefficients of X in the outcome model
 tau = .25              #treatment effect
+g = rep(1:10, each = 30)
 
 X = matrix(rnorm(3*N),N,3)           #covariates
 
@@ -115,36 +116,16 @@ X = matrix(rnorm(3*N),N,3)           #covariates
 # Example with continuous treatment
 set.seed(836)
 U = rnorm(N, 0, 1)         #unmeasured confounder
-Z = rnorm(N,X \%*\% betaz + zetaz*U,1)         #treatment variable
-Y = rnorm(N,X \%*\% betay + zetay*U + tau*Z,2) #outcome variable
+Z = rnorm(N,X \%*\% betaz + zetaz*U,1) + rep(rnorm(10), each = 30)        #treatment variable
+Y = rnorm(N,X \%*\% betay + zetay*U + tau*Z,2) + rep(rnorm(10), each = 30) #outcome variable
 
 # sensitivity analysis
-out.cont <- treatSens(Y~Z+X, grid.dim = c(8,5), nsim = 5,
+out.cont <- treatSens.MLM(Y~Z+X+(1|g), grid.dim = c(8,5), nsim = 5, trt.level = "indiv",
                      standardize = FALSE, verbose = TRUE, zero.loc = "full")
 
 summary(out.cont) #Prints average value of tau (trt effect) for each cell in grid.
 
 sensPlot(out.cont) # draw contour plot
 # You can see when zetay=zetaz=.5, tau is about .25.
-
-###############################
-# Example with binary treatment
-set.seed(725)
-U = rbinom(N,1,.5)                   #unmeasured confounder
-ps = pnorm(X\%*\%betaz + zetaz*(U-.5)) #propensity score
-Z = rbinom(N,1,ps)                   #treatment variable
-epsilon = rnorm(N,0,2)               #error term
-Y0 = X\%*\%betay + zetay*(U-.5) + epsilon       #potential outcome(Z=0)
-Y1 = X\%*\%betay + zetay*(U-.5) + tau + epsilon #potential outcome(Z=1)
-Y = Y0*(1-Z) + Y1*Z                  #realization of potential outcome
-
-# sensitivity analysis
-out.bin <- treatSens(Y~Z+X, trt.family = binomial(link="probit"), nsim = 3, 
-                      spy.range = c(0,4), spz.range = c(-2,2),grid.dim = c(5,3),
-                      standardize = FALSE, verbose = TRUE)
-
-summary(out.bin) #Prints average value of tau (trt effect) for each cell in grid.
-
-sensPlot(out.bin) # draw contour plot
-
 }
+
