@@ -471,3 +471,5 @@ src/config.hpp
 src/bart/config.hpp
 src/external/config.h
 *.swp
+src/Modules.cpp
+src/include/models.hpp

@@ -342,7 +342,6 @@ contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, o
 }
 
 
-
 ###############
 #Generate binary U 
 #Y: continuous response variable
