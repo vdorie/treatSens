@@ -2,6 +2,7 @@
 #Main function call
 ###############
 treatSens <- function(formula,         #formula: assume treatment is 1st term on rhs
+                      response.covariates = NULL,  #additional covariates to be added to response model only, as RHS-only formula (~ variables)
                      sensParam = "coef",	    #type of sensitivity parameter: accepts "coef" for model coefficients and "cor" for partial correlations
 				             resp.family = gaussian,  #family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
@@ -10,6 +11,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                      standardize = TRUE,	#Logical: should variables be standardized?
                      nsim = 20,			#number of simulated Us to average over per cell in grid
                      zero.loc = 1/3,		#location of zero along line y=x, as fraction in [0,1], or "full" if full range is desired
+				            # factor.summary = FALSE,  #logical; plot factor coefficents as a single summary across values (average magnitude)
                      verbose = FALSE,
                      buffer = 0.1, 		#restriction to range of coef on U to ensure stability around the edges
                      weights = NULL, 		#some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
@@ -60,15 +62,34 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   }
   
   #extract variables from formula
-  form.vars <- parse.formula(formula, data)
+  form.vars <- parse.formula(formula, response.covariates,data)
   
+  #######
+  ######
+  #Need to figure out how to make lengths compatible; removing observations with NA is not symmetric for two formulas
+  #######
+  ######
   Y = form.vars$resp
   Z = form.vars$trt
   X = as.matrix(form.vars$covars)
+  XY = switch(is.null(form.vars$RespX)+1, as.matrix(form.vars$RespX), NULL)
   
   Z = as.numeric(Z)  	#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
 
   if (is.null(data))   data = data.frame(Y,Z,X)
+  if(!is.null(X)){
+    if(!is.null(XY)){
+      data = data.frame(Y,Z,X,XY)
+    }else{
+      data = data.frame(Y,Z,X)
+    }
+  }else{
+    if(!is.null(XY)){
+      data = data.frame(Y,Z,XY)
+    }else{
+      data = data.frame(Y,Z)
+    }    
+  }
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warnings(formula, resp.family, trt.family, theta, grid.dim, 
@@ -117,6 +138,8 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     Z = std.nonbinary(Z)
     if(!is.null(X))
       X = apply(X, 2, std.nonbinary)
+    if(!is.null(XY))
+      XY = apply(XY, 2, std.nonbinary)
   } else { #MH: following two lines are added to avoid error in contYZU
     Y = as.numeric(Y)
     Z = as.numeric(Z)
@@ -198,18 +221,35 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   if (verbose) cat("Fitting null models...\n")
   #fit null model for the outcome & get residuals
   if(!is.null(X)) {
-    null.resp <- glm(Y~Z+X, family=resp.family, weights=weights)
+    if(!is.null(XY)){
+      null.resp <- glm(Y~Z+X+XY, family=resp.family, weights=weights)
+      nx = dim(X)[2]+dim(XY)[2]
+      nxy = dim(XY)[2]
+    }else{
+      null.resp <- glm(Y~Z+X, family=resp.family, weights=weights)
+      nx = dim(X)[2]
+      nxy = 0
+    }
   }else{
-    null.resp <- glm(Y~Z, resp.family)
+    if(!is.null(XY)){
+      null.resp <- glm(Y~Z+XY, family=resp.family, weights=weights)
+      nx = dim(XY)[2]
+      nxy = dim(XY)[2]
+    }else{
+      null.resp <- glm(Y~Z, resp.family)
+      nx = 0
+      nxy = 0
+    }
   }
   sgnTau0 = sign(null.resp$coef[2])
 
   n = length(null.resp$coef)
   Y.res <- Y-null.resp$fitted.values
-  if(!is.null(X)) {
-    v_Y <- var(Y.res)*(n.obs-1)/(n.obs-dim(X)[2]-2)
-    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2)])
-    Xpartials <- X.partials(Y, Z, X, resp.family, trt.family)
+  if(!is.null(X) | !is.null(XY)) {
+    v_Y <- var(Y.res)*(n.obs-1)/(n.obs-nx-2)
+    ncoef = length(null.resp$coef)
+    Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2,(nx-nxy+3):(ncoef+1))])
+    Xpartials <- X.partials(Y, Z, X, XY, resp.family, trt.family)
   }else{
     v_Y <- var(Y.res)*(n.obs-1)/(n.obs-2)
     Xcoef <- NULL
@@ -227,21 +267,25 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
-    null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
-    Xcoef.plot = cbind(null.trt$coef[-1], null.resp.plot$coef[-c(1,2)])
+    if(!is.null(XY)){
+      null.resp.plot <- glm(Y~Z+X.positive+XY, family=resp.family, weights=weights)
+    }else{
+      null.resp.plot <- glm(Y~Z+X.positive, family=resp.family, weights=weights)
+    }
+    Xcoef.plot = cbind(null.trt$coef[-1], null.resp.plot$coef[-c(1,2,(nx-nxy+3):(ncoef+1))])
   }
   if(!is.null(X) & sensParam == "cor") {
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xpartials[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
-    Xcoef.plot <- cbind(X.partials[,1], X.partials(Y, Z, X.positive, resp.family, trt.family)[,2])
+    Xcoef.plot <- cbind(X.partials[,1], X.partials(Y, Z, X.positive, XY, resp.family, trt.family)[,2])
     Xcoef <- Xpartials
   }
   
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
-                     offset = offset, p = NULL)
+                     offset = offset, p = NULL, XY = XY)
   
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, verbose)
   zetaZ = range$zetaZ
@@ -389,7 +433,8 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
   iter.j = control.fit$iter.j
   offset = control.fit$offset
   p = control.fit$p
-
+  XY = control.fit$XY
+  
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
     U <- try(contYZU(Y.res, Z.res, zetaY, zetaZ,v_Y, v_Z, sensParam))      
@@ -399,9 +444,9 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
     if(identical(trt.family$link,"probit")){
       if(!is.null(X)) {
         #debug(contYbinaryZU)
-        out.contYbinaryZU <- try(contYbinaryZU(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+        out.contYbinaryZU <- try(contYbinaryZU(Y, Z, X, XY, zetaY, zetaZ, theta, iter.j, weights, offset, p))
       } else {
-        out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+        out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, XY, zetaY, zetaZ, theta, iter.j, weights, offset, p))
       }
     }else{
       stop("only probit link is allowed")
@@ -418,20 +463,41 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
     if(std) U = std.nonbinary(U)
     
     if(!is.null(X)) {
-      fit.glm <- switch(offset+1,
-                        "FALSE" = glm(Y~Z+U+X, family=resp.family, weights=weights),
-                        "TRUE" = glm(Y~Z+X, family=resp.family, weights=weights, offset=zetaY*U))   
+      if(!is.null(XY)){
+        fit.glm <- switch(offset+1,
+                        "FALSE" = glm(Y~Z+U+X+XY, family=resp.family, weights=weights),
+                        "TRUE" = glm(Y~Z+X+XY, family=resp.family, weights=weights, offset=zetaY*U))   
       
-      sens.se <- switch(class(weights),
+        sens.se <- switch(class(weights),
                         "NULL" = summary(fit.glm)$coefficients[2,2],
-                        "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
-                        "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
+                        "character" = pweight(Z=Z, X=cbind(X,XY), r=fit.glm$residuals, wt=weights), #pweight is custom function
+                        "numeric" = pweight(Z=Z, X=cbind(X,XY), r=fit.glm$residuals, wt=weights)) #pweight is custom function
+      }else{
+        fit.glm <- switch(offset+1,
+                          "FALSE" = glm(Y~Z+U+X, family=resp.family, weights=weights),
+                          "TRUE" = glm(Y~Z+X, family=resp.family, weights=weights, offset=zetaY*U))   
+        
+        sens.se <- switch(class(weights),
+                          "NULL" = summary(fit.glm)$coefficients[2,2],
+                          "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
+                          "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
+      }
       fit.trt <- glm(Z~U+X, family=trt.family)
     }else{
-      fit.glm <- switch(offset+1,
-                        "FALSE" = glm(Y~Z+U, family=resp.family, weights=weights),
-                        "TRUE" = glm(Y~Z, family=resp.family, weights=weights, offset=zetaY*U))   
-      sens.se = summary(fit.glm)$coefficients[2,2]
+      if(!is.null(XY)){
+        fit.glm <- switch(offset+1,
+                        "FALSE" = glm(Y~Z+U+XY, family=resp.family, weights=weights),
+                        "TRUE" = glm(Y~Z+XY, family=resp.family, weights=weights, offset=zetaY*U))   
+        sens.se = switch(class(weights),
+                         "NULL" = summary(fit.glm)$coefficients[2,2],
+                         "character" = pweight(Z=Z, X=XY, r=fit.glm$residuals, wt=weights), #pweight is custom function
+                         "numeric" = pweight(Z=Z, X=XY, r=fit.glm$residuals, wt=weights)) #pweight is custom function
+      }else{
+        fit.glm <- switch(offset+1,
+                          "FALSE" = glm(Y~Z+U, family=resp.family, weights=weights),
+                          "TRUE" = glm(Y~Z, family=resp.family, weights=weights, offset=zetaY*U))   
+        sens.se = summary(fit.glm)$coefficients[2,2]
+      }
       fit.trt <- glm(Z~U, family=trt.family)		
     }
     

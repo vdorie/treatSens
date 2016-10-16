@@ -2,6 +2,7 @@
 #Main function call
 ###############
 treatSens.MLM <- function(formula,         #formula: assume treatment is 1st term on rhs
+                          response.covariates = NULL, #RHS formula of additional covariates for the response model only
                      resp.family = gaussian,  #family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
                      trt.level = "indiv", #treatment level - individual ("indiv") or group ("group")
@@ -36,41 +37,67 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   set.seed(seed)
   
   #extract variables from formula
-  form.vars <- suppressWarnings(parse.formula.mlm(formula, data))  #can return warning about scale of variables, which is not an issue when standardizing
+  form.vars <- suppressWarnings(parse.formula.mlm(formula, response.covariates, data))  #can return warning about scale of variables, which is not an issue when standardizing
   
   Y = form.vars$resp
   Z = form.vars$trt
   allX = form.vars$covars
+  RespX = form.vars$RespX
   group = form.vars$group
   
   Z = as.numeric(Z)  	#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
   
   if(trt.level == "indiv"){
-    W = NULL
+    W = RespX
     X = allX
     Xstar = NULL
   }
   if(trt.level == "group"){
     colsAtTrtLev = getColumnsAtTreatmentLevel(allX, Z)
-    W = allX[,!colsAtTrtLev]
+    W = cbind(allX[,!colsAtTrtLev], RespX)
     X = allX[,colsAtTrtLev]
-    if(dim(W)[[2]]==0) W = NULL
-    if(dim(X)[[2]]==0) X = NULL
+    if(is.null(dim(W))) W = NULL
+    if(dim(X)[2]==0) X = NULL
     if(!is.null(W)){
       gps <- names(table(group))
       ng <- length(gps)
       gpind = matrix(NA, nrow = length(Y), ncol = ng)
       for(i in 1:ng)
         gpind[,i] = (group==gps[i])
-      Xstar = gpind%*%(t(gpind)%*%W)
+      Xstar = gpind%*%(t(gpind)%*%W[,-((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))])
     }else{
       Xstar = NULL
     }
   }
-  
-  if (is.null(data)) {
-    data <- if (is.null(X)) data.frame(Y,Z,group) else data.frame(Y,Z,X,group)
-    if (!is.null(W)) data$W <- W
+
+  if(!is.null(W)){
+    if(!is.null(X)){
+      if(!is.null(Xstar)){
+        data = data.frame(Y,Z,W,X,Xstar,group)
+      }else{
+        data = data.frame(Y,Z,W,X,group)
+      }
+    }else{
+      if(!is.null(Xstar)){
+        data = data.frame(Y,Z,W,Xstar,group)
+      }else{
+        data = data.frame(Y,Z,W,group)
+      }
+    }
+  }else{
+    if(!is.null(X)){
+      if(!is.null(Xstar)){
+        data = data.frame(Y,Z,X,Xstar,group)
+      }else{
+        data = data.frame(Y,Z,X,group)
+      }
+    }else{
+      if(!is.null(Xstar)){
+        data = data.frame(Y,Z,Xstar,group)
+      }else{
+        data = data.frame(Y,Z,group)
+      }
+    }    
   }
   
   #Check whether data, options, and etc. conform to the format in "warnings.R"
@@ -124,9 +151,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   #fit null model for treatment model & get residuals
   if(trt.level == "indiv"){
     if(!is.null(X)) {
-      null.trt <- glmer(Z~X + (1|group), family=trt.family)
+      null.trt <- suppressWarnings(glmer(Z~X + (1|group), family=trt.family))
     }else{
-      null.trt <- glmer(Z~1 + (1|group), family=trt.family)
+      null.trt <- suppressWarnings(glmer(Z~1 + (1|group), family=trt.family))
     } 
     Z.res <- residuals(null.trt)
     v_Z <- summary(null.trt)$sigma^2
@@ -134,12 +161,12 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   }else if(trt.level == "group"){
     if(!is.null(cbind(X, Xstar))) {
       X.temp = cbind(Xstar,X)
-      null.trt <- suppressWarnings(glm(Z~X.temp, family=trt.family))
+      null.trt <- suppressWarnings(glm(Z~X.temp, family=trt.family, control = glm.control(epsilon = 1e-6, maxit = 50)))
       Z.res <- residuals(null.trt)
       Z.res.gp <- tapply(Z.res, group, mean)
       v_Z <- var(Z.res.gp)*(length(Z.res.gp)-1)/(length(Z.res.gp)-dim(X.temp)[2]-1)
     }else{
-      null.trt <- suppressWarnings(glm(Z~1, family=trt.family))
+      null.trt <- suppressWarnings(glm(Z~1, family=trt.family, control = glm.control(epsilon = 1e-6, maxit = 50)))
       Z.res <- residuals(null.trt)
       Z.res.gp <- tapply(Z.res, group, mean)
       v_Z <- var(Z.res.gp)
@@ -206,7 +233,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   #fit null model for the outcome & get residuals
   if(!is.null(X)) {
     if(!is.null(W)){
-      null.resp <- suppressWarnings(glmer(Y~Z+W+X+(1|group), family=resp.family, weights=weights))
+      null.resp <- suppressWarnings(glmer(Y~Z+X+W+(1|group), family=resp.family, weights=weights))
     }else {
       null.resp <- suppressWarnings(glmer(Y~Z+X+(1|group), family=resp.family, weights=weights))
     }
@@ -223,8 +250,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   v_alpha <- VarCorr(null.resp)$g[1]
   
   if(!is.null(allX)) {
-    Xcoef = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), 
-                  fixef(null.resp)[-c(1,2)])
+    zXcoef = switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1])
+    Xcoef = cbind(zXcoef, 
+                  fixef(null.resp)[3:(2+length(zXcoef))])
   }else{
     Xcoef <- Xcoef.plot<- NULL
   }
@@ -237,11 +265,19 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
    
   
   if(!is.null(allX)) {
+    if(!is.null(W)){
+      Wboth = W[,-c((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))]
+      Wresp = W[,c((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))]
+    }else{
+      Wboth = NULL
+      Wresp = NULL
+    }
+      
     #Transform covars with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
-    X.positive = t(t(cbind(W,X))*Xcoef.flg)
-    null.resp.plot <- suppressWarnings(glmer(Y~Z+X.positive+(1|group), family=resp.family, weights=weights))
-    Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), fixef(null.resp.plot)[-c(1,2)])
+    X.positive = t(t(cbind(Wboth,X))*Xcoef.flg)
+    null.resp.plot <- switch(is.null(Wresp)+1, suppressWarnings(glmer(Y~Z+X.positive+Wresp+(1|group), family=resp.family, weights=weights)), suppressWarnings(glmer(Y~Z+X.positive+(1|group), family=resp.family, weights=weights)))
+    Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), fixef(null.resp.plot)[3:(2+length(zXcoef))])
   }
     
   #register control.fit

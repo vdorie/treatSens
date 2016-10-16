@@ -7,7 +7,7 @@ Performing Dual-Parameter Sensitivity Analysis
 \code{treatSens} performs dual-parameter sensitivity analysis for unobserved confounding for both continuous and binary treatment variables.
 }
 \usage{
-treatSens(formula, sensParam = "coef", resp.family = gaussian, trt.family = gaussian, 
+treatSens(formula, response.covariates = NULL, sensParam = "coef", resp.family = gaussian, trt.family = gaussian, 
 theta = 0.5, grid.dim = c(8,4), standardize = TRUE, 
 nsim = 20, zero.loc = 1/3, verbose = FALSE, 
 buffer = 0.1, weights = NULL, data = NULL, seed = 1234, 
@@ -17,7 +17,9 @@ spz.range = NULL, trim.wt = 10)
 \arguments{
   \item{formula}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a symbolic description of the model to be fitted.
 }
-  \item{sensParam}{a string giving the choice of the form of the sensitivity parameters.  Supports "coef" for model coefficient and "cor" for partial correlations (with continuous treatment only)
+\item{response.covariates}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a one-sided formula giving additional predictors to be included in the response model but not the treatment model.
+}
+\item{sensParam}{a string giving the choice of the form of the sensitivity parameters.  Supports "coef" for model coefficient and "cor" for partial correlations (with continuous treatment only)
 }
   \item{resp.family}{an assumed family for GLM of the response model. Currently only supports \code{gaussian}. 
 }
@@ -91,7 +93,7 @@ When \code{weights} are specified, \code{treatSens} returns clustered robust sta
 
 Matrices and data frames should include only complete cases.
 }
-\references{Carnegie NB, Hill JH and Harada M. Assessing sensitivity to unmeasured confounding using simulated potential confounders (under review)
+\references{Carnegie NB, Hill JH and Harada M. (2016) Assessing sensitivity to unmeasured confounding using simulated potential confounders. Journal of Research on Educational Effectiveness 9(3):395-420.
 }
 \author{Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
 }
