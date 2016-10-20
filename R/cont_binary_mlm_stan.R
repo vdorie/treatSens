@@ -47,14 +47,14 @@ contYbinaryZU.mlm.stan <- function(y, z, x, zeta.y, zeta.z, theta, g,
                theta = theta)
   
   ## required to shut stan up
-  if (!verbose) {
+  if (verbose == 0L) {
     stanMessages <- NULL
     stringConnection <- textConnection("stanMessages", "w", local = TRUE)
     sink(stringConnection)
   }
   stanFit <- rstan::sampling(stanmodels$cont_binary_mlm,
     chains = n.chain, iter = n.samp * n.thin, warmup = n.warm * n.thin, thin = n.thin,
-    data = data, open_progress = FALSE, show_messages = verbose)
+    data = data, open_progress = FALSE, verbose = verbose > 1L, show_messages = verbose >= 1L)
   if (!verbose) {
     sink()
     close(stringConnection)
