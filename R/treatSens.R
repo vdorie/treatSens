@@ -57,9 +57,12 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   if (!is.null(core)) {
     if (!is.numeric(core) || anyNA(core) || any(core <= 0))
       stop("core must be a positive integer or NULL")
-    if (!is.integer(core) && any(as.double(as.integer(core)) != core))
+    if (!is.integer(core) && any(as.double(as.integer(core)) != core)) {
       warning("core changed by coercion from double; supply an integer to be precise")
+      core <- as.integer(core)
+    }
   }
+  if (all(core == 1L)) core <- NULL
   
   #extract variables from formula
   form.vars <- parse.formula(formula, response.covariates,data)

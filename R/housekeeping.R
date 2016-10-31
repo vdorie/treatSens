@@ -57,7 +57,7 @@ parse.formula <- function(formula, resp.cov, data) {
     }
   }
   
-  if(missing(data))
+  if (missing(data) || is.null(data))
     data = environment(formula)
 
   names = c(allVarsRec(resp.cov), allVarsRec(formula[[3]]))
@@ -65,7 +65,7 @@ parse.formula <- function(formula, resp.cov, data) {
   nrc = switch(is.null(rc.exp)+1, rc.exp[2],0) #length(allVarsRec(resp.cov))
   form = eval(parse(text = paste(formula[[2]], "~", paste(names, collapse = "+")))[[1]])
   
-  mf <- model.frame(form)
+  mf <- model.frame(form, data)
   mt <- attr(mf, "terms")
   resp <- model.response(mf, "numeric")    	#response from LHS
   if (is.empty.model(mt)) {
