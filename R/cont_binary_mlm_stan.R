@@ -6,7 +6,9 @@ contYbinaryZU.mlm.stan <- function(y, z, x, zeta.y, zeta.z, theta, g,
   
   ## y | u, z ~ N(x beta.y + tau z + zeta.y * u, sigma.sq.y)
   ## z | u    ~ Bernoulli(Phi^-1(x beta.z + zeta.z * u))
-
+  
+  n <- length(y)
+  
   if (!is.null(g)) {
     n.gp <- table(g)
     gps <- names(n.gp)

@@ -1,69 +1,5 @@
-if (FALSE) {
-require(testthat)
-
-rh <- c(2, 5)
-list[a,b] <- rh
-expect_equal(a, 2)
-expect_equal(b, 5)
-rm(a, b)
-
-list[a,] <- rh
-expect_equal(a, 2)
-expect_error(b)
-rm(a)
-list[,b] <- rh
-expect_equal(b, 5)
-expect_error(a)
-rm(b)
-
-expect_warning(list[a = b,] <- rh)
-rm(a)
-
-rh <- c(a = 2, b = 5)
-list[a, c = b] <- rh
-expect_equal(a, 2)
-expect_equal(c, 5)
-expect_error(b)
-rm(a, c)
-
-list[c = a,] <- rh
-expect_equal(c, 2)
-
-expect_error(list[c = d,] <- rh)
-
-list[c = a, d = a] <- rh
-expect_equal(c, 2)
-expect_equal(d, 2)
-
-expect_warning(list[c = a, c = b] <- rh)
-rm(c)
-
-rh <- c(a = 2, a = 5)
-expect_warning(list[b = a, c] <- rh)
-expect_equal(b, 2)
-expect_equal(c, 5)
-rm(b, c)
-
-rh <- list(a = 2, b = 5)
-unpack[a, b] <- rh
-expect_equal(a, 2)
-expect_equal(b, 5)
-rm(a, b)
-
-unpack[b, a] <- rh
-expect_equal(a, 2)
-expect_equal(b, 5)
-rm(a, b)
-
-rh <- c(a = 2, c = 5)
-unpack[a, b] <- rh
-expect_equal(a, 2)
-expect_error(b)
-rm(a)
-}
-
 ## allows multiple assignment
-list <- structure(NA, class = "lval")
+massign <- structure(NA, class = "lval")
 
 "[<-.lval" <- function(x, ..., value) {
   callingEnv <- parent.frame(1L)
@@ -137,7 +73,8 @@ list <- structure(NA, class = "lval")
     assign(varName, value[sel][[1L]], envir = callingEnv)
     #eval.parent(substitute(varName <- val, list(varName = varName, val = value[sel][[1L]])))
     ## check to see if the value is named later, if not pop it off
-    if (i == length(argNames) || !any(valueName %in% tail(args, -i))) {
+    if (i == length(argNames) || !any(valueName %in% args[seq.int(i + 1L, length(args))])) {
+      ## tail(args, -i))) {
       value <- value[!sel]
       valueNames <- valueNames[!sel]
     }
