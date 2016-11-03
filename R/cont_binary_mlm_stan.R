@@ -1,5 +1,7 @@
 contYbinaryZU.mlm.stan <- function(y, z, x, zeta.y, zeta.z, theta, g,
-  n.chain = 2L, n.samp = 400L, n.thin = 5L, n.warm = n.samp %/% 2L, verbose = FALSE)
+  n.cores  = getOption("mc.cores", 1L),
+  n.chain = 2L, n.samp = 400L, n.thin = 5L, n.warm = n.samp %/% 2L, init = "random",
+  verbose = FALSE)
 {
   is.discrete <- function(col) is.factor(col) || length(unique(col)) <= 2L
   standardize <- function(x) { m <- mean(x); s <- sd(x); res <- (x - m) / s; attr(res, "mean") <- m; attr(res, "sd") <- s; res }
@@ -55,17 +57,34 @@ contYbinaryZU.mlm.stan <- function(y, z, x, zeta.y, zeta.z, theta, g,
     sink(stringConnection)
   }
   stanFit <- rstan::sampling(stanmodels$cont_binary_mlm,
-    chains = n.chain, iter = n.samp * n.thin, warmup = n.warm * n.thin, thin = n.thin,
-    data = data, open_progress = FALSE, verbose = verbose > 1L, show_messages = verbose >= 1L)
+    cores = n.cores, init = init,
+    chains = n.chain, iter = n.samp * n.thin, warmup = n.warm * n.thin, thin = n.thin, data = data,
+    open_progress = FALSE, verbose = verbose > 1L, show_messages = verbose >= 1L)
   if (!verbose) {
     sink()
     close(stringConnection)
   }
+    
+  lastIndex <- n.samp - n.warm
   
-  pars <- rstan::extract(stanFit, pars = c("p", "ranef_treatment", "ranef_response"))
+  modelPars <- rstan::extract(stanFit, permuted = FALSE,
+                              c("ranef_treatment", "ranef_response", "treatmentEffect", "beta_treatment",
+                                "beta_response", "sigma_response", "sigma_ranef_treatment", "sigma_ranef_response"))
+  last <- lapply(seq_len(n.chain), function(chainNum) {
+    list(ranef_treatment = modelPars[lastIndex, chainNum, paste0("ranef_treatment[", seq_along(n.gp), "]")],
+         ranef_response  = modelPars[lastIndex, chainNum, paste0("ranef_response[",  seq_along(n.gp), "]")],
+         treatmentEffect = modelPars[lastIndex, chainNum, "treatmentEffect"],
+         beta_treatment  = modelPars[lastIndex, chainNum, paste0("beta_treatment[", seq_len(ncol(x.stan)), "]")],
+         beta_response   = modelPars[lastIndex, chainNum, paste0("beta_response[", seq_len(ncol(x.stan)), "]")],
+         sigma_response  = modelPars[lastIndex, chainNum, "sigma_response"],
+         sigma_ranef_treatment = modelPars[lastIndex, chainNum, "sigma_ranef_treatment"],
+         sigma_ranef_response  = modelPars[lastIndex, chainNum, "sigma_ranef_response"])
+  })
+  
+  pars <- rstan::extract(stanFit, pars = "p")
   
   p <- drop(t(pars$p))
   U <- drop(matrix(rbinom(length(p), 1L, p), NROW(p)))
   
-  list(p = p, U = U, phi = drop(t(pars$ranef_treatment)), alpha = drop(t(pars$ranef_response)))
+  list(p = p, U = U, last = last)
 }

@@ -242,7 +242,7 @@ contYbinaryZU.noX <- function(y, z, xy, cy, cz, theta, iter.j=10, weights=NULL, 
 #rho_y, rho_z: desired correlations between U and Y or Z
 ###############
 
-contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
+if (FALSE) contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, offset, p, g) { 
   n = length(y)
   if(!is.null(g)){
     n.gp <- table(g)
@@ -348,6 +348,188 @@ contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j=10, weights=NULL, o
     p = p
   ))
 }
+
+contYbinaryZU.mlm.fitLinearModels <- function(data, offset, u)
+{
+  df <- list(y = data$y, z = data$z, x = data$x, g = data$g)
+  if (!is.null(data$weights)) df$weights <- data$weights
+  if (!is.null(u)) df$u <- u
+  class(df) <- "data.frame"
+  attr(df, "row.names") <- as.character(seq_along(data$y))
+  
+  if (is.null(u)) {
+    fit.rsp <- lmer(y ~ z + x + (1 | g), data = df, weights = weights)
+    fit.trt <- glmer(z ~ x + (1 | g), data = df, family = binomial(link = "probit"))
+    
+    return(list(v.y = sigma(fit.rsp)^2,
+                v.alpha = VarCorr(fit.rsp)$g[1L],
+                v.phi   = VarCorr(fit.trt)$g[1L],
+                beta.y = c(fixef(fit.rsp), 0),
+                beta.z = c(fixef(fit.trt), 0)))
+  }
+    
+  result <- list()
+  
+  if (offset == FALSE) {
+    if (data$zeta.y != 0) {
+      fit.rsp <- lmer(y ~ z + x + u + (1 | g), data = df, weights = data$weights)
+      result$beta.y <- fixef(fit.rsp)
+      result$beta.y[length(result$beta.y)] <- data$zeta.y
+    }
+    if (data$zeta.z != 0) {
+      fit.trt <- glmer(z ~ x + u + (1 | g), data = df, family = binomial(link = "probit"))
+      result$beta.z <- fixef(fit.trt)
+      result$beta.z[length(result$beta.z)] <- data$zeta.z
+    }
+  } else {
+    if (data$zeta.y != 0) {
+      fit.rsp <- lmer(y ~ z + x + (1 | g), data = df, offset = data$zeta.y * u, weights = data$weights)
+      result$beta.y <- c(fixef(fit.rsp), data$zeta.y)
+    }
+    if (data$zeta.z != 0) {
+      fit.trt <- glmer(z ~ x + (1 | g), data = df, offset = data$zeta.z * u, family = binomial(link = "probit"))
+      result$beta.z <- c(fixef(fit.trt), data$zeta.z)
+    }
+  }
+  
+  if (exists("fit.rsp")) {
+    result$v.y <- sigma(fit.rsp)^2
+    result$v.alpha <- VarCorr(fit.rsp)$g[1L]
+  }
+  if (exists("fit.trt"))
+    result$v.phi <- VarCorr(fit.trt)$g[1L]
+  
+  result
+}
+
+contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j = 10, weights = NULL, offset, p, g) { 
+  n.obs <- length(y)
+  
+  if (!is.null(g)) {
+    n.gp <- table(g)
+    gps <- names(n.gp)    
+    g.ind <- match(g, gps) ## since g doesn't necessary go 1:numGroups, for each obs we get the index of its group
+  } else {
+    n.gp <- n.obs
+    gps <- ""
+    g.ind <- rep_len(1L, n.obs)
+  }
+  
+  data <- namedList(y, z, x, g, weights, zeta.y = cy, zeta.z = cz,
+                    n.obs, n.gp)
+  
+  ## indexes back into U if we split by group
+  g.ind <- lapply(seq_along(gps), function(i) which(g.ind == i))
+  ## cache splits across groups
+  y.g <- lapply(seq_along(gps), function(i) y[g.ind[[i]]])
+  x.g <- lapply(seq_along(gps), function(i) if (NCOL(x) == 1L) x[g.ind[[i]]] else x[g.ind[[i]],])
+  z.g <- lapply(seq_along(gps), function(i) z[g.ind[[i]]])
+
+  p <- if (!is.null(p)) rep_len(p, n.obs) else rep_len(0.5, n.obs)
+  
+  fitLinearModels <- contYbinaryZU.mlm.fitLinearModels
+  
+  u <- rbinom(n.obs, 1L, p)
+  
+  for (j in seq_len(iter.j)) {
+    unpack[beta.y, beta.z, v.y, v.alpha, v.phi] <- fitLinearModels(data, offset, u)
+    
+    for (i in seq_along(n.gp)) {
+      Sigma.z <- diag(1,   n.gp[i]) + matrix(v.phi,   nrow = n.gp[i], ncol = n.gp[i])
+      Sigma.y <- diag(v.y, n.gp[i]) + matrix(v.alpha, nrow = n.gp[i], ncol = n.gp[i])
+      
+      z.g.i <- z.g[[i]]
+      x.g.i <- x.g[[i]]
+      y.g.i <- y.g[[i]]
+      u.g.i <- u[g.ind[[i]]]
+      
+      ## cache values for calculating zprob
+      intLimit <- as.vector(cbind(1, x.g.i, u.g.i) %*% beta.z)
+      zprobValues <- list(beta.z = beta.z[length(beta.z)],
+                          lower = ifelse(z.g.i == 0, intLimit, -Inf),
+                          upper = ifelse(z.g.i == 1, intLimit,  Inf))
+      zprob.cur <- with(zprobValues, log(pmvnorm(lower = lower, upper = upper, sigma = Sigma.z))[1L])
+      
+      ## cache values for calculting yprob
+      yprobValues <- list(mu = as.vector(y.g.i - cbind(1, z.g.i, x.g.i, u.g.i) %*% beta.y),
+                          beta.y = beta.y[length(beta.y)],
+                          L.inv = solve(t(chol(Sigma.y))))
+      yprob.cur <- with(yprobValues, -0.5 * crossprod(L.inv %*% mu)[1L])
+      
+      ## iterate through observations in group
+      for (k in seq_len(n.gp[i])) {
+        u.cur <- u.g.i[k]
+        if (u.cur == 0) {
+          if (z.g.i[k] == 0) {
+            ## u.g.i[k] == 0 && z.g.i[k] == 0
+            lower.k <- zprobValues$lower
+            lower.k[k] <- lower.k[k] + zprobValues$beta.z
+            zprob.new <- log(pmvnorm(lower = lower.k, upper = zprobValues$upper, sigma = Sigma.z))[1L]
+          } else {
+            ## u.g.i[k] == 0 && z.g.i[k] == 1
+            upper.k <- zprobValues$upper
+            upper.k[k] <- upper.k[k] + zprobValues$beta.z
+            zprob.new <- log(pmvnorm(lower = zprobValues$lower, upper = upper.k, sigma = Sigma.z))[1L]
+          }
+          
+          mu.k <- yprobValues$mu
+          mu.k[k] <- mu.k[k] - yprobValues$beta.y
+          yprob.new <- with(yprobValues, -0.5 * crossprod(L.inv %*% mu.k)[1L])
+          
+          z0prob <- zprob.cur; z1prob <- zprob.new
+          y0prob <- yprob.cur; y1prob <- yprob.new
+        } else { ## u.g.i[k] == 1
+          if (z.g.i[k] == 0) {
+            ## u.g.i[k] == 1 && z.g.i[k] == 0
+            lower.k <- zprobValues$lower
+            lower.k[k] <- lower.k[k] - zprobValues$beta.z
+            zprob.new <- log(pmvnorm(lower = lower.k, upper = zprobValues$upper, sigma = Sigma.z))[1L]
+          } else {
+            ## u.g.i[k] == 1 && z.g.i[k] == 1
+            upper.k <- zprobValues$upper
+            upper.k[k] <- upper.k[k] - zprobValues$beta.z
+            zprob.new <- log(pmvnorm(lower = zprobValues$lower, upper = upper.k, sigma = Sigma.z))[1L]
+          }
+          
+          mu.k <- yprobValues$mu
+          mu.k[k] <- mu.k[k] + yprobValues$beta.y
+          yprob.new <- with(yprobValues,  -0.5 * crossprod(L.inv %*% mu.k)[1L])
+          
+          z0prob <- zprob.new; z1prob <- zprob.cur
+          y0prob <- yprob.new; y1prob <- yprob.cur
+        }
+        
+        p0 <- y0prob + z0prob + log(1 - theta)
+        p1 <- y1prob + z1prob + log(theta)
+        temp <- mean(c(p0, p1))
+        p0 <- exp(p0 - temp)
+        p1 <- exp(p1 - temp)
+        p.k <- p1 / (p0 + p1)
+        
+        ## index into 1:n for this particular obs
+        k.ind <- g.ind[[i]][k]
+        
+        p[k.ind] <- p.k
+        u.new <- rbinom(1L, 1L, p.k)
+        if (u.new != u.cur) {
+          u.g.i[k] <- u.new
+          u[k.ind] <- u.new
+          if (z.g.i[k] == 0)
+            zprobValues$lower <- lower.k
+          else 
+            zprobValues$upper <- upper.k
+          zprob.cur <- zprob.new
+          yprob.cur <- yprob.new
+        }
+      }
+    }
+    
+    if (cy == 0 & cz == 0) break
+  }
+  
+  list(U = u, p = p)
+}
+
 
 
 ###############

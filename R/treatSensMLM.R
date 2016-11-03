@@ -297,6 +297,15 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   #fill in grid
   cell = 0
   
+  useStan <- trt.family$family == "binomial" && trt.family$link == "probit" && (identical(resp.family, gaussian) || resp.family$family == "gaussian")
+  
+    
+  if (useStan) {
+    init <- "random"
+    n.cores <- if (!is.null(core)) core else getOption("mc.cores", 1L)
+    core <- NULL
+  }
+  
   #calling necessary packages for multicore processing.
   if(!is.null(core)){
     dp = requireNamespace("doParallel", quietly = TRUE)
@@ -309,7 +318,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     } 
   }
 
-  if(!is.null(core) & U.model=="binomial"){
+  if (!is.null(core) && U.model == "binomial"){
     ngrid = grid.dim[2]*grid.dim[1]
     h = NULL #included for R CMD check
     out.foreach <- foreach::"%dopar%"(foreach::foreach(h=ngrid:1,.combine=cbind,.verbose=F),{
@@ -361,8 +370,21 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
         control.fit$p = NULL
         
         if(is.null(core)){
+          if (useStan) {
+            n.warm <- if (init == "random") 100L else 25L
+            samples <- contYbinaryZU.mlm.stan(Y, Z, X, zY, zZ, theta, g, init = init, n.cores = n.cores,
+                                              n.samp = nsim %/% 4L + n.warm, n.chain = 4L, n.warm = n.warm,
+                                              verbose = verbose)
+            init <- samples$last
+          }
+          
           for(k in 1:nsim){
-            fit.sens = fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
+            fit.sens <-
+              if (useStan)
+                fit.treatSens.mlm.u(Y, Z, X, W, samples$U[,k], zY, zZ, control.fit)
+              else
+                fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
+            
             control.fit$p = fit.sens$p
             sens.coef[i,j,k] <- fit.sens$sens.coef
             sens.se[i,j,k] <- fit.sens$sens.se
@@ -420,6 +442,59 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
 #fit.treatSens
 ###########
 
+dropFormulaTerm <- function(form, term)
+{
+  if (length(form) == 3L) {
+    if (form[[2L]] == term) return(form[[3L]])
+    if (form[[3L]] == term) return(form[[2L]])
+    form[[2L]] <- dropFormulaTerm(form[[2L]], term)
+    form[[3L]] <- dropFormulaTerm(form[[3L]], term)
+  }
+  form
+}
+
+## gets predictions for a specific value of U
+fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
+  resp.family <- control.fit$resp.family
+  trt.family  <- control.fit$trt.family
+  trt.level   <- control.fit$trt.level
+  weights <- control.fit$weights
+  offset  <- control.fit$offset
+  
+  args.resp <- list(family = resp.family, weights = weights)
+  if (offset == TRUE) {
+    args.resp$offset <- zetaY * U
+    args.resp$formula <- if (!is.null(W)) Y ~ Z + X + W + (1 | g) else Y ~ Z + X + (1 | g)
+  } else {
+    args.resp$formula <- if (!is.null(W)) Y ~ Z + X + W + U + (1 | g) else Y ~ Z + X + U + (1 | g)
+  }
+  
+  args.trt <- list(family = trt.family)
+  args.trt$formula <- if (trt.level == "indiv") Z ~ U + X + (1 | g) else Z ~ U + X
+  
+  if (is.null(X)) {
+    args.resp$formula <- dropFormulaTerm(args.resp$formula, "X")
+    args.trt$formula  <- dropFormulaTerm(args.trt$formula, "X")
+  }
+  
+  fit.glm <- suppressWarnings(do.call("glmer", args.resp))
+    
+  sens.se <- switch(class(weights),
+                    "NULL" = summary(fit.glm)$coefficients[2,2],
+                    "character" = pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights), #pweight is custom function
+                    "numeric"   = pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights)) #pweight is custom function
+  fit.trt <- do.call(if (trt.level == "indiv") "glmer" else glm, args.trt)
+  
+  list(sens.coef = fixef(fit.glm)[2],
+       sens.se = sens.se, 	#SE of Z coef
+       zeta.y = if (offset == TRUE) zetaY else fixef(fit.glm)[3],     	            #estimated coefficient of U in response model
+       zeta.z = if (trt.level == "indiv") fixef(fit.trt)[2] else coef(fit.trt)[2], #estimated coef of U in trt model
+       zy.se  = if (offset == TRUE) NA else summary(fit.glm)$coefficients[3,2],     #SE of U coef in response model
+       zz.se  = summary(fit.trt)$coefficients[2,2],                                 #SE of U coef in trt model
+       resp.sigma2 = summary(fit.glm)$sigma^2,
+       trt.sigma2  = if (trt.level == "indiv") summary(fit.trt)$sigma^2 else sum(fit.trt$resid^2)/fit.trt$df.residual)
+}
+
 fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ, v_Y, v_Z, theta, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
@@ -447,7 +522,7 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
         if(!is.null(X)) {
           #debug(contYbinaryZU)
           ## results are n.samp - n.warm in length, so this gives us 1 sample but I've added a bit of warm up
-          out.contYbinaryZU <- try(contYbinaryZU.mlm.stan(Y, Z, X, zetaY, zetaZ, theta, g, n.chain = 1L, n.samp = 21L, n.warm = 20L, n.thin = iter.j))
+          out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, offset, p, g))
         } else {
           stop("Need to write Binary MLM code with no X") #out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
         }
@@ -472,45 +547,10 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
     #Do we want to return a warning/the error message/our own error message if try fails?
     #fit models with U
     if(std) U = std.nonbinary(U)
-
-    if(!is.null(X)) {
-      fit.glm <- switch(offset+1,
-                        "FALSE" = switch(is.null(W)+1, suppressWarnings(glmer(Y~Z+U+X+W+(1|g), family=resp.family, weights=weights)), suppressWarnings(glmer(Y~Z+U+X+(1|g), family=resp.family, weights=weights))),
-                        "TRUE" = switch(is.null(W)+1, suppressWarnings(glmer(Y~Z+X+W+(1|g), family=resp.family, weights=weights, offset=zetaY*U)), 
-                                        suppressWarnings(glmer(Y~Z+X+(1|g), family=resp.family, weights=weights, offset=zetaY*U)))   
-                        )
-      sens.se <- switch(class(weights),
-                        "NULL" = summary(fit.glm)$coefficients[2,2],
-                        "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
-                        "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
-      fit.trt <- switch(trt.level,
-                        "indiv" = suppressWarnings(glmer(Z~U+X+(1|g), family=trt.family)),
-                        "group" = glm(Z~U+X, family = trt.family))
-    }else{
-      fit.glm <- switch(offset+1,
-                        "FALSE" = switch(is.null(W)+1, suppressWarnings(glmer(Y~Z+U+W+(1|g), family=resp.family, weights=weights)),  suppressWarnings(glmer(Y~Z+U+(1|g), family=resp.family, weights=weights))),
-                        "TRUE" = switch(is.null(W)+1, suppressWarnings(glmer(Y~Z+W+(1|g), family=resp.family, weights=weights, offset=zetaY*U)), suppressWarnings(glmer(Y~Z+(1|g), family=resp.family, weights=weights, offset=zetaY*U))))   
-      sens.se = summary(fit.glm)$coefficients[2,2]
-      fit.trt <- switch(trt.level,
-                        "indiv" = suppressWarnings(glmer(Z~U+(1|g), family=trt.family)),
-                        "group" = glm(Z~U, family = trt.family))
-    }
     
-    return(list(
-      sens.coef = fixef(fit.glm)[2],
-      sens.se = sens.se, 	#SE of Z coef
-      zeta.y = ifelse(offset==1,zetaY,fixef(fit.glm)[3]),     		#estimated coefficient of U in response model
-      zeta.z = switch(trt.level,
-                      "indiv" = fixef(fit.trt)[2],
-                      "group" = coef(fit.trt)[2]),       #estimated coef of U in trt model
-      zy.se = ifelse(offset==1,NA,summary(fit.glm)$coefficients[3,2]),   #SE of U coef in response model
-      zz.se = summary(fit.trt)$coefficients[2,2], 	            #SE of U coef in trt model
-      resp.sigma2 = summary(fit.glm)$sigma^2,
-      trt.sigma2 = switch(trt.level,
-                          "indiv" =summary(fit.trt)$sigma^2,
-                          "group" = sum(fit.trt$resid^2)/fit.trt$df.residual),
-      p = p
-    ))
+    result <- fit.treatSens.mlm.u(Y, Z, X, W, U, zetaY, zetaZ, control.fit)
+    result$p <- p
+    return(result)
   }else{
     return(list(
       sens.coef = NA,
