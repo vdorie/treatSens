@@ -297,7 +297,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   #fill in grid
   cell = 0
   
-  useStan <- trt.family$family == "binomial" && trt.family$link == "probit" && (identical(resp.family, gaussian) || resp.family$family == "gaussian")
+  useStan <- is(trt.family, "family") && trt.family$family == "binomial" && trt.family$link == "probit" &&
+             (identical(resp.family, gaussian) || (is(trt.family, "family") && resp.family$family == "gaussian"))
   
     
   if (useStan) {
@@ -372,7 +373,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
         if(is.null(core)){
           if (useStan) {
             n.warm <- if (init == "random") 100L else 25L
-            samples <- contYbinaryZU.mlm.stan(Y, Z, X, zY, zZ, theta, g, init = init, n.cores = n.cores,
+            samples <- contYbinaryZU.mlm.stan(Y, Z, X, zY, zZ, theta, group, init = init, n.cores = n.cores,
                                               n.samp = nsim %/% 4L + n.warm, n.chain = 4L, n.warm = n.warm,
                                               verbose = verbose)
             init <- samples$last

@@ -357,13 +357,17 @@ contYbinaryZU.mlm.fitLinearModels <- function(data, offset, u)
   class(df) <- "data.frame"
   attr(df, "row.names") <- as.character(seq_along(data$y))
   
+  ## import warning prevents us from directly referencing stats::sigma or lme4::sigma, since
+  ## only one will be imported
+  sigma <- get("sigma", envir = if (getRversion() >= "3.3.0") getNamespace("stats") else getNamespace("lme4"))
+  
   if (is.null(u)) {
-    fit.rsp <- lmer(y ~ z + x + (1 | g), data = df, weights = weights)
+    fit.rsp <- lmer(y ~ z + x + (1 | g), data = df, weights = data$weights)
     fit.trt <- glmer(z ~ x + (1 | g), data = df, family = binomial(link = "probit"))
     
     return(list(v.y = sigma(fit.rsp)^2,
-                v.alpha = VarCorr(fit.rsp)$g[1L],
-                v.phi   = VarCorr(fit.trt)$g[1L],
+                v.alpha = lme4::VarCorr(fit.rsp)$g[1L],
+                v.phi   = lme4::VarCorr(fit.trt)$g[1L],
                 beta.y = c(fixef(fit.rsp), 0),
                 beta.z = c(fixef(fit.trt), 0)))
   }
@@ -394,10 +398,10 @@ contYbinaryZU.mlm.fitLinearModels <- function(data, offset, u)
   
   if (exists("fit.rsp")) {
     result$v.y <- sigma(fit.rsp)^2
-    result$v.alpha <- VarCorr(fit.rsp)$g[1L]
+    result$v.alpha <- lme4::VarCorr(fit.rsp)$g[1L]
   }
   if (exists("fit.trt"))
-    result$v.phi <- VarCorr(fit.trt)$g[1L]
+    result$v.phi <- lme4::VarCorr(fit.trt)$g[1L]
   
   result
 }
@@ -428,6 +432,7 @@ contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j = 10, weights = NUL
   p <- if (!is.null(p)) rep_len(p, n.obs) else rep_len(0.5, n.obs)
   
   fitLinearModels <- contYbinaryZU.mlm.fitLinearModels
+  beta.y <- beta.z <- v.y <- v.alpha <- v.phi <- NA ## only needed for R CMD check
   
   u <- rbinom(n.obs, 1L, p)
   
