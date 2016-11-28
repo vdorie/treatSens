@@ -105,14 +105,21 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   
   if (limit.Xplot) {
     #old codes
-    plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("blue","red")[Xpart.plot2[,3]], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
+    plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[Xpart.plot2[,3]], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
          ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)), pch = X.pch, xlab = xlab, ylab = ylab)
     outsidePts = Xpart.plot2[(Xpart.plot[,1] < min(Zcors, na.rm = T)) | (Xpart.plot[,1] > max(Zcors, na.rm = T)) | (Xpart.plot[,2] > max(Ycors, na.rm = T)),]
     if(length(outsidePts) > 0){
-      outsidePts[,1] = apply(cbind(outsidePts[,1], min(Zcors, na.rm = T)), 1, max)
-      outsidePts[,1] = apply(cbind(outsidePts[,1], max(Zcors, na.rm = T)), 1, min)
-      outsidePts[,2] = apply(cbind(outsidePts[,2], max(Ycors, na.rm = T)), 1, min)
-      points(outsidePts[,1], outsidePts[,2], col=c("blue","red")[outsidePts[,3]], pch = out.pch, cex = 1.5, lwd = 3)
+      if(is.null(dim(outsidePts))){
+        outsidePts[1] = max(outsidePts[1], min(Zcors, na.rm = T))
+        outsidePts[1] = min(outsidePts[1], max(Zcors, na.rm = T))
+        outsidePts[2] = min(outsidePts[2], max(Ycors, na.rm = T))
+        outsidePts = matrix(outsidePts, nrow = 1)
+      }else{
+        outsidePts[,1] = apply(cbind(outsidePts[,1], min(Zcors, na.rm = T)), 1, max)
+        outsidePts[,1] = apply(cbind(outsidePts[,1], max(Zcors, na.rm = T)), 1, min)
+        outsidePts[,2] = apply(cbind(outsidePts[,2], max(Ycors, na.rm = T)), 1, min)
+      }
+      points(outsidePts[,1], outsidePts[,2], col=c("red","blue")[outsidePts[,3]], pch = out.pch, cex = 1.5, lwd = 3)
       warning("Note: predictors outside plot region plotted at margin with O")
     }
   } else {
