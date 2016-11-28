@@ -491,7 +491,12 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, xs, cy, cz, theta, iter.j=10, weig
   
   for(j in 1:j2) {
     U = gpind%*%matrix(rbinom(ng,1,p), ncol =1)
-    
+    rep = 1
+    while(identical(as.numeric(U),z) | identical(1-as.numeric(U),z)){
+      U = gpind%*%matrix(rbinom(ng,1,p), ncol =1)
+      rep = rep + 1
+      if(rep > 5000) stop()
+    }
     if (!offset) { 
       if(j == 1 | cy != 0){
         U.fit = switch(is.null(w)+1,
