@@ -71,12 +71,11 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   ######
   Y = form.vars$resp
   Z = form.vars$trt
-  X = as.matrix(form.vars$covars)
+  X = switch(is.null(form.vars$covars)+1, as.matrix(form.vars$covars), NULL)
   XY = switch(is.null(form.vars$RespX)+1, as.matrix(form.vars$RespX), NULL)
   
   Z = as.numeric(Z)  	#treat factor-level Z as numeric...?  Or can recode so factor-level trt are a) not allowed b) not modeled (so no coefficient-type sensitivity params)
 
-  if (is.null(data))   data = data.frame(Y,Z,X)
   if(!is.null(X)){
     if(!is.null(XY)){
       data = data.frame(Y,Z,X,XY)
@@ -246,7 +245,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   n = length(null.resp$coef)
   Y.res <- Y-null.resp$fitted.values
   if(!is.null(X) | !is.null(XY)) {
-    v_Y <- var(Y.res)*(n.obs-1)/(n.obs-nx-2)
+    v_Y <- var(Y.res)*(n.obs-1)/(n.obs-nx-nxy-2)
     ncoef = length(null.resp$coef)
     Xcoef = cbind(null.trt$coef[-1], null.resp$coef[-c(1,2,(nx-nxy+3):(ncoef+1))])
     Xpartials <- X.partials(Y, Z, X, XY, resp.family, trt.family)
