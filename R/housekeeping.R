@@ -61,8 +61,7 @@ parse.formula <- function(formula, resp.cov, data) {
     data = environment(formula)
 
   names = c(allVarsRec(resp.cov), allVarsRec(formula[[3]]))
-  rc.exp = dim(eval(parse(text =paste('cbind(',paste(allVarsRec(resp.cov), collapse =","),')'))))[2]
-  nrc = switch(is.null(rc.exp)+1, rc.exp[2],0) #length(allVarsRec(resp.cov))
+  nrc = switch(is.null(resp.cov)+1, dim(model.matrix(resp.cov))[2]-1,0) 
   form = eval(parse(text = paste(formula[[2]], "~", paste(names, collapse = "+")))[[1]])
   
   mf <- model.frame(form)
@@ -77,11 +76,11 @@ parse.formula <- function(formula, resp.cov, data) {
   
   #extract variables from formula & data
   
-    trt <- x[,2]				#assume treatment is 1st var on RHS
+    trt <- x[,nrc+2]				#assume treatment is 1st var on RHS
     if(dim(x)[2] > 2) {
       if(!is.null(resp.cov)){
         covars <- x[,-c(1:(nrc+2))]			#variables on RHS, less the intercept, treatment, response covariates
-        RespX <- x[,(3:(nrc+2))]  		#response-only variables on RHS
+        RespX <- x[,(2:(nrc+1))]  		#response-only variables on RHS
       }else{
         covars <- x[,-c(1,2)]			#variables on RHS, less the intercept, treatment, response covariates
         RespX <- NULL
@@ -115,7 +114,7 @@ parse.formula.mlm <- function(formula, resp.cov, data) {
     data = environment(formula)
   
   names = c(allVarsRec(resp.cov), allVarsRec(formula[[3]]))
-  nrc = length(allVarsRec(resp.cov))
+  nrc = switch(is.null(resp.cov)+1, dim(model.matrix(resp.cov))[2]-1,0)
   form = eval(parse(text = paste(formula[[2]], "~", paste(names[-length(names)], collapse = "+"), paste("+(1|", names[length(names)],")")))[[1]])
   
   formexp = lFormula(form, data = data)
@@ -123,7 +122,7 @@ parse.formula.mlm <- function(formula, resp.cov, data) {
   group <- formexp$fr[,dim(formexp$fr)[2]]
   
   #extract variables from formula & data
-  trt <- formexp$fr[,(2+nrc)]				#assume treatment is 1st var on RHS
+  trt <- formexp$X[,(2+nrc)]				#assume treatment is 1st var on RHS
   
   if(dim(formexp$fr)[2] > 3) {
     if(!is.null(resp.cov)){

@@ -63,8 +63,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
       ng <- length(gps)
       gpind = matrix(NA, nrow = length(Y), ncol = ng)
       for(i in 1:ng)
-        gpind[,i] = (group==gps[i])
-      Xstar = gpind%*%(t(gpind)%*%W[,-((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))])
+        gpind[,i] = (group==gps[i])/sqrt(sum(group==gps[i]))
+      Xstar = allX[,!colsAtTrtLev] #gpind%*%(t(gpind)%*%W[,-((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))])
     }else{
       Xstar = NULL
     }
@@ -155,19 +155,19 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     }else{
       null.trt <- suppressWarnings(glmer(Z~1 + (1|group), family=trt.family))
     } 
-    Z.res <- residuals(null.trt)
+    Z.res <- residuals(null.trt, type = "response")
     v_Z <- summary(null.trt)$sigma^2
     v_phi <- VarCorr(null.trt)$g[1]
   }else if(trt.level == "group"){
     if(!is.null(cbind(X, Xstar))) {
       X.temp = cbind(Xstar,X)
       null.trt <- suppressWarnings(glm(Z~X.temp, family=trt.family, control = glm.control(epsilon = 1e-6, maxit = 50)))
-      Z.res <- residuals(null.trt)
+      Z.res <- residuals(null.trt, type = "response")
       Z.res.gp <- tapply(Z.res, group, mean)
-      v_Z <- var(Z.res.gp)*(length(Z.res.gp)-1)/(length(Z.res.gp)-dim(X.temp)[2]-1)
+      v_Z <- var(Z.res)*(length(Z.res)-1)/(length(Z.res)-dim(X.temp)[2]-1)#var(Z.res.gp)*(length(Z.res.gp)-1)/(length(Z.res.gp)-dim(X.temp)[2]-1)
     }else{
       null.trt <- suppressWarnings(glm(Z~1, family=trt.family, control = glm.control(epsilon = 1e-6, maxit = 50)))
-      Z.res <- residuals(null.trt)
+      Z.res <- residuals(null.trt, type = "response")
       Z.res.gp <- tapply(Z.res, group, mean)
       v_Z <- var(Z.res.gp)
     }
@@ -245,7 +245,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   sgnTau0 = sign(null.resp@beta[2])
 
   #n = length(Y)
-  Y.res <- residuals(null.resp)
+  Y.res <- residuals(null.resp, type = "response")
   v_Y <- summary(null.resp)$sigma^2
   v_alpha <- VarCorr(null.resp)$g[1]
   
@@ -266,8 +266,13 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   
   if(!is.null(allX)) {
     if(!is.null(W)){
-      Wboth = W[,-c((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))]
-      Wresp = W[,c((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))]
+      if(!is.null(RespX)){
+        Wboth = W[,-c((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))]
+        Wresp = W[,c((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))]
+      }else{
+        Wboth = W
+        Wresp = NULL
+      }
     }else{
       Wboth = NULL
       Wresp = NULL
@@ -322,7 +327,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
       out <- matrix(NA,8,nsim)
       for(k in 1:nsim){
         fit.sens <- fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
-        control.fit$p = fit.sens$p
+     #   control.fit$p = fit.sens$p
         out[1,k] <- fit.sens$sens.coef
         out[2,k] <- fit.sens$sens.se
         out[3,k] <- fit.sens$zeta.y
@@ -363,7 +368,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
         if(is.null(core)){
           for(k in 1:nsim){
             fit.sens = fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
-            control.fit$p = fit.sens$p
+    #        control.fit$p = fit.sens$p
             sens.coef[i,j,k] <- fit.sens$sens.coef
             sens.se[i,j,k] <- fit.sens$sens.se
             zeta.y[i,j,k] <- fit.sens$zeta.y
@@ -442,28 +447,38 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
   }
   
   if(U.model == "binomial"){
-    if(identical(trt.family$link,"probit")){
-      if(trt.level == "indiv"){
-        if(!is.null(X)) {
-          #debug(contYbinaryZU)
-          out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
-        } else {
-          stop("Need to write Binary MLM code with no X") #out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+    reps = 0
+    repeat{
+      reps = reps+1
+      if(identical(trt.family$link,"probit")){
+        if(trt.level == "indiv"){
+          if(!is.null(X)) {
+            #debug(contYbinaryZU)
+            out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+          } else {
+            stop("Need to write Binary MLM code with no X") #out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
+          }
+        }else if(trt.level == "group"){
+          if(!is.null(X)) {
+            #debug(contYbinaryZU)
+            out.contYbinaryZU <- try(contYbinaryZU.mlm.gp(Y, Z, X, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+          } else {
+            out.contYbinaryZU <- try(contYbinaryZU.mlm.gp.noX(Y, Z, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+          }
         }
-      }else if(trt.level == "group"){
-        if(!is.null(X)) {
-          #debug(contYbinaryZU)
-          out.contYbinaryZU <- try(contYbinaryZU.mlm.gp(Y, Z, X, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
-        } else {
-          out.contYbinaryZU <- try(contYbinaryZU.mlm.gp.noX(Y, Z, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
-        }
+      }else{
+        stop(paste("Only probit link is allowed."))
       }
-    }else{
-      stop(paste("Only probit link is allowed."))
+      if(!(class(out.contYbinaryZU) == "try-error")){
+        U = out.contYbinaryZU$U
+        p.est = out.contYbinaryZU$p
+        if(length(unique(U))>1 && !identical(U,Z) && !identical(U,1-Z)) break
+      }
+      if(reps > 5000){
+        class(U) = "try-error" #stop("No non-constant simulated U vectors in 5000 tries")
+        break
+      } 
     }
-
-    U = out.contYbinaryZU$U
-    p = out.contYbinaryZU$p
   }
   
   if(!(class(U) == "try-error")){
@@ -508,7 +523,7 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
       trt.sigma2 = switch(trt.level,
                           "indiv" =summary(fit.trt)$sigma^2,
                           "group" = sum(fit.trt$resid^2)/fit.trt$df.residual),
-      p = p
+      p = p.est
     ))
   }else{
     return(list(
@@ -520,7 +535,7 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
       zz.se = NA,
       resp.sigma2 = NA,
       trt.sigma2 = NA,
-      p = p
+      p = p.est
     ))
   }
 }
