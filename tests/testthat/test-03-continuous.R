@@ -21,8 +21,9 @@ data <- generateData()
 X <- data$X
 Z <- data$Z
 Y <- data$Y
-
 rm(data)
+
+testFormula <- Y ~ Z + X
 
 ## pull out utility functions from within package
 namedList <- treatSens:::namedList
@@ -31,12 +32,12 @@ namedList <- treatSens:::namedList
 setInList <- treatSens:::setInList
 
 test_that("treatSens runs correctly on example data", {
-  fit <- treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = 1, standardize = FALSE, zero.loc = "full") 
+  fit <- treatSens(testFormula, grid.dim = c(2, 2), nsim = 1, standardize = FALSE, zero.loc = "full") 
   expect_is(fit, "sensitivity")
 })
 
 test_that("treatSens fails with an invalid theta parameter", {
-  baseArgs <- namedList(formula = Y ~ Z + X, grid.dim = c(2, 2), nsim = 1, standardize = FALSE, zero.loc = "full")
+  baseArgs <- namedList(formula = testFormula, grid.dim = c(2, 2), nsim = 1, standardize = FALSE, zero.loc = "full")
   expect_error(
     do.call(treatSens, setInList(baseArgs, theta = 1.5)))
   expect_error(
@@ -48,7 +49,7 @@ test_that("treatSens fails with an invalid theta parameter", {
 })
 
 test_that("treatSens fails with an invalid seed", {
-  baseArgs <- namedList(formula = Y ~ Z + X, grid.dim = c(2, 2), nsim = 1, standardize = FALSE, zero.loc = "full")
+  baseArgs <- namedList(formula = testFormula, grid.dim = c(2, 2), nsim = 1, standardize = FALSE, zero.loc = "full")
   expect_warning(
     do.call(treatSens, setInList(baseArgs, seed = 1.5)))
   ## apparently, seeds with length > 1 are OK, so we let this slide
@@ -63,48 +64,57 @@ test_that("treatSens fails with an invalid seed", {
 ## documentation edited to reflect that
 
 test_that("treatSens fails with an invalid core parameter", {
+  baseArgs <- namedList(formula = testFormula, grid.dim = c(2, 2), nsim = 1, standardize = FALSE, zero.loc = "full")
+  
   expect_error(
-    treatSens(Y ~ Z + X, core = -1, grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(baseArgs, core = -1)))
   expect_warning(
-    treatSens(Y ~ Z + X, core = 1.5, grid.dim = c(2, 2), nsim = 2, iter.j = 2, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(baseArgs, core = 1.5)))
   expect_error(
-    treatSens(Y ~ Z + X, core = "not-a-number", grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(baseArgs, core = "not-a-number")))
   expect_error(
-    treatSens(Y ~ Z + X, core = NA_integer_, grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(baseArgs, core = NA_integer_)))
 })
 
 
 test_that("treatSens fails with an invalid simulation number", {
+  baseArgs <- namedList(formula = testFormula, grid.dim = c(2, 2), standardize = FALSE, zero.loc = "full")
+  
   expect_warning(
-    treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = 1.5, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(baseArgs, nsim = 1.5)))
   expect_error(
-    treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = "not-a-number", standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(baseArgs, nsim = "not-a-number")))
   expect_error(
-    treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = NA_integer_, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(baseArgs, nsim = NA_integer_)))
 })
 
 test_that("treatSens fails with an invalid trim weight parameter", {
+  baseArgs <- namedList(formula = testFormula, grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = "full")
+  
   #trim.wt is only used when weights option is specified.
   expect_warning(
-    treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = 2, trim.wt = 30, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(baseArgs, trim.wt = 30)))
+  
+  baseArgs$weights <- "ATE"
+  
   expect_error(
-    treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = 2, weights = "ATE", trim.wt = 150, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(trim.tw = 150)))
   expect_error(
-    treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = 2, weights = "ATE", trim.wt = c(10,50), standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(trim.tw = c(10, 50))))
   expect_error(
-    treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = 2, weights = "ATE", trim.wt = "not-a-number", standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(trim.tw = "not-a-number")))
   expect_error(
-    treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = 2, weights = "ATE", trim.wt = NA_integer_, standardize = FALSE, zero.loc = "full"))
+    do.call(treatSens, setInList(trim.tw = NA_integer_)))
 })
 
 test_that("treatSens fails with overridden zero.loc parameter", {
   expect_warning(
-    treatSens(Y ~ Z + X,  grid.dim = c(2, 2), nsim = 2, standardize = FALSE, spy.range=c(0,2), spz.range=c(0,2), zero.loc=1/3))
+    treatSens(testFormula,  grid.dim = c(2, 2), nsim = 2, standardize = FALSE, spy.range=c(0,2), spz.range=c(0,2), zero.loc=1/3))
   #warning: zero.loc will be overridden when spy.range and spz.range both specified.
 })
 
 ##Vince's code: test that zero loc breaks, but also that it runs correctly.
 test_that("treatSens runs correctly with numerical zero.loc", {
-  fit <- treatSens(Y ~ Z + X, grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = 1 / 3) 
+  fit <- treatSens(testFormula, grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = 1 / 3) 
   expect_is(fit, "sensitivity")
 })

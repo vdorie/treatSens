@@ -289,7 +289,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
                      standardize=standardize, weights=weights, iter.j=iter.j, 
                      offset = offset, p = NULL, g=group, trt.level = trt.level, v_alpha = v_alpha, v_phi = v_phi, Xstar = Xstar)
-
+  
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, verbose = verbose, W = W)
   zetaZ = range$zetaZ
   zetaY = range$zetaY
@@ -304,9 +304,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   
   useStan <- is(trt.family, "family") && trt.family$family == "binomial" && trt.family$link == "probit" &&
     (identical(resp.family, gaussian) || (is(trt.family, "family") && resp.family$family == "gaussian"))
-  
-  
-  if (useStan) {
+
+    if (useStan) {
     init <- "random"
     n.cores <- if (!is.null(core)) core else getOption("mc.cores", 1L)
     core <- NULL
@@ -324,7 +323,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     } 
   }
 
-  if(!is.null(core) & U.model=="binomial"){
+  if (!is.null(core) && U.model == "binomial"){
     ngrid = grid.dim[2]*grid.dim[1]
     h = NULL #included for R CMD check
     out.foreach <- foreach::"%dopar%"(foreach::foreach(h=ngrid:1,.combine=cbind,.verbose=F),{
@@ -385,8 +384,15 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
           }
           
           for(k in 1:nsim){
-            fit.sens = fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
-    #        control.fit$p = fit.sens$p
+
+            fit.sens <-
+              if (useStan)
+                fit.treatSens.mlm.u(Y, Z, X, W, samples$U[,k], zY, zZ, control.fit)
+              else
+                fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
+            
+          #  control.fit$p = fit.sens$p
+
             sens.coef[i,j,k] <- fit.sens$sens.coef
             sens.se[i,j,k] <- fit.sens$sens.se
             zeta.y[i,j,k] <- fit.sens$zeta.y
@@ -496,6 +502,59 @@ fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
 }
 
 
+dropFormulaTerm <- function(form, term)
+{
+  if (length(form) == 3L) {
+    if (form[[2L]] == term) return(form[[3L]])
+    if (form[[3L]] == term) return(form[[2L]])
+    form[[2L]] <- dropFormulaTerm(form[[2L]], term)
+    form[[3L]] <- dropFormulaTerm(form[[3L]], term)
+  }
+  form
+}
+
+## gets predictions for a specific value of U
+fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
+  resp.family <- control.fit$resp.family
+  trt.family  <- control.fit$trt.family
+  trt.level   <- control.fit$trt.level
+  weights <- control.fit$weights
+  offset  <- control.fit$offset
+  
+  args.resp <- list(family = resp.family, weights = weights)
+  if (offset == TRUE) {
+    args.resp$offset <- zetaY * U
+    args.resp$formula <- if (!is.null(W)) Y ~ Z + X + W + (1 | g) else Y ~ Z + X + (1 | g)
+  } else {
+    args.resp$formula <- if (!is.null(W)) Y ~ Z + X + W + U + (1 | g) else Y ~ Z + X + U + (1 | g)
+  }
+  
+  args.trt <- list(family = trt.family)
+  args.trt$formula <- if (trt.level == "indiv") Z ~ U + X + (1 | g) else Z ~ U + X
+  
+  if (is.null(X)) {
+    args.resp$formula <- dropFormulaTerm(args.resp$formula, "X")
+    args.trt$formula  <- dropFormulaTerm(args.trt$formula, "X")
+  }
+  
+  fit.glm <- suppressWarnings(do.call("glmer", args.resp))
+    
+  sens.se <- switch(class(weights),
+                    "NULL" = summary(fit.glm)$coefficients[2,2],
+                    "character" = pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights), #pweight is custom function
+                    "numeric"   = pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights)) #pweight is custom function
+  fit.trt <- do.call(if (trt.level == "indiv") "glmer" else glm, args.trt)
+  
+  list(sens.coef = fixef(fit.glm)[2],
+       sens.se = sens.se, 	#SE of Z coef
+       zeta.y = if (offset == TRUE) zetaY else fixef(fit.glm)[3],     	            #estimated coefficient of U in response model
+       zeta.z = if (trt.level == "indiv") fixef(fit.trt)[2] else coef(fit.trt)[2], #estimated coef of U in trt model
+       zy.se  = if (offset == TRUE) NA else summary(fit.glm)$coefficients[3,2],     #SE of U coef in response model
+       zz.se  = summary(fit.trt)$coefficients[2,2],                                 #SE of U coef in trt model
+       resp.sigma2 = summary(fit.glm)$sigma^2,
+       trt.sigma2  = if (trt.level == "indiv") summary(fit.trt)$sigma^2 else sum(fit.trt$resid^2)/fit.trt$df.residual)
+}
+
 fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ, v_Y, v_Z, theta, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
@@ -562,6 +621,7 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
 
     result <- fit.treatSens.mlm.u(Y, Z, X, W, U, zetaY, zetaZ, control.fit)
     result$p <- p.est
+
     return(result)
   }else{
     return(list(
