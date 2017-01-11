@@ -120,7 +120,8 @@ Z = rnorm(N,X \%*\% betaz + zetaz*U,1) + rep(rnorm(10), each = 30)        #treat
 Y = rnorm(N,X \%*\% betay + zetay*U + tau*Z,2) + rep(rnorm(10), each = 30) #outcome variable
 
 # sensitivity analysis
-out.cont <- treatSens.MLM(Y~Z+X+(1|g), grid.dim = c(8,5), nsim = 5, trt.level = "indiv",
+# small grid.dim and nsim just for example purposes
+out.cont <- treatSens.MLM(Y~Z+X+(1|g), grid.dim = c(3,2), nsim = 5, trt.level = "indiv",
                      standardize = FALSE, verbose = TRUE, zero.loc = "full")
 
 summary(out.cont) #Prints average value of tau (trt effect) for each cell in grid.

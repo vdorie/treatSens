@@ -119,7 +119,8 @@ Z = rnorm(N,X \%*\% betaz + zetaz*U,1)         #treatment variable
 Y = rnorm(N,X \%*\% betay + zetay*U + tau*Z,2) #outcome variable
 
 # sensitivity analysis
-out.cont <- treatSens(Y~Z+X, grid.dim = c(8,5), nsim = 5,
+# small grid.dim and nsim just for example purposes
+out.cont <- treatSens(Y~Z+X, grid.dim = c(3,2), nsim = 5,
                      standardize = FALSE, verbose = TRUE, zero.loc = "full")
 
 summary(out.cont) #Prints average value of tau (trt effect) for each cell in grid.
