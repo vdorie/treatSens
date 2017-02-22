@@ -7,31 +7,32 @@ Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = 
              person("Vincent",         "Dorie", role = "aut",           email = "vjd4@nyu.edu"),
              person("Jennifer",         "Hill", role = "ctb",           email = "jennifer.hill@nyu.edu"))
 Depends:
-  R (>= 3.1-0),
-  Rcpp (>= 0.11.0)
+    R (>= 3.1-0),
+    Rcpp (>= 0.11.0)
 Imports:
-  methods,
-  stats,
-  graphics,
-  grDevices,
-  mvtnorm,
-  lme4,
-  dbarts (>= 0.8-5),
-  rstan (>= 2.8.1)
+    methods,
+    stats,
+    graphics,
+    grDevices,
+    mvtnorm,
+    lme4,
+    dbarts (>= 0.8-7),
+    rstan (>= 2.8.1)
 Suggests:
-  doParallel,
-  foreach,
-  testthat (>= 0.9-0)
-LinkingTo:
-  dbarts (>= 0.8-5),
-  StanHeaders (>= 2.9.0),
-  rstan (>= 2.9.0),
-  BH (>= 1.60.0),
-  Rcpp (>= 0.12.0),
-  RcppEigen
-Description: Utilities to investigate sensitivity to unmeasured confounding in parametric models with either binary or continuous treatment.
+    doParallel,
+    foreach,
+    testthat (>= 0.9-0)
+LinkingTo: dbarts (>= 0.8-5),
+    StanHeaders (>= 2.9.0),
+    rstan (>= 2.9.0),
+    BH (>= 1.60.0),
+    Rcpp (>= 0.12.0),
+    RcppEigen
+Description: Utilities to investigate sensitivity to unmeasured confounding in
+    parametric models with either binary or continuous treatment.
 NeedsCompilation: yes
 Biarch: yes
 License: GPL (>= 2)
 URL: https://github.com/vdorie/treatSens
 BugReports: https://github.com/vdorie/treatSens/issues
+RoxygenNote: 5.0.1

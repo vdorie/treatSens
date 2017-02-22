@@ -21,9 +21,9 @@
 
 // clock_gettime + CLOCK_REALTIME are in time.h, gettimeofday is in sys/time.h; plain time() is in time.h too
 #if (!defined(HAVE_CLOCK_GETTIME) || !defined(CLOCK_REALTIME)) && defined(HAVE_GETTIMEOFDAY)
-#include <sys/time.h>
+#  include <sys/time.h>
 #else
-#include <time.h>
+#  include <time.h>
 #endif
 
 #include <external/alloca.h>
@@ -36,6 +36,8 @@
   ( defined(__clang__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 7))))
 #  define SUPPRESS_DIAGNOSTIC 1
 #endif
+
+#include <external/Rinternals.h> // SEXP
 
 // should match enum order
 static const char* const rngNames[] = {
@@ -123,6 +125,130 @@ ext_rng* ext_rng_create(ext_rng_algorithm_t algorithm, const void* v_state)
   
   return result;
 }
+
+ext_rng* ext_rng_createDefault(bool useNative)
+{
+  ext_rng* result;
+  
+  if (useNative) {
+    ext_rng_userFunction uniformFunction;
+    uniformFunction.f.stateless = &unif_rand;
+    uniformFunction.state = NULL;
+    result = ext_rng_create(EXT_RNG_ALGORITHM_USER_UNIFORM, &uniformFunction);
+    if (result == NULL) return NULL;
+  
+    ext_rng_userFunction normalFunction;
+    normalFunction.f.stateless = &norm_rand;
+    normalFunction.state = NULL;
+    ext_rng_setStandardNormalAlgorithm(result, EXT_RNG_STANDARD_NORMAL_USER_NORM, &normalFunction);
+    return result;
+  }
+  
+  // if not useNative, we at least seed from native and match its type
+      
+  SEXP seedsExpr = Rf_findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
+  if (seedsExpr == R_UnboundValue) {
+    GetRNGstate();
+    PutRNGstate();
+    seedsExpr = Rf_findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
+  }
+  if (TYPEOF(seedsExpr) == PROMSXP) seedsExpr = Rf_eval(R_SeedsSymbol, R_GlobalEnv);
+  
+  bool seedFound = true;
+  if (seedsExpr == R_UnboundValue) {
+    seedFound = false;
+    ext_issueWarning("seeds still unbound after calling GetRNGstate/PutRNGstate");
+  } else if (!Rf_isInteger(seedsExpr)) {
+    seedFound = false;
+    if (seedsExpr == R_MissingArg)
+      ext_issueWarning("'.Random.seed' is a missing argument with no default");
+    else 
+      ext_issueWarning("'.Random.seed' is not an integer vector but of type '%s', so ignored", Rf_type2char(TYPEOF(seedsExpr)));
+  }
+  
+  if (!seedFound) {
+    // use defaults
+    result = ext_rng_create(EXT_RNG_ALGORITHM_MERSENNE_TWISTER, NULL);
+    if (result != NULL) ext_rng_setSeedFromClock(result);
+    return result;
+  }
+  
+  uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
+  
+  ext_rng_algorithm_t algorithmType      = (ext_rng_algorithm_t) (seed0 % 100);
+  ext_rng_standardNormal_t stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
+  
+  void* state = (void*) (1 + INTEGER(seedsExpr));
+  
+#ifdef SUPPRESS_DIAGNOSTIC
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wswitch-enum"
+#endif
+  switch (algorithmType) {
+    case EXT_RNG_ALGORITHM_KNUTH_TAOCP:
+    case EXT_RNG_ALGORITHM_KNUTH_TAOCP2:
+    {
+      ext_rng_knuthState* kt = (ext_rng_knuthState*) malloc(sizeof(ext_rng_knuthState));
+      if (kt == NULL) return NULL;
+      memcpy(kt->state1, state, EXT_RNG_KNUTH_NUM_RANDOM * sizeof(uint_least32_t));
+      kt->info = EXT_RNG_KNUTH_NUM_RANDOM; // this is a static var which we cannot access
+      for (size_t i = 0; i < EXT_RNG_KNUTH_QUALITY; ++i) kt->state2[i] = 0; // also static
+      state = kt;
+    }
+    break;
+    case EXT_RNG_ALGORITHM_USER_UNIFORM:
+    {
+      ext_rng_userFunction* uniformFunction = (ext_rng_userFunction*) malloc(sizeof(ext_rng_userFunction));
+      if (uniformFunction == NULL) return NULL;
+      uniformFunction->f.stateless = &unif_rand;
+      uniformFunction->state = NULL;
+      state = uniformFunction;
+    }
+    break;
+    default:
+    break;
+  }    
+  result = ext_rng_create(algorithmType, state);
+  if (algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP  ||
+      algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP2 ||
+      algorithmType == EXT_RNG_ALGORITHM_USER_UNIFORM) free(state);
+  if (result == NULL) return NULL; 
+  
+  void* normalState = NULL;
+  switch (stdNormalType) {
+    case EXT_RNG_STANDARD_NORMAL_BOX_MULLER:
+    normalState = malloc(sizeof(double));
+    if (normalState == NULL) { ext_rng_destroy(result); return NULL; }
+    *((double*) normalState) = 0.0; // static var, again
+    break;
+    case EXT_RNG_STANDARD_NORMAL_USER_NORM:
+    {
+      ext_rng_userFunction* normalFunction = (ext_rng_userFunction*) malloc(sizeof(ext_rng_userFunction));
+      if (normalFunction == NULL) { ext_rng_destroy(result); return NULL; }
+      normalFunction->f.stateless = &norm_rand;
+      normalFunction->state = NULL;
+      normalState = normalFunction;
+    }
+    break;
+    default:
+    break;
+  }
+  
+#ifdef SUPPRESS_DIAGNOSTIC
+#  pragma GCC diagnostic pop
+#endif
+  
+  int errorCode = ext_rng_setStandardNormalAlgorithm(result, stdNormalType, normalState);
+  if (stdNormalType == EXT_RNG_STANDARD_NORMAL_BOX_MULLER || stdNormalType == EXT_RNG_STANDARD_NORMAL_USER_NORM) free(normalState);
+  
+  if (errorCode != 0) {
+    ext_rng_destroy(result);
+    return NULL;
+  }
+  
+  return result;
+}
+
 
 void ext_rng_destroy(ext_rng* generator)
 {
@@ -294,7 +420,7 @@ static void validateSeed(ext_rng* generator, bool isFirstRun)
       if (!notAllAreZero) ext_rng_setSeedFromClock(generator);
     }
     break;
-    case LECUYER_CMRG:
+    case EXT_RNG_ALGORITHM_LECUYER_CMRG:
     // first set: not all zero, in [0, m1)
     // second set: not all zero, in [0, m2)
     {
