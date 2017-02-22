@@ -339,7 +339,7 @@ if (FALSE) contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j=10, weig
     
     p = pyzu/pyz
     p[pyz==0] = 0
-    if(cy == 0 & cz == 0) break
+    if(cy == 0 && cz == 0) break
   }
   U = rbinom(n,1,p)
   

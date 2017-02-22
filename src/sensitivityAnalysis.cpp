@@ -4,10 +4,11 @@
 #include "config.hpp"
 #include "sensitivityAnalysis.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <cmath>
 #include <dbarts/cstdint.hpp>
+
 #if !defined(HAVE_SYS_TIME_H) && defined(HAVE_GETTIMEOFDAY)
 #  undef HAVE_GETTIMEOFDAY
 #endif
@@ -17,10 +18,13 @@
 #  include <time.h>
 #endif
 
-#include <dbarts/bartFit.hpp>
-#include <dbarts/types.hpp>
-#include <dbarts/results.hpp>
-#include <dbarts/R_C_interface.hpp>
+// #include <R.h>
+// #include <Rdefines.h>
+// #include <Rinternals.h>
+// #include <Rmath.h>
+#include <R_ext/Rdynload.h>
+
+// #include <external/Rinternals.h> // SEXP
 
 #include <external/alloca.h>
 #include <external/io.h>
@@ -29,21 +33,14 @@
 #include <external/stats.h>
 #include <external/thread.h>
 
-#include <R.h>
-#include <Rdefines.h>
-#include <Rinternals.h>
-#include <Rmath.h>
-#include <R_ext/Rdynload.h>
+#include <dbarts/bartFit.hpp>
+#include <dbarts/types.hpp>
+#include <dbarts/results.hpp>
+#include <dbarts/R_C_interface.hpp>
 
 #include "treatmentModel.hpp"
 
 #define DEFAULT_BART_MAX_NUM_CUTS 100u
-
-#if defined(__GNUC__) && (\
-  (!defined(__clang__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6))) || \
-  ( defined(__clang__) && (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 7))))
-#  define SUPPRESS_DIAGNOSTIC 1
-#endif
 
 using std::size_t;
 using std::uint32_t;
@@ -639,16 +636,13 @@ namespace {
     bart_x_train = NULL;
   }
   
-  static ext_rng* createRNG(bool useNativeGenerator);
-
   Scratch::Scratch(const Control& control, const Data& data) : yMinusZetaU(NULL), p(NULL), u(NULL),
     treatmentModel(control.treatmentModel), treatmentScratch(NULL), temp_numObs_1(NULL), temp_numObs_2(NULL)
   {
     if (control.numThreads > 1) {
-      rng = createRNG(false);
-      ext_rng_setSeed(rng, static_cast<uint_least32_t>(unif_rand() * static_cast<double>(UINT_LEAST32_MAX)));
+      rng = ext_rng_createDefault(false);
     } else {
-      rng = createRNG(true);
+      rng = ext_rng_createDefault(true);
     }
     
     yMinusZetaU = new double[data.numObservations];
@@ -698,96 +692,6 @@ namespace {
     control.invalidateNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*)>(R_GetCCallable("dbarts", "invalidateNormalPrior"));
     control.initializeChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*, double, double)>(R_GetCCallable("dbarts", "initializeChiSquaredPriorFromOptions"));
     control.invalidateChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*)>(R_GetCCallable("dbarts", "invalidateChiSquaredPrior"));
-  }
-  
-  static ext_rng* createRNG(bool useNativeGenerator)
-  {
-    ext_rng* result;
-    
-    if (useNativeGenerator) {
-      ext_rng_userFunction uniformFunction;
-      uniformFunction.f.stateless = &unif_rand;
-      uniformFunction.state = NULL;
-      result = ext_rng_create(EXT_RNG_ALGORITHM_USER_UNIFORM, &uniformFunction);
-    
-      ext_rng_userFunction normalFunction;
-      normalFunction.f.stateless = &norm_rand;
-      normalFunction.state = NULL;
-      ext_rng_setStandardNormalAlgorithm(result, EXT_RNG_STANDARD_NORMAL_USER_NORM, &normalFunction);
-    } else {
-      
-      SEXP seedsExpr = findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
-      if (seedsExpr == R_UnboundValue) GetRNGstate();
-      if (TYPEOF(seedsExpr) == PROMSXP) seedsExpr = eval(R_SeedsSymbol, R_GlobalEnv);
-    
-      uint_least32_t seed0 = static_cast<uint_least32_t>(INTEGER(seedsExpr)[0]);
-    
-      ext_rng_algorithm_t algorithmType = static_cast<ext_rng_algorithm_t>(seed0 % 100);
-      ext_rng_standardNormal_t stdNormalType = static_cast<ext_rng_standardNormal_t>(seed0 / 100);
-    
-      void* state = static_cast<void*>(1 + INTEGER(seedsExpr));
-#ifdef SUPPRESS_DIAGNOSTIC
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wswitch-enum"
-#endif
-      switch (algorithmType) {
-        case EXT_RNG_ALGORITHM_KNUTH_TAOCP:
-        case EXT_RNG_ALGORITHM_KNUTH_TAOCP2:
-        {
-          ext_rng_knuthState* kt = static_cast<ext_rng_knuthState*>(std::malloc(sizeof(ext_rng_knuthState)));
-          std::memcpy(kt->state1, state, EXT_RNG_KNUTH_NUM_RANDOM * sizeof(uint_least32_t));
-          kt->info = EXT_RNG_KNUTH_NUM_RANDOM; // this is a static var which we cannot access
-          for (size_t i = 0; i < EXT_RNG_KNUTH_QUALITY; ++i) kt->state2[i] = 0; // also static
-          state = kt;
-        }
-        break;
-        case EXT_RNG_ALGORITHM_USER_UNIFORM:
-        {
-          ext_rng_userFunction* uniformFunction = static_cast<ext_rng_userFunction*>(std::malloc(sizeof(ext_rng_userFunction)));
-          uniformFunction->f.stateless = &unif_rand;
-          uniformFunction->state = NULL;
-          state = uniformFunction;
-        }
-        break;
-        default:
-        break;
-      }    
-      result = ext_rng_create(algorithmType, state);
-      if (algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP || algorithmType == EXT_RNG_ALGORITHM_KNUTH_TAOCP2 || algorithmType == EXT_RNG_ALGORITHM_USER_UNIFORM) std::free(state);
-      if (result == NULL) return NULL; 
-    
-      void* normalState = NULL;
-      switch (stdNormalType) {
-        case EXT_RNG_STANDARD_NORMAL_BOX_MULLER:
-        normalState = malloc(sizeof(double));
-        *static_cast<double*>(normalState) = 0.0; // static var, again
-        break;
-        case EXT_RNG_STANDARD_NORMAL_USER_NORM:
-        {
-          ext_rng_userFunction* normalFunction = static_cast<ext_rng_userFunction*>(std::malloc(sizeof(ext_rng_userFunction)));
-          normalFunction->f.stateless = &norm_rand;
-          normalFunction->state = NULL;
-          normalState = normalFunction;
-        }
-        break;
-        default:
-        break;
-      }
-
-#ifdef SUPPRESS_DIAGNOSTIC
-#  pragma GCC diagnostic pop
-#endif
-    
-      int errorCode = ext_rng_setStandardNormalAlgorithm(result, stdNormalType, normalState);
-      if (stdNormalType == EXT_RNG_STANDARD_NORMAL_BOX_MULLER || stdNormalType == EXT_RNG_STANDARD_NORMAL_USER_NORM) std::free(normalState);
-    
-      if (errorCode != 0) {
-        ext_rng_destroy(result);
-        return NULL;
-      }
-    }
-    
-    return result;
   }
   
 #ifdef HAVE_GETTIMEOFDAY

@@ -1,8 +1,8 @@
 #include <external/io.h>
 
 #include <stdarg.h>
-
-#include <R.h>
+#include <stddef.h>
+#include <stdio.h>
 
 #define MAX_BUFFER_LENGTH 8192
 NORETURN void ext_throwError(const char* format, ...)
@@ -21,7 +21,7 @@ NORETURN void ext_throwError(const char* format, ...)
     }
   }
   
-  error(buffer);
+  Rf_error(buffer);
 }
 
 void ext_printMessage(const char* format, ...)
@@ -57,5 +57,5 @@ void ext_issueWarning(const char* format, ...)
     }
   }
   
-  warning(buffer);
+  Rf_warning(buffer);
 }

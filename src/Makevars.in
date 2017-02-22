@@ -4,7 +4,7 @@ PKG_LIBS=glm/libglm.a external/libexternal.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS
 
 # from rstan.package.skeleton
 STANHEADERS_SRC = `"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" --vanilla -e "cat(system.file('include', 'src', package = 'StanHeaders'))"`
-PKG_CPPFLAGS = -Iinclude @PTHREAD_CFLAGS@ -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS
+PKG_CPPFLAGS = -Iinclude -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG
 
 .PHONY : all glm/libglm.a external/libexternal.a clean
 
