@@ -15,7 +15,7 @@ rm -f src/external/config.h
 rm -f src/Makevars
 
 # from rstan.package.skeleton
-R_HOME=`R --slave -e 'cat(R.home())'`
+R_HOME=`R RHOME`
 mkdir -p src/include
 "${R_HOME}/bin/R" --vanilla --slave --file=tools/make_cpp.R
 sed -i.bak '/current_statement_begin__ = [0-9]/d' src/include/models.hpp
