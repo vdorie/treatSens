@@ -5,6 +5,8 @@
 /* #define HAVE_ALLOCA_H 1 */
 #define STDC_HEADERS 1
 
+#define restrict __restrict
+
 #define PACKAGE_BUGREPORT "vdorie@gmail.com"
 #define PACKAGE_NAME "treatSens"
 #define PACKAGE_STRING "treatSens 3.0"
