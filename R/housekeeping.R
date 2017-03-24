@@ -114,7 +114,7 @@ parse.formula.mlm <- function(formula, resp.cov, data) {
     data = environment(formula)
   
   names = c(allVarsRec(resp.cov), allVarsRec(formula[[3]]))
-  nrc = switch(is.null(resp.cov)+1, dim(model.matrix(resp.cov))[2]-1,0)
+  nrc = switch(is.null(resp.cov)+1, dim(model.matrix(resp.cov, data = data))[2]-1,0)
   form = eval(parse(text = paste(formula[[2]], "~", paste(names[-length(names)], collapse = "+"), paste("+(1|", names[length(names)],")")))[[1]])
   
   formexp = lFormula(form, data = data)
@@ -127,9 +127,12 @@ parse.formula.mlm <- function(formula, resp.cov, data) {
   if(dim(formexp$fr)[2] > 3) {
     if(!is.null(resp.cov)){
       covars <- formexp$X[,-c(1:(nrc+2))]			#variables on RHS, less the intercept, treatment, response covariates
+      if(is.null(dim(covars))) covars = matrix(covars, ncol = 1)
       RespX <- formexp$X[,(2:(nrc+1))]  		#response-only variables on RHS
+      if(is.null(dim(RespX))) RespX = matrix(RespX, ncol = 1)
     }else{
       covars <- formexp$X[,-c(1:2)]			#variables on RHS, less the intercept, treatment, response covariates
+      if(is.null(dim(covars))) covars = matrix(covars, ncol = 1)
       RespX <- NULL
     }
   }else{
