@@ -3,7 +3,6 @@
 ###############
 treatSens.MLM <- function(formula,         #formula: assume treatment is 1st term on rhs
                           response.covariates = NULL, #RHS formula of additional covariates for the response model only
-                     resp.family = gaussian,  #family for GLM of model for response
                      trt.family = gaussian,	#family for GLM of model for treatment
                      trt.level = "indiv", #treatment level - individual ("indiv") or group ("group")
                      theta = 0.5, 		#Pr(U=1) for binomial model
@@ -27,7 +26,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   options(warn=1)
   
   sensParam = "coef"	    #type of sensitivity parameter: "coef" for model coefficients
-
+  resp.family = gaussian  #family for GLM of model for response - must be Gaussian
+  
   #return error if only either spy.range or spz.range is specified.
   if((is.null(spy.range) & !is.null(spz.range))|(!is.null(spy.range) & is.null(spz.range))){
     stop(paste("Either spy.range or spz.range is missing."))
@@ -64,7 +64,12 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
       gpind = matrix(NA, nrow = length(Y), ncol = ng)
       for(i in 1:ng)
         gpind[,i] = (group==gps[i])/sqrt(sum(group==gps[i]))
-      Xstar = allX[,!colsAtTrtLev] #gpind%*%(t(gpind)%*%W[,-((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))])
+      if(sum(!colsAtTrtLev) > 0){
+        Xstar = allX[,!colsAtTrtLev] #gpind%*%(t(gpind)%*%W[,-((dim(W)[2]+1-dim(RespX)[2]):(dim(W)[2]))])
+        if(is.null(dim(Xstar))) Xstar = matrix(Xstar, ncol = 1)
+      }else{
+        Xstar = NULL
+      }
     }else{
       Xstar = NULL
     }
@@ -228,31 +233,34 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
   }
   
+  if(is.null(weights)) weights = rep(1, n.obs)
+  
   ##########
 
   #fit null model for the outcome & get residuals
   if(!is.null(X)) {
     if(!is.null(W)){
-      null.resp <- suppressWarnings(glmer(Y~Z+X+W+(1|group), family=resp.family, weights=weights))
+      null.resp <- suppressWarnings(gls(Y~Z+X+W, correlation = corCompSymm(form = ~1|group), weights=~1/weights))
     }else {
-      null.resp <- suppressWarnings(glmer(Y~Z+X+(1|group), family=resp.family, weights=weights))
+      null.resp <- suppressWarnings(gls(Y~Z+X, correlation = corCompSymm(form = ~1|group), weights=~1/weights))
     }
   }else if(!is.null(W)){
-    null.resp <- suppressWarnings(glmer(Y~Z+W+(1|group), family=resp.family, weights=weights))
+    null.resp <- suppressWarnings(gls(Y~Z+W, correlation = corCompSymm(form = ~1|group), weights=~1/weights))
   }else{
-    null.resp <- suppressWarnings(glmer(Y~Z+(1|group), family=resp.family, weights=weights))
+    null.resp <- suppressWarnings(gls(Y~Z, correlation = corCompSymm(form = ~1|group), weights=~1/weights))
   }
-  sgnTau0 = sign(null.resp@beta[2])
+  sgnTau0 = sign(null.resp$coef[2])
 
   #n = length(Y)
   Y.res <- residuals(null.resp, type = "response")
-  v_Y <- summary(null.resp)$sigma^2
-  v_alpha <- VarCorr(null.resp)$g[1]
+  r = coef(null.resp$modelStruct, unconstrained = FALSE)
+  v_Y = null.resp$sigma^2*r
+  v_alpha <- v_Y*(1-r)/r  
   
   if(!is.null(allX)) {
     zXcoef = switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1])
     Xcoef = cbind(zXcoef, 
-                  fixef(null.resp)[3:(2+length(zXcoef))])
+                  null.resp$coef[3:(2+length(zXcoef))])
   }else{
     Xcoef <- Xcoef.plot<- NULL
   }
@@ -281,8 +289,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     #Transform covars with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
     X.positive = t(t(cbind(Wboth,X))*Xcoef.flg)
-    null.resp.plot <- switch(is.null(Wresp)+1, suppressWarnings(glmer(Y~Z+X.positive+Wresp+(1|group), family=resp.family, weights=weights)), suppressWarnings(glmer(Y~Z+X.positive+(1|group), family=resp.family, weights=weights)))
-    Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), fixef(null.resp.plot)[3:(2+length(zXcoef))])
+    null.resp.plot <- switch(is.null(Wresp)+1, suppressWarnings(gls(Y~Z+X.positive+Wresp, correlation = corCompSymm(form = ~1|group), weights=~1/weights)), suppressWarnings(gls(Y~Z+X.positive, correlation = corCompSymm(form = ~1|group), weights=~1/weights)))
+    Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), null.resp.plot$coef[3:(2+length(zXcoef))])
   }
     
   #register control.fit
@@ -302,7 +310,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   #fill in grid
   cell = 0
   
-  useStan <- is(trt.family, "family") && trt.family$family == "binomial" && trt.family$link == "probit" &&
+  useStan <- is(trt.family, "family") && trt.family$family == "binomial" && trt.family$link == "probit" && trt.level == "indiv" &&
     (identical(resp.family, gaussian) || (is(trt.family, "family") && resp.family$family == "gaussian"))
 
     if (useStan) {
@@ -425,8 +433,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
                    sp.z = zeta.z, sp.y = zeta.y, 
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
-                   tau0 = fixef(null.resp)[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
+                   tau0 = null.resp$coef[2], se.tau0 = null.resp$varBeta[2,2],
+                   Xcoef = switch((!is.null(Xcoef) & is.null(dim(Xcoef)))+1, Xcoef, matrix(Xcoef, nrow = 1)), 
+                   Xcoef.plot = switch((!is.null(Xcoef.plot) & is.null(dim(Xcoef.plot)))+1, Xcoef.plot, matrix(Xcoef.plot, nrow = 1)),
                    varnames = all.vars(formula), var_ytilde = v_Y, var_ztilde = v_Z)
     class(result) <- "sensitivity"
   }else{
@@ -434,8 +443,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
                    sp.z = zeta.z, sp.y = zeta.y, 
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
-                   tau0 = fixef(null.resp)[2], se.tau0 = summary(null.resp)$coefficients[2,2],
-                   Xcoef = Xcoef, Xcoef.plot = Xcoef.plot,
+                   tau0 = null.resp$coef[2], se.tau0 = null.resp$varBeta[2,2],
+                   Xcoef = switch((!is.null(Xcoef) & is.null(dim(Xcoef)))+1, Xcoef, matrix(Xcoef, nrow = 1)), 
+                   Xcoef.plot = switch((!is.null(Xcoef.plot) & is.null(dim(Xcoef.plot)))+1, Xcoef.plot, matrix(Xcoef.plot, nrow = 1)),
                    varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z)
     class(result) <- "sensitivity"
   }
@@ -515,43 +525,45 @@ dropFormulaTerm <- function(form, term)
 
 ## gets predictions for a specific value of U
 fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
+  g <- control.fit$g
   resp.family <- control.fit$resp.family
   trt.family  <- control.fit$trt.family
   trt.level   <- control.fit$trt.level
   weights <- control.fit$weights
   offset  <- control.fit$offset
+  if(is.null(weights)) weights = rep(1, length(Y))
   
-  args.resp <- list(family = resp.family, weights = weights)
+  args.resp <- list(correlation = corCompSymm(form = ~1|g), weights = ~1/weights)
   if (offset == TRUE) {
-    args.resp$offset <- zetaY * U
-    args.resp$formula <- if (!is.null(W)) Y ~ Z + X + W + (1 | g) else Y ~ Z + X + (1 | g)
+    u.offset = zetaY*U
+    args.resp$model <- if (!is.null(W)) I(Y-u.offset) ~ Z + X + W  else I(Y-u.offset) ~ Z + X 
   } else {
-    args.resp$formula <- if (!is.null(W)) Y ~ Z + X + W + U + (1 | g) else Y ~ Z + X + U + (1 | g)
+    args.resp$model <- if (!is.null(W)) Y ~ Z + X + W + U  else Y ~ Z + X + U
   }
   
   args.trt <- list(family = trt.family)
   args.trt$formula <- if (trt.level == "indiv") Z ~ U + X + (1 | g) else Z ~ U + X
   
   if (is.null(X)) {
-    args.resp$formula <- dropFormulaTerm(args.resp$formula, "X")
+    args.resp$model <- dropFormulaTerm(args.resp$model, "X")
     args.trt$formula  <- dropFormulaTerm(args.trt$formula, "X")
   }
   
-  fit.glm <- suppressWarnings(do.call("glmer", args.resp))
+  fit.gls <- suppressWarnings(do.call("gls", args.resp))
     
   sens.se <- switch(class(weights),
-                    "NULL" = summary(fit.glm)$coefficients[2,2],
-                    "character" = pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights), #pweight is custom function
-                    "numeric"   = pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights)) #pweight is custom function
+                    "NULL" = fit.gls$varBeta[2,2],
+                    "character" = pweight(Z = Z, X = X, r = fit.gls$residuals, wt = weights), #pweight is custom function
+                    "numeric"   = pweight(Z = Z, X = X, r = fit.gls$residuals, wt = weights)) #pweight is custom function
   fit.trt <- do.call(if (trt.level == "indiv") "glmer" else glm, args.trt)
   
-  list(sens.coef = fixef(fit.glm)[2],
+  list(sens.coef = fit.gls$coef[2],
        sens.se = sens.se, 	#SE of Z coef
-       zeta.y = if (offset == TRUE) zetaY else fixef(fit.glm)[3],     	            #estimated coefficient of U in response model
+       zeta.y = if (offset == TRUE) zetaY else fit.gls$coef[length(fit.gls$coef)],     	            #estimated coefficient of U in response model
        zeta.z = if (trt.level == "indiv") fixef(fit.trt)[2] else coef(fit.trt)[2], #estimated coef of U in trt model
-       zy.se  = if (offset == TRUE) NA else summary(fit.glm)$coefficients[3,2],     #SE of U coef in response model
+       zy.se  = if (offset == TRUE) NA else fit.gls$varBeta[dim(fit.gls$varBeta)],     #SE of U coef in response model
        zz.se  = summary(fit.trt)$coefficients[2,2],                                 #SE of U coef in trt model
-       resp.sigma2 = summary(fit.glm)$sigma^2,
+       resp.sigma2 = fit.gls$sigma^2,
        trt.sigma2  = if (trt.level == "indiv") summary(fit.trt)$sigma^2 else sum(fit.trt$resid^2)/fit.trt$df.residual)
 }
 
@@ -574,6 +586,7 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
   if(U.model == "normal"){  
     U <- try(contYZU(Y = Y.res, Z = Z.res, zeta_y = zetaY, zeta_z = zetaZ, v_Y = v_Y, v_Z = v_Z, 
                      sensParam = sensParam, gp = g, v_alpha = v_alpha, v_phi = v_phi, trt.lev = trt.level))
+    p.est <- NULL
   }
   
   if(U.model == "binomial"){
@@ -607,6 +620,8 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
         if(length(unique(U))>1 && !identical(U,Z) && !identical(U,1-Z)) break
       }
       if(reps > 5000){
+        U = "No non-constant simulated U vectors in 5000 tries"
+        p.est = NULL
         class(U) = "try-error" #stop("No non-constant simulated U vectors in 5000 tries")
         break
       } 

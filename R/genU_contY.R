@@ -43,7 +43,6 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_ph
   if(sensParam == "coef"){
     delta = zeta_z/v_Z
     gamma = as.numeric(zeta_y/v_Y*(v_Z-zeta_z^2)/v_Z) 
-    #	var.U = (v_Z-zeta_z^2)/(v_Z*v_Y)*(v_Z*(v_Y-zeta_y^2)+zeta_y^2*zeta_z^2)/v_Z	
     var.UgZinv.diag = v_Z/(v_Z-zeta_z^2)
     var.UgZinv.mat = -zeta_z^2*v_phi/((v_Z-zeta_z^2)*(v_Z-zeta_z^2+n.gp*v_phi))
     
@@ -56,7 +55,10 @@ contYZU <- function(Y, Z, zeta_y, zeta_z, v_Y, v_Z, sensParam, v_alpha = 0, v_ph
       if(trt.lev == "indiv"){
         var.U = solve(zeta_y^2*solve(var.Ymat)+var.UgZinv)
       }else if(trt.lev == "group"){
-        var.U = solve(diag(n.gp[i]*zeta_y^2/apply(var.Ymat,1,sum))+var.UgZinv)[1,1]
+        var.U = (1+(var.UgZinv.diag-1)+zeta_y^2*n.gp[i]/(v_Y+n.gp[i]*(v_alpha-zeta_y^2*var.UgZinv.diag^(-1))))^(-1)
+        delta = var.U*(zeta_z/(v_Z-zeta_z^2) + zeta_y^2*zeta_z/v_Z*n.gp[i]/(v_Y+n.gp[i]*(v_alpha-zeta_y^2*var.UgZinv.diag^(-1))))
+        gamma = var.U*(zeta_y/(v_Y) *(v_Y+n.gp[i]*v_alpha)/(v_Y+n.gp[i]*(v_alpha-zeta_y^2*var.UgZinv.diag^(-1))))
+        if(var.U < 0 | v_alpha < zeta_y^2*var.UgZinv.diag^(-1)) stop("Sensitivity parameters outside range allowed by variance components")
       }
       if(length(gps) == 1){
         eps.u = as.vector(rmvnorm(1, rep(0, n), var.U))
@@ -559,6 +561,7 @@ contYbinaryZU.mlm.gp <- function(y, z, x, w, xs, cy, cz, theta, iter.j=10, weigh
   
   if(!is.null(w)){
     xw = cbind(x,w)
+    dimnames(xw)[[2]] = paste("X", 1:dim(xw)[2], sep = "")
   }else{
     xw = x
   }
@@ -581,11 +584,13 @@ contYbinaryZU.mlm.gp <- function(y, z, x, w, xs, cy, cz, theta, iter.j=10, weigh
     
     if (!offset) { 
       if(j == 1 | cy != 0){
-        U.fit = suppressWarnings(glmer(y~z+xw+U+(1|g), weights=weights))
-        y.coef = fixef(U.fit)
-        y.coef[length(y.coef)]  = cy
-        v_Y = summary(U.fit)$sigma^2
-        v_alpha <- VarCorr(U.fit)$g[1]
+        if(is.null(weights)) weights = rep(1, length(y))
+        U.fit = suppressWarnings(gls(y~z+xw+U, correlation = corCompSymm(form = ~1|g), weights=~1/weights))
+        y.coef = U.fit$coef
+        y.coef[length(y.coef)] = cy
+        r = coef(U.fit$modelStruct, unconstrained = FALSE)
+        v_Y = U.fit$sigma^2*r
+        v_alpha <- v_Y*(1-r)/r
       }
       if(j==1 | cz != 0){
         UZ.fit = suppressWarnings(glm(z~xstar+U, family=binomial(link="probit"), control = glm.control(epsilon = 1e-5, maxit = 75)))
@@ -594,10 +599,13 @@ contYbinaryZU.mlm.gp <- function(y, z, x, w, xs, cy, cz, theta, iter.j=10, weigh
       }
     } else {
       if(j==1 | cy != 0){
-        U.fit = suppressWarnings(glmer(y~z+xw+(1|g), offset=cy*U, weights=weights))
-        y.coef = c(fixef(U.fit), cy)
-        v_Y = summary(U.fit)$sigma^2
-        v_alpha <- VarCorr(U.fit)$g[1]
+        u.gen.gls = cy*U
+        if(is.null(weights)) weights = rep(1, length(y))
+        U.fit = suppressWarnings(gls(I(y-u.gen.gls)~z+xw, correlation = corCompSymm(form = ~1|g), weights=~1/weights))
+        y.coef = c(U.fit$coef, cy)
+        r = coef(U.fit$modelStruct, unconstrained = FALSE)
+        v_Y = U.fit$sigma^2*r
+        v_alpha <- v_Y*(1-r)/r
       }
       if(j == 1 | cz != 0){
         UZ.fit = suppressWarnings(glm(z~xstar, family=binomial(link="probit"), offset=cz*U, control = glm.control(epsilon = 1e-5, maxit = 75)))
@@ -685,13 +693,15 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, xs, cy, cz, theta, iter.j=10, weig
     }
     if (!offset) { 
       if(j == 1 | cy != 0){
+        if(is.null(weights)) weights = rep(1, length(y))
         U.fit = switch(is.null(w)+1,
-                       suppressWarnings(glmer(y~z+U+w+(1|g), weights=weights)),
-                       suppressWarnings(glmer(y~z+U+(1|g), weights=weights)))
-        y.coef = fixef(U.fit)
-        y.coef[length(y.coef)]  = cy
-        v_Y = summary(U.fit)$sigma^2
-        v_alpha <- VarCorr(U.fit)$g[1]
+                       suppressWarnings(gls(y~z+w+U, correlation = corCompSymm(form = ~1|g), weights=~1/weights)),
+                       suppressWarnings(gls(y~z+U, correlation = corCompSymm(form = ~1|g), weights=~1/weights)))
+        y.coef = U.fit$coef
+        y.coef[length(y.coef)] = cy
+        r = coef(U.fit$modelStruct, unconstrained = FALSE)
+        v_Y = U.fit$sigma^2*r
+        v_alpha <- v_Y*(1-r)/r
       }
       if(j==1 | cz != 0){
         UZ.fit = switch(is.null(xstar)+1,
@@ -702,12 +712,15 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, xs, cy, cz, theta, iter.j=10, weig
       }
     } else {
       if(j==1 | cy != 0){
+        u.gen.gls = cy*U
+        if(is.null(weights)) weights = rep(1, length(y))
         U.fit = switch(is.null(w)+1,
-                       suppressWarnings(glmer(y~z+w+(1|g), offset=cy*U, weights=weights)),
-                       suppressWarnings(glmer(y~z+(1|g), offset=cy*U, weights=weights)))
-        y.coef = c(fixef(U.fit), cy)
-        v_Y = summary(U.fit)$sigma^2
-        v_alpha <- VarCorr(U.fit)$g[1]
+                       suppressWarnings(gls(I(y-u.gen.gls)~z+w, correlation = corCompSymm(form = ~1|g), weights=~1/weights)),
+                       suppressWarnings(gls(I(y-u.gen.gls)~z, correlation = corCompSymm(form = ~1|g), weights=~1/weights)))
+        y.coef = c(U.fit$coef, cy)
+        r = coef(U.fit$modelStruct, unconstrained = FALSE)
+        v_Y = U.fit$sigma^2*r
+        v_alpha <- v_Y*(1-r)/r
       }
       if(j == 1 | cz != 0){
         UZ.fit = switch(is.null(xstar)+1,

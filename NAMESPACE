@@ -30,6 +30,8 @@ importFrom(grDevices, contourLines)
 
 importFrom(lme4, lmer, glmer, fixef, VarCorr, lFormula, glmerControl)
 
+importFrom(nlme, gls, corCompSymm)
+
 if (getRversion() >= "3.3.0") {
   importFrom(stats, sigma)
 } else {

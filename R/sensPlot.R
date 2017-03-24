@@ -52,7 +52,16 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   ############
   Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
   Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
+  if(!is.null(Xpart) & is.null(dim(Xpart))){
+    Xpart = matrix(Xpart, nrow = 1)
+    Xpart.plot = matrix(Xpart.plot, nrow = 1)
+  
+  } 
+  
   Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,2)) #MH: add sign of coef of X on Y to Xpart  
+  if(!is.null(Xpart.plot2) & is.null(dim(Xpart.plot2))){
+    Xpart.plot2 = matrix(Xpart.plot2, nrow = 1)
+  } 
     
   #note that due to correlation among Xs, some may not appear on plot
   #because observed partial cors don't map directly to coefs in this case
