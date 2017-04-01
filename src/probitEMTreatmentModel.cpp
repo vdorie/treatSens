@@ -96,5 +96,15 @@ namespace {
       probZForU0[i] = (scratch.z[i] == 1.0 ? zHatU0 : 1.0 - zHatU0);
       probZForU1[i] = (scratch.z[i] == 1.0 ? zHatU1 : 1.0 - zHatU1);
     }
+    /* ext_leftMultiplyMatrixAndVector(scratch.x, scratch.numObservations, scratch.numPredictors,
+                                    scratch.coefficients, probZForU0);
+    
+    for (size_t i = 0; i < scratch.numObservations; ++i) {
+      double zHatU0 = ext_cumulativeProbabilityOfNormal(probZForU0[i], 0.0, 1.0);
+      double zHatU1 = ext_cumulativeProbabilityOfNormal(probZForU0[i] + zetaZ, 0.0, 1.0);
+      
+      probZForU0[i] = (scratch.z[i] == 1.0 ? zHatU0 : 1.0 - zHatU0);
+      probZForU1[i] = (scratch.z[i] == 1.0 ? zHatU1 : 1.0 - zHatU1);
+    } */
   }
 }
