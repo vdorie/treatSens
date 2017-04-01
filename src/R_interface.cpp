@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <dbarts/cstdint.hpp>
+#include <cstdlib> // malloc, free for PoDs
 #include <cstring>
 
 #include <R.h>
@@ -67,12 +68,15 @@ namespace {
       cibart::ProbitPrior* prior = NULL;
       switch(family) {
         case cibart::PROBIT_PRIOR_STUDENT_T:
-        prior = new cibart::ProbitStudentTPrior;
+        // prior = new cibart::ProbitStudentTPrior;
+        // these are PoDs which require that we malloc them
+        prior = static_cast<cibart::ProbitPrior*>(malloc(sizeof(cibart::ProbitPrior)));
         static_cast<cibart::ProbitStudentTPrior *>(prior)->scale = REAL(getListElement(modelExpr, "scale"));
         static_cast<cibart::ProbitStudentTPrior *>(prior)->dof   = REAL(getListElement(modelExpr, "df"))[0];
         break;
         case cibart::PROBIT_PRIOR_NORMAL:
-        prior = new cibart::ProbitNormalPrior;
+        // prior = new cibart::ProbitNormalPrior;
+        prior = static_cast<cibart::ProbitPrior*>(malloc(sizeof(cibart::ProbitNormalPrior)));
         static_cast<cibart::ProbitNormalPrior *>(prior)->scale = REAL(getListElement(modelExpr, "scale"));
         case cibart::PROBIT_PRIOR_FLAT:
         break;
@@ -103,7 +107,8 @@ namespace {
       case PROBIT:
       {
         cibart::ProbitTreatmentModel* treatmentModel = static_cast<cibart::ProbitTreatmentModel*>(treatmentModelPtr);
-        delete treatmentModel->prior;
+        // delete treatmentModel->prior;
+        free(const_cast<cibart::ProbitPrior*>(treatmentModel->prior));
         delete treatmentModel;
       }
       break;

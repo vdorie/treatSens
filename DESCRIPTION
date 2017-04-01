@@ -16,6 +16,7 @@ Imports:
     grDevices,
     mvtnorm,
     lme4,
+    nlme,
     dbarts (>= 0.8-7),
     rstan (>= 2.8.1)
 Suggests:

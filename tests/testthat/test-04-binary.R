@@ -33,9 +33,9 @@ namedList <- treatSens:::namedList
 setInList <- treatSens:::setInList
 
 test_that("treatSens runs correctly on example data", {
-  fit.bin <-  treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim = 2,
-                        spy.range = c(0, 2), spz.range = c(-2, 2),grid.dim = c(2, 2),
-                        standardize = FALSE)
+  fit.bin <- suppressWarnings(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim = 2,
+                              spy.range = c(0, 2), spz.range = c(-2, 2),grid.dim = c(2, 2),
+                              standardize = FALSE))
   expect_is(fit.bin, "sensitivity")
 })
 
