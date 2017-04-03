@@ -2,25 +2,7 @@
 #Housekeeping functions
 #################
 
-###
-#Differentiate between group-level and individual-level variables when treatment is group level
-###
-getColumnsAtTreatmentLevel <- function(x, treatment)
-{
-  if(is.null(x)) return(NULL)
-  if(is.null(dim(x))) x = matrix(x, ncol = 1)
-  
-  treatmentLevels <- unique(treatment)
-  treatmentIndices <- match(treatment, treatmentLevels)
-  
-  sapply(seq_len(ncol(x)), function(j) {
-    col <- x[,j]
-    all(sapply(seq_along(treatmentLevels), function(k) {
-      col.trt <- col[treatmentIndices == k]
-      all(col.trt == col.trt[1L])
-    }))
-  })
-}
+
 
 ###
 #Determine if a vector consists entirely of zeroes and ones
@@ -46,7 +28,7 @@ is.binary <- function(x) {
 #data: data object containing variables (may be NULL)
 ###
 
-parse.formula <- function(formula, resp.cov, data) {
+parse.formula <- function(formula, resp.cov = NULL, data) {
   
   allVarsRec <- function(object){
     if (is.list(object)) {
@@ -93,55 +75,7 @@ parse.formula <- function(formula, resp.cov, data) {
   return(list(resp = resp, trt = trt, covars = covars, RespX = RespX))
 }
 
-###
-#Parses out response, treatment, covariates and group from formula
-#arguments:
-#form: formula object.  1st variable on RHS assumed to be treatment
-#data: data object containing variables (may be NULL)
-###
 
-parse.formula.mlm <- function(formula, resp.cov, data) {
-  
-  allVarsRec <- function(object){
-    if (is.list(object)) {
-      unlist(lapply(object, allVarsRec))
-    }
-    else {
-      all.vars(object)
-    }
-  }
-  if(missing(data))
-    data = environment(formula)
-  
-  names = c(allVarsRec(resp.cov), allVarsRec(formula[[3]]))
-  nrc = switch(is.null(resp.cov)+1, dim(model.matrix(resp.cov, data = data))[2]-1,0)
-  form = eval(parse(text = paste(formula[[2]], "~", paste(names[-length(names)], collapse = "+"), paste("+(1|", names[length(names)],")")))[[1]])
-  
-  formexp = lFormula(form, data = data)
-  resp <- formexp$fr[,1]    	#response from LHS
-  group <- formexp$fr[,dim(formexp$fr)[2]]
-  
-  #extract variables from formula & data
-  trt <- formexp$X[,(2+nrc)]				#assume treatment is 1st var on RHS
-  
-  if(dim(formexp$fr)[2] > 3) {
-    if(!is.null(resp.cov)){
-      covars <- formexp$X[,-c(1:(nrc+2))]			#variables on RHS, less the intercept, treatment, response covariates
-      if(is.null(dim(covars))) covars = matrix(covars, ncol = 1)
-      RespX <- formexp$X[,(2:(nrc+1))]  		#response-only variables on RHS
-      if(is.null(dim(RespX))) RespX = matrix(RespX, ncol = 1)
-    }else{
-      covars <- formexp$X[,-c(1:2)]			#variables on RHS, less the intercept, treatment, response covariates
-      if(is.null(dim(covars))) covars = matrix(covars, ncol = 1)
-      RespX <- NULL
-    }
-  }else{
-    covars = NULL
-    RespX = NULL
-  }
-  
-  return(list(resp = resp, trt = trt, covars = covars, RespX = RespX, group = group))
-}
 
 ###
 #Standardize non-binary variables

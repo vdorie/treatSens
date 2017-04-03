@@ -2,7 +2,6 @@ useDynLib(treatSens, .registration = TRUE)
 
 export(treatSens, sensPlot)
 export(treatSens.BART)
-export(treatSens.MLM)
 
 S3method(summary, sensitivity)
 S3method(plot, sensitivity)
@@ -27,10 +26,6 @@ importFrom(stats, na.omit, setNames)
 
 importFrom(graphics, par, plot, points, text, abline, legend, contour, box)
 importFrom(grDevices, contourLines)
-
-importFrom(lme4, lmer, glmer, fixef, VarCorr, lFormula, glmerControl)
-
-importFrom(nlme, gls, corCompSymm)
 
 if (getRversion() >= "3.3.0") {
   importFrom(stats, sigma)

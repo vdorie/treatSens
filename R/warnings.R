@@ -221,7 +221,7 @@ warningsBART <- function(formula,     #formula: assume treatment is 1st term on 
   if ((verbose) & nobs.deleted>0) warning(nobs.deleted, " observations were deleted listwise.\n") 
   
   #extract variables from formula
-  form.vars <- parse.formula(formula, data)
+  form.vars <- parse.formula(formula, resp.cov = NULL, data)
   Y = form.vars$resp
   Z = form.vars$trt
   X = form.vars$covars 

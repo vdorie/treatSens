@@ -7,11 +7,10 @@ Performing Dual-Parameter Sensitivity Analysis
 \code{treatSens} performs dual-parameter sensitivity analysis for unobserved confounding for both continuous and binary treatment variables.
 }
 \usage{
-treatSens(formula, response.covariates = NULL, sensParam = "coef", resp.family = gaussian, trt.family = gaussian, 
-theta = 0.5, grid.dim = c(8,4), standardize = TRUE, 
-nsim = 20, zero.loc = 1/3, verbose = FALSE, 
-buffer = 0.1, weights = NULL, data = NULL, seed = 1234, 
-iter.j = 10, offset = TRUE, core = NULL, spy.range = NULL, 
+treatSens(formula, response.covariates = NULL, sensParam = "coef", resp.family = gaussian,
+trt.family = gaussian, theta = 0.5, grid.dim = c(8,4), standardize = TRUE, 
+nsim = 20, zero.loc = 1/3, verbose = FALSE, buffer = 0.1, weights = NULL, 
+data = NULL, seed = 1234, iter.j = 10, offset = TRUE, core = NULL, spy.range = NULL, 
 spz.range = NULL, trim.wt = 10)
 }
 \arguments{
