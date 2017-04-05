@@ -202,9 +202,10 @@ warningsBART <- function(formula,     #formula: assume treatment is 1st term on 
                          zetay.range,  	#custom range for zeta^y, e.g.(0,10), zero.loc will be overridden.
                          zetaz.range,  	#custom range for zeta^z, e.g.(-2,2), zero.loc will be overridden.
                          weights,     #some user-specified vector or "ATE", "ATT", or "ATC" for GLM.sens to create weights.
+                         form.vars,
                          data) {
   
-  if(is.null(data)) stop(paste("Either a matrix or data.frame object must be specified in data field."))
+  if(is.null(data)) stop("either a matrix or data.frame object must be specified in data field")
   
   #check that data is a data frame
   if(identical(class(data),"matrix")) {
@@ -212,16 +213,17 @@ warningsBART <- function(formula,     #formula: assume treatment is 1st term on 
     data = data.frame(data)
   }
   else if(!identical(class(data),"data.frame")) {
-    stop(paste("Data is not a data.frame object"))
+    stop("data is not a data.frame object")
   } 
   
   #Code for listwise deletion
   postdata=na.omit(data)
   nobs.deleted = dim(data)[1] - dim(postdata)[1]
-  if ((verbose) & nobs.deleted>0) warning(nobs.deleted, " observations were deleted listwise.\n") 
+  if ((verbose) & nobs.deleted>0) warning(nobs.deleted, " observations were deleted listwise") 
   
   #extract variables from formula
   form.vars <- parse.formula(formula, resp.cov = NULL, data)
+
   Y = form.vars$resp
   Z = form.vars$trt
   X = form.vars$covars 
@@ -237,7 +239,7 @@ warningsBART <- function(formula,     #formula: assume treatment is 1st term on 
   
   #check whether the dimentions of grid are at least 2.
   if(!is.null(grid.dim) && (length(grid.dim) != 2)) {
-    stop(paste("Error: grid dimenstions must a vector of length 2"))
+    stop("grid dimenstions must a vector of length 2")
   }
   
   #If single value entered for range with 1 cell grid, expand to length 2 to avoid errors
@@ -248,16 +250,16 @@ warningsBART <- function(formula,     #formula: assume treatment is 1st term on 
   
   #If single value entered for range with >1 cell grid, return an error
   if(!is.null(zetay.range) && (length(zetay.range) != 2)) {
-    stop(paste("Error: zeta.y range must a vector of length 2"))
+    stop("zeta.y range must a vector of length 2")
   }
   if(!is.null(zetaz.range) && (length(zetaz.range) != 2)) {
-    stop(paste("Error: zeta.z range must a vector of length 2"))
+    stop("zeta.z range must a vector of length 2")
   }
   
-  return(list(formula=formula,
-              grid.dim=grid.dim,
-              nsim = nsim,
-              zetay.range=zetay.range,
-              zetaz.range=zetaz.range,
-              data=postdata))
+  list(formula=formula,
+       grid.dim=grid.dim,
+       nsim = nsim,
+       zetay.range=zetay.range,
+       zetaz.range=zetaz.range,
+       data=postdata)
 }            
