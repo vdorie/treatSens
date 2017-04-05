@@ -74,13 +74,12 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
     stop("either spy.range or spz.range is missing")
   }
   
-  "%not_in%" <- function(x, table) match(x, table, nomatch = 0) == 0
   if (!is.null(est.type) && est.type %not_in% c("ATE", "ATT", "ATC")) {
     stop("estimate type must be either \"ATE\", \"ATT\", or \"ATC\"")
   }
   
   # set seed
-  if (!is.numeric(seed))
+  if (!is.numeric(seed) || anyNA(seed))
     stop("seed must be an integer")
   if (!is.integer(seed) && as.double(as.integer(seed)) != seed)
     warning("seed changed by coercion from double; supply an integer to be precise")
@@ -102,7 +101,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
  
   # Check whether data, options, and etc. conform to the format in "warnings.R"
   out.warnings <- warningsBART(formula, theta, grid.dim, nsim,
-                               verbose, spy.range, spz.range, est.type, data)
+                               verbose, spy.range, spz.range, est.type, form.vars, data)
   
   formula   <- out.warnings$formula
   grid.dim  <- out.warnings$grid.dim
