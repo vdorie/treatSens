@@ -1,17 +1,21 @@
-# PKG_CPPFLAGS=-Iinclude @PTHREAD_CFLAGS@
-PKG_CPPXXFLAGS=-Iinclude @PTHREAD_CFLAGS@
+PKG_CPPFLAGS=-Iinclude @PTHREAD_CFLAGS@
 PKG_LIBS=glm/libglm.a external/libexternal.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) @PTHREAD_LIBS@
 
 # from rstan.package.skeleton
 STANHEADERS_SRC = `"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" --vanilla -e "cat(system.file('include', 'src', package = 'StanHeaders'))"`
-PKG_CPPFLAGS = -Iinclude -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG
+STAN_CPPFLAGS = -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG
+#PKG_CPPFLAGS = -Iinclude @PTHREAD_CFLAGS@ -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG
 
-.PHONY : all glm/libglm.a external/libexternal.a clean
-
+.PHONY : all glm/libglm.a external/libexternal.a Modules.o clean
+#.PHONY : all glm/libglm.a external/libexternal.a clean
 
 all : $(SHLIB)
 
 $(SHLIB) : glm/libglm.a external/libexternal.a
+
+Modules.o : Modules.cpp
+	$(CXX) $(R_XTRA_CPPFLAGS) $(PKG_CPPFLAGS) $(STAN_CPPFLAGS) $(CPPFLAGS) \
+	  $(CLINK_CPPFLAGS) $(CXXPICFLAGS) $(CXXFLAGS) -c Modules.cpp -o Modules.o
 
 glm/libglm.a :
 	@(cd glm && $(MAKE) libglm.a \
@@ -29,9 +33,6 @@ external/libexternal.a :
 	  CFLAGS="$(R_XTRA_CFLAGS) $(CPICFLAGS) $(CFLAGS)" \
 	  AR="$(AR)" ARFLAGS="$(ARFLAGS)" RANLIB="$(RANLIB)" \
 	  INST_DIR="$(INST_DIR)")
-
-#rstan :
-#	@(R --no-save < src/make_cpp.R)
 
 clean :
 	@(cd glm && $(MAKE) clean)
