@@ -70,7 +70,7 @@ namespace {
         case cibart::PROBIT_PRIOR_STUDENT_T:
         // prior = new cibart::ProbitStudentTPrior;
         // these are PoDs which require that we malloc them
-        prior = static_cast<cibart::ProbitPrior*>(malloc(sizeof(cibart::ProbitPrior)));
+        prior = static_cast<cibart::ProbitPrior*>(malloc(sizeof(cibart::ProbitStudentTPrior)));
         static_cast<cibart::ProbitStudentTPrior *>(prior)->scale = REAL(getListElement(modelExpr, "scale"));
         static_cast<cibart::ProbitStudentTPrior *>(prior)->dof   = REAL(getListElement(modelExpr, "df"))[0];
         break;
