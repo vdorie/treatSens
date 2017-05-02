@@ -17,7 +17,7 @@ citEntry(entry="Manual",
          note         = paste("Version ", csaversion,
                         sep=""),
          address      = "New York, NY",
-         url          = "http://CRAN.R-project.org/package=treatSens",
+         url          = "https://CRAN.R-project.org/package=treatSens",
          textVersion = paste(paste(authors, collapse=", "), " (", csayear,
                "), ", csatitle, ". Version ", csaversion,
                sep="")
