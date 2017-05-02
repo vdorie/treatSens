@@ -100,7 +100,7 @@ Matrices and data frames should include only complete cases.
 \code{\link{sensPlot}} \code{\link{summary.sensitivity}} \code{\link{glm}}
 }
 \examples{
-N = 300          #number of observations
+N = 250          #number of observations
 
 zetay = .5             #coefficient on U in the outcome model
 zetaz = .5             #coefficient on U in the treatment model
@@ -122,8 +122,6 @@ Y = rnorm(N,X \%*\% betay + zetay*U + tau*Z,2) #outcome variable
 out.cont <- treatSens(Y~Z+X, grid.dim = c(3,2), nsim = 5,
                      standardize = FALSE, verbose = TRUE, zero.loc = "full")
 
-summary(out.cont) #Prints average value of tau (trt effect) for each cell in grid.
-
 sensPlot(out.cont) # draw contour plot
 # You can see when zetay=zetaz=.5, tau is about .25.
 
@@ -142,8 +140,6 @@ Y = Y0*(1-Z) + Y1*Z                  #realization of potential outcome
 out.bin <- treatSens(Y~Z+X, trt.family = binomial(link="probit"), nsim = 3, 
                       spy.range = c(0,4), spz.range = c(-2,2),grid.dim = c(5,3),
                       standardize = FALSE, verbose = TRUE)
-
-summary(out.bin) #Prints average value of tau (trt effect) for each cell in grid.
 
 sensPlot(out.bin) # draw contour plot
 

@@ -179,7 +179,7 @@ ext_rng* ext_rng_createDefault(bool useNative)
   ext_rng_standardNormal_t stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
   
   void* state = (void*) (1 + INTEGER(seedsExpr));
-  
+
 #ifdef SUPPRESS_DIAGNOSTIC
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wswitch-enum"
