@@ -1,32 +1,17 @@
 Package: treatSens
-Version: 2.1
-Date: 2017-04-3
+Version: 2.1.2
+Date: 2017-04-22
 Title: Sensitivity Analysis for Causal Inference
 Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = "carnegin@uwm.edu"),
              person("Masataka",       "Harada", role = "aut",           email = "masatakaharada@gmail.com"),
              person("Vincent",         "Dorie", role = "aut",           email = "vjd4@nyu.edu"),
              person("Jennifer",         "Hill", role = "ctb",           email = "jennifer.hill@nyu.edu"))
-Depends:
-    R (>= 3.1-0),
-    Rcpp (>= 0.11.0)
-Imports:
-    methods,
-    stats,
-    graphics,
-    grDevices,
-    mvtnorm,
-    dbarts (>= 0.8-7),
-    rstan (>= 2.8.1)
-Suggests:
-    doParallel,
-    foreach,
-    testthat (>= 0.9-0)
-LinkingTo: dbarts (>= 0.8-5),
-    StanHeaders (>= 2.9.0),
-    rstan (>= 2.9.0),
-    BH (>= 1.60.0),
-    Rcpp (>= 0.12.0),
-    RcppEigen
+Depends: R (>= 3.1-0), Rcpp (>= 0.11.0)
+Imports: methods, stats, graphics, grDevices, mvtnorm, dbarts (>=
+        0.8-7), rstan (>= 2.8.1)
+Suggests: doParallel, foreach, testthat (>= 0.9-0)
+LinkingTo: dbarts (>= 0.8-5), StanHeaders (>= 2.9.0), rstan (>= 2.9.0),
+        BH (>= 1.60.0), Rcpp (>= 0.12.0), RcppEigen
 Description: Utilities to investigate sensitivity to unmeasured confounding in
     parametric models with either binary or continuous treatment.
 NeedsCompilation: yes
@@ -35,3 +20,11 @@ License: GPL (>= 2)
 URL: https://github.com/vdorie/treatSens
 BugReports: https://github.com/vdorie/treatSens/issues
 RoxygenNote: 5.0.1
+Packaged: 2017-04-22 07:19:50 UTC; ripley
+Author: Nicole Bohme Carnegie [aut, cre],
+  Masataka Harada [aut],
+  Vincent Dorie [aut],
+  Jennifer Hill [ctb]
+Maintainer: Nicole Bohme Carnegie <carnegin@uwm.edu>
+Repository: CRAN
+Date/Publication: 2017-04-22 07:29:05 UTC

@@ -234,7 +234,7 @@ namespace {
         else firstReallocation = false;
         
         numBytesInBuffer = 0;
-        delete cpuInfo;
+        delete[] cpuInfo;
         cpuInfo = temp;
       }
     }
