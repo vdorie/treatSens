@@ -8,7 +8,7 @@ AC_CONFIG_AUX_DIR([tools/build-aux])
 AC_CONFIG_HEADER([src/config.hpp])
 AC_CONFIG_HEADER([src/external/config.h])
 
-m4_include([tools/m4/m4_ax_pthread.m4])
+m4_include([tools/m4/ax_pthread.m4])
 m4_include([tools/m4/ax_func_posix_memalign.m4])
 
 # Checks for programs.
