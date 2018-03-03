@@ -5,10 +5,8 @@
 
 #include <external/io.h>
 
-using std::uint32_t;
 using std::size_t;
-
-
+using std::uint32_t;
 
 // windows adapted from
 //   http://scriptionary.com/2010/09/01/counting-processor-cores-and-threads/
@@ -122,7 +120,7 @@ namespace cibart {
 #  include <fcntl.h>    // open
 #  include <unistd.h>   // close, lseek
 #  include <sys/mman.h> // mmap
-#  include <cstring>   // srtncmp
+#  include <cstring>   // srtncmp, strerror_r
 #  include <errno.h>
 #  include <sys/stat.h> // stat
 
@@ -132,7 +130,8 @@ namespace cibart {
 #  include <vector>
 #  include <utility>
 
-#include <stdio.h>
+#  include <cstdio>
+#  include <cstdlib>
 
 namespace {
   typedef std::map<uint32_t, uint32_t> CoreMap;
@@ -199,7 +198,7 @@ namespace {
     }
   }
 
-#  define ERROR_BUFFER_LENGTH 1024
+#  define ERROR_BUFFER_LENGTH static_cast<size_t>(1024)
   bool parseProcCPUInfo(std::vector < Processor* >& result)
   {
     char errorBuffer[ERROR_BUFFER_LENGTH];
@@ -209,8 +208,13 @@ namespace {
     
     int fd = open("/proc/cpuinfo", O_RDONLY);
     if (fd == -1) {
-      strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
+#ifdef _GNU_SOURCE
+      char* errorMessage = strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
+      ext_issueWarning("unable to open /proc/cpuinfo: %s (%d)\n", errorMessage, errno);
+#else
+      int ignored = strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
       ext_issueWarning("unable to open /proc/cpuinfo: %s (%d)\n", errorBuffer, errno);
+#endif
       return false;
     }
     
@@ -234,14 +238,19 @@ namespace {
         else firstReallocation = false;
         
         numBytesInBuffer = 0;
-        delete[] cpuInfo;
+        delete [] cpuInfo;
         cpuInfo = temp;
       }
     }
     close(fd);
     if (numBytesRead == -1) {
-      strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
-      ext_issueWarning("error reading /proc/cpuinfo: %s (%d)\n", errorBuffer, errno);
+#ifdef _GNU_SOURCE
+      char* errorMessage = strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
+      ext_issueWarning("unable to open /proc/cpuinfo: %s (%d)\n", errorMessage, errno);
+#else
+      int ignored = strerror_r(errno, errorBuffer, ERROR_BUFFER_LENGTH);
+      ext_issueWarning("unable to open /proc/cpuinfo: %s (%d)\n", errorBuffer, errno);
+#endif
       return false;
     }
     
@@ -296,10 +305,10 @@ namespace {
       while (endOfNumber < (off_t) fileLength && cpuInfo[endOfNumber] >= '0' && cpuInfo[endOfNumber] <= '9') ++endOfNumber;
       
       char* buffer = ext_stackAllocate(endOfNumber - offset + 1, char);
-      memcpy(buffer, (const char*) cpuInfo + offset, endOfNumber - offset);
+      std::memcpy(buffer, (const char*) cpuInfo + offset, endOfNumber - offset);
       buffer[endOfNumber - offset] = '\0';
       
-      long parsedInt = strtol(buffer, NULL, 10);
+      long parsedInt = std::strtol(buffer, NULL, 10);
       ext_stackFree(buffer);
       
       offset = endOfNumber;
@@ -414,3 +423,4 @@ namespace cibart {
 }
 
 #endif
+

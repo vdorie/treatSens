@@ -7,12 +7,12 @@ Performing Dual-Parameter Sensitivity Analysis in Multi-level Models
 \code{treatSens.MLM} performs dual-parameter sensitivity analysis for unobserved confounding for both continuous and binary treatment variables in multi-level models.
 }
 \usage{
-treatSens.MLM(formula, response.covariates=NULL, resp.family = gaussian, trt.family = gaussian, 
-trt.level = "indiv", theta = 0.5, grid.dim = c(8,4), standardize = TRUE, 
-nsim = 20, zero.loc = 1/3, verbose = FALSE, 
-buffer = 0.1, weights = NULL, data = NULL, seed = 1234, 
-iter.j = 10, offset = TRUE, core = NULL, spy.range = NULL, 
-spz.range = NULL, trim.wt = 10)
+treatSens.MLM(formula, response.covariates = NULL,
+              trt.family = gaussian, trt.level = "indiv", theta = 0.5,
+              grid.dim = c(8,4), standardize = TRUE, nsim = 20,
+              zero.loc = 1/3, verbose = FALSE,  buffer = 0.1, weights = NULL,
+              data = NULL, seed = 1234, iter.j = 10, offset = TRUE,
+              core = NULL, spy.range = NULL, spz.range = NULL, trim.wt = 10)
 }
 \arguments{
   \item{formula}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a symbolic description of the model to be fitted.
@@ -20,8 +20,6 @@ spz.range = NULL, trim.wt = 10)
   \item{response.covariates}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a one-sided formula giving additional predictors to be included in the response model but not the treatment model.
 }
   \item{trt.level}{The level at which treatment is assigned.  Can be individual ("indiv") or group ("group").
-}
-  \item{resp.family}{an assumed family for GLMM of the response model. Currently only supports \code{gaussian}. 
 }
   \item{trt.family}{an assumed family for GLMM of the treatment model. The default is \code{gaussian}. \code{binomial(link="probit")} can be also specified.
 }

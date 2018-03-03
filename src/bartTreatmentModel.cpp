@@ -35,6 +35,7 @@ namespace cibart {
   struct BARTTreatmentModelFunctionTable {
     void (*initializeFit)(dbarts::BARTFit* fit, dbarts::Control* control, dbarts::Model* model, dbarts::Data* data);
     void (*invalidateFit)(dbarts::BARTFit* fit);
+    void (*setRNGState)(dbarts::BARTFit* fit, const void* const* uniformState, const void* const* normalState);
     dbarts::Results* (*runSampler)(dbarts::BARTFit* fit);
     void (*setOffset)(dbarts::BARTFit* fit, const double* offset);
     void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double);
@@ -64,7 +65,17 @@ namespace cibart {
   }
 }
 
+extern "C" {
+  static double uniformRand(void* state) {
+    return ext_rng_simulateContinuousUniform(reinterpret_cast<ext_rng*>(state));
+  }
+  static double normRand(void* state) {
+    return ext_rng_simulateStandardNormal(reinterpret_cast<ext_rng*>(state));
+  }
+}
+
 namespace {
+  
   using cibart::TreatmentModel;
   using cibart::BARTTreatmentModel;
   typedef cibart::BARTTreatmentModelFunctionTable FunctionTable;
@@ -78,7 +89,7 @@ namespace {
     dbarts::Results* bartResults;
   };
   
-  dbarts::Control* createBARTControl(BARTTreatmentModel& model, ext_rng* generator);
+  dbarts::Control* createBARTControl(BARTTreatmentModel& model);
   dbarts::Data*    createBARTData(const double* x, size_t numObservations, size_t numPredictors, const double* z);
   dbarts::Model*   createBARTModel(BARTTreatmentModel& model, const dbarts::Control* bartControl);
   
@@ -93,7 +104,7 @@ namespace {
     
     Scratch* scratch = new Scratch;
     
-    scratch->bartControl = createBARTControl(model, generator);
+    scratch->bartControl = createBARTControl(model);
         
     scratch->bartData = createBARTData(x, numObservations, numPredictors, z);
     
@@ -101,6 +112,18 @@ namespace {
     
     scratch->bartFit = static_cast<dbarts::BARTFit*>(::operator new (sizeof(dbarts::BARTFit)));
     functionTable.initializeFit(scratch->bartFit, scratch->bartControl, scratch->bartModel, scratch->bartData);
+    
+    ext_rng_userFunction userUniform;
+    userUniform.f.stateful = &uniformRand;
+    userUniform.state = reinterpret_cast<void*>(generator);
+    
+    ext_rng_userFunction userNorm;
+    userNorm.f.stateful = &normRand;
+    userNorm.state = reinterpret_cast<void*>(generator);
+    
+    void* v_userUniform = reinterpret_cast<void*>(&userUniform);
+    void* v_userNorm    = reinterpret_cast<void*>(&userNorm);
+    functionTable.setRNGState(scratch->bartFit, &v_userUniform, &v_userNorm);
     
     scratch->bartResults = NULL;
     
@@ -169,6 +192,7 @@ namespace {
   {
     functionTable->initializeFit             = reinterpret_cast<void (*)(dbarts::BARTFit*, dbarts::Control*, dbarts::Model*, dbarts::Data*)>(lookupFunction("dbarts", "initializeFit"));
     functionTable->invalidateFit             = reinterpret_cast<void (*)(dbarts::BARTFit*)>(lookupFunction("dbarts", "invalidateFit"));
+    functionTable->setRNGState               = reinterpret_cast<void (*)(dbarts::BARTFit*, const void* const* uniformState, const void* const* normalState)>(lookupFunction("dbarts", "setRNGState"));
     functionTable->runSampler                = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*)>(lookupFunction("dbarts", "runSampler"));
     functionTable->setOffset                 = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*)>(lookupFunction("dbarts", "setOffset"));
     functionTable->initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double)>(lookupFunction("dbarts", "initializeCGMPriorFromOptions"));
@@ -179,17 +203,19 @@ namespace {
     functionTable->invalidateChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*)>(lookupFunction("dbarts", "invalidateChiSquaredPrior"));
   }
   
-  dbarts::Control* createBARTControl(BARTTreatmentModel& model, ext_rng* generator)
+  dbarts::Control* createBARTControl(BARTTreatmentModel& model)
   {
     dbarts::Control* control = new dbarts::Control;
-    control->numSamples = 1;
-    control->numBurnIn  = 0;
+    control->defaultNumSamples = 1;
+    control->defaultNumBurnIn  = 0;
     control->numTrees   = model.numTrees;
+    control->numChains = 1;
     control->treeThinningRate = static_cast<uint32_t>(model.numThin);
     control->responseIsBinary = true;
     control->verbose = false;
     control->numThreads = 1;
-    control->rng = generator;
+    control->rng_algorithm = EXT_RNG_ALGORITHM_USER_UNIFORM;
+    control->rng_standardNormal = EXT_RNG_STANDARD_NORMAL_USER_NORM;
     
     return control;
   }

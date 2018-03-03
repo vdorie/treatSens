@@ -199,6 +199,8 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
     sampler.control <- dbartsControl(keepTrainingFits = FALSE,
                                      n.samples = as.integer(nsim),                                   
                                      n.burn    = as.integer(0),                                   
+                                     n.chains  = 1L,
+                                     n.threads = 1L,
                                      updateState = FALSE)      ## only useful if you plan on save()ing
     
     sampler <- dbarts(X.train, Y, control = sampler.control)
