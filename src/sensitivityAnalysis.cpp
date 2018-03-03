@@ -64,6 +64,7 @@ namespace {
     
     void (*initializeFit)(dbarts::BARTFit* fit, dbarts::Control* control, dbarts::Model* model, dbarts::Data* data);
     void (*invalidateFit)(dbarts::BARTFit* fit);
+    void (*setRNGState)(dbarts::BARTFit* fit, const void* const* uniformState, const void* const* normalState);
     dbarts::Results* (*runSampler)(dbarts::BARTFit* fit);
     dbarts::Results* (*runSamplerForIterations)(dbarts::BARTFit* fit, size_t numBurnIn, size_t numSamples);
     void (*setResponse)(dbarts::BARTFit* fit, const double* newResponse);
@@ -188,7 +189,7 @@ namespace cibart {
                          bool verbose)
   {
     Control control = { estimand, treatmentModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
-                        numTreeSamplesToThin, numThreads, theta, verbose, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                        numTreeSamplesToThin, numThreads, theta, verbose, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       
     lookupBARTFunctions(control);
     
@@ -332,6 +333,15 @@ namespace {
 }
 
 extern "C" {
+  static double uniformRand(void* state) {
+    return ext_rng_simulateContinuousUniform(reinterpret_cast<ext_rng*>(state));
+  }
+  static double normRand(void* state) {
+    return ext_rng_simulateStandardNormal(reinterpret_cast<ext_rng*>(state));
+  }
+}
+
+extern "C" {
   static void sensitivityAnalysisTask(void* v_data)
   {
     ThreadData& threadData(*static_cast<ThreadData*>(v_data));
@@ -361,11 +371,13 @@ extern "C" {
     
     dbarts::Control bartControl; // use defaults
     bartControl.verbose = false; // otherwise, waaaay too much
-    bartControl.numSamples = control.numSimsPerCell;
-    bartControl.numBurnIn = control.numInitialBurnIn;
+    bartControl.defaultNumSamples = control.numSimsPerCell;
+    bartControl.defaultNumBurnIn = control.numInitialBurnIn;
+    bartControl.numChains = 1;
     bartControl.numThreads = 1;
     bartControl.treeThinningRate = static_cast<uint32_t>(control.numTreeSamplesToThin);
-    bartControl.rng = scratch.rng;
+    bartControl.rng_algorithm = EXT_RNG_ALGORITHM_USER_UNIFORM;
+    bartControl.rng_standardNormal = EXT_RNG_STANDARD_NORMAL_USER_NORM;
     
     dbarts::Model bartModel;
     
@@ -388,6 +400,19 @@ extern "C" {
     
     dbarts::BARTFit* fit = ext_stackAllocate(1, dbarts::BARTFit);
     control.initializeFit(fit, &bartControl, &bartModel, &bartData);
+    
+    ext_rng_userFunction userUniform;
+    userUniform.f.stateful = &uniformRand;
+    userUniform.state = reinterpret_cast<void*>(scratch.rng);
+    
+    ext_rng_userFunction userNorm;
+    userNorm.f.stateful = &normRand;
+    userNorm.state = reinterpret_cast<void*>(scratch.rng);
+    
+    void* v_userUniform = reinterpret_cast<void*>(&userUniform);
+    void* v_userNorm    = reinterpret_cast<void*>(&userNorm);
+    
+    control.setRNGState(fit, &v_userUniform, &v_userNorm);
     
     size_t estimateOffset = gridCells[0].offset * control.numSimsPerCell;
     
@@ -683,6 +708,7 @@ namespace {
   {
     control.initializeFit             = reinterpret_cast<void (*)(dbarts::BARTFit*, dbarts::Control*, dbarts::Model*, dbarts::Data*)>(R_GetCCallable("dbarts", "initializeFit"));
     control.invalidateFit             = reinterpret_cast<void (*)(dbarts::BARTFit*)>(R_GetCCallable("dbarts", "invalidateFit"));
+    control.setRNGState               = reinterpret_cast<void (*)(dbarts::BARTFit*, const void* const* uniformState, const void* const* normalState)>(R_GetCCallable("dbarts", "setRNGState"));
     control.runSampler                = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*)>(R_GetCCallable("dbarts", "runSampler"));
     control.runSamplerForIterations   = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*, size_t, size_t)>(R_GetCCallable("dbarts", "runSamplerForIterations"));
     control.setResponse               = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*)>(R_GetCCallable("dbarts", "setResponse"));
