@@ -1,17 +1,31 @@
 Package: treatSens
-Version: 2.1.2
-Date: 2017-04-22
+Version: 2.1.3
+Date: 2018-03-08
 Title: Sensitivity Analysis for Causal Inference
-Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = "carnegin@uwm.edu"),
+Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = "nicole.carnegie@montana.edu"),
              person("Masataka",       "Harada", role = "aut",           email = "masatakaharada@gmail.com"),
              person("Vincent",         "Dorie", role = "aut",           email = "vjd4@nyu.edu"),
              person("Jennifer",         "Hill", role = "ctb",           email = "jennifer.hill@nyu.edu"))
-Depends: R (>= 3.1-0), Rcpp (>= 0.11.0)
-Imports: methods, stats, graphics, grDevices, mvtnorm, dbarts (>=
-        0.8-7), rstan (>= 2.8.1)
-Suggests: doParallel, foreach, testthat (>= 0.9-0)
-LinkingTo: dbarts (>= 0.8-5), StanHeaders (>= 2.9.0), rstan (>= 2.9.0),
-        BH (>= 1.60.0), Rcpp (>= 0.12.0), RcppEigen
+Imports:
+    methods,
+    stats,
+    graphics,
+    grDevices,
+    mvtnorm,
+    lme4,
+    nlme,
+    dbarts (>= 0.9-0),
+    rstan (>= 2.8.1)
+Suggests:
+    doParallel,
+    foreach,
+    testthat (>= 0.9-0)
+LinkingTo: dbarts (>= 0.9-0),
+    StanHeaders (>= 2.9.0),
+    rstan (>= 2.9.0),
+    BH (>= 1.60.0),
+    Rcpp (>= 0.12.0),
+    RcppEigen
 Description: Utilities to investigate sensitivity to unmeasured confounding in
     parametric models with either binary or continuous treatment.
 NeedsCompilation: yes

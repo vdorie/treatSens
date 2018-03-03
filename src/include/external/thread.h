@@ -2,6 +2,7 @@
 #define EXTERNAL_THREAD_H
 
 #include "stddef.h"
+#include <time.h>
 #include <sys/types.h>
 
 #ifdef __cplusplus
@@ -31,6 +32,34 @@ int ext_mt_runTasks(ext_mt_manager_t restrict manager, ext_mt_taskFunction_t tas
 int ext_mt_runTasksWithInfo(ext_mt_manager_t restrict manager, ext_mt_taskFunction_t task,
                     void** restrict data, ext_size_t numTasks, time_t sleepSeconds, ext_mt_infoFunction_t info);
 
+
+// hierarchical thread manager
+#define EXT_HTM_INVALID_TASK_ID ((ext_size_t) -1)
+struct _ext_htm_manager_t;
+typedef struct _ext_htm_manager_t* ext_htm_manager_t;
+
+
+typedef void (*ext_htm_topLevelTaskFunction_t)(ext_size_t taskId, void*);
+typedef void (*ext_htm_subTaskFunction_t)(void*);
+
+int ext_htm_create(ext_htm_manager_t* manager, ext_size_t numThreads);
+int ext_htm_destroy(ext_htm_manager_t manager);
+
+int ext_htm_runTopLevelTasks(ext_htm_manager_t restrict manager, ext_htm_topLevelTaskFunction_t task,
+                             void** restrict data, ext_size_t numTasks);
+int ext_htm_runTopLevelTasksWithOutput(ext_htm_manager_t restrict manager, ext_htm_topLevelTaskFunction_t task,
+                                       void** restrict data, ext_size_t numTasks, const struct timespec* restrict outputDelay);
+
+ext_size_t ext_htm_reserveThreadsForSubTask(const ext_htm_manager_t manager, ext_size_t taskId, ext_size_t percentComplete);
+int ext_htm_runSubTask(ext_htm_manager_t restrict manager, ext_size_t taskId, ext_htm_subTaskFunction_t subTask,
+                       void** restrict data, ext_size_t numPieces);
+
+ext_size_t ext_htm_getNumThreadsForTopLevelTask(const ext_htm_manager_t threadManager, ext_size_t taskId);
+void ext_htm_getNumPiecesForSubTask(const ext_htm_manager_t restrict threadManager, ext_size_t taskId,
+                                    ext_size_t numElements, ext_size_t minNumElementsPerPiece,
+                                    ext_size_t* restrict numPiecesPtr, ext_size_t* restrict numElementsPerPiecePtr, ext_size_t* restrict offByOneIndexPtr);
+
+void ext_htm_printf(ext_htm_manager_t manager, const char* format, ...);
 
 
 #ifdef __cplusplus
