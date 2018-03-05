@@ -5877,17 +5877,6 @@ _ACEOF
 fi
 done
 
-for ac_func in usleep
-do :
-  ac_fn_c_check_func "$LINENO" "usleep" "ac_cv_func_usleep"
-if test "x$ac_cv_func_usleep" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_USLEEP 1
-_ACEOF
-
-fi
-done
-
 ac_fn_c_check_type "$LINENO" "size_t" "ac_cv_type_size_t" "$ac_includes_default"
 if test "x$ac_cv_type_size_t" = xyes; then :
 
