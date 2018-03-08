@@ -26,7 +26,7 @@ using std::uint32_t;
 using std::strcmp;
 
 extern "C" {
-  // void R_init_treatSens(DllInfo* info);
+   void R_init_treatSens(DllInfo* info);
 }
 
 namespace {
@@ -476,18 +476,12 @@ namespace {
     
     return result;
   } */
-}
-
-extern "C" SEXP _rcpp_module_boot_stan_fit4cont_binary_mlm_mod();
-
-namespace {
 #define DEF_FUNC(_N_, _F_, _A_) { _N_, reinterpret_cast<DL_FUNC>(&_F_), _A_ }
   
   R_CallMethodDef R_callMethods[] = {
     DEF_FUNC("treatSens_fitSensitivityAnalysis", fitSensitivityAnalysis, 11),
     DEF_FUNC("treatSens_guessNumCores", guessNumCores, 0),
     DEF_FUNC("treatSens_glmFit", glmFit, 5),
-    DEF_FUNC("_rcpp_module_boot_stan_fit4cont_binary_mlm_mod", _rcpp_module_boot_stan_fit4cont_binary_mlm_mod, 0),
 //    DEF_FUNC("treatSens_chol", chol, 1),
 //    DEF_FUNC("treatSens_crossprod", crossprod, 1),
 //    DEF_FUNC("treatSens_multiply", multiply, 2),
