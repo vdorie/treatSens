@@ -6,6 +6,9 @@ Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = 
              person("Masataka",       "Harada", role = "aut",           email = "masatakaharada@gmail.com"),
              person("Vincent",         "Dorie", role = "aut",           email = "vjd4@nyu.edu"),
              person("Jennifer",         "Hill", role = "ctb",           email = "jennifer.hill@nyu.edu"))
+Depends:
+    R (>= 3.1-0),
+    Rcpp (>= 0.11.0)
 Imports:
     methods,
     stats,
@@ -15,14 +18,11 @@ Imports:
     lme4,
     nlme,
     dbarts (>= 0.9-1),
-    rstan (>= 2.8.1)
 Suggests:
     doParallel,
     foreach,
     testthat (>= 0.9-0)
 LinkingTo: dbarts (>= 0.9-1),
-    StanHeaders (>= 2.9.0),
-    rstan (>= 2.9.0),
     BH (>= 1.60.0),
     Rcpp (>= 0.12.0),
     RcppEigen
