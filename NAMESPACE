@@ -12,7 +12,6 @@ S3method(plot, sensitivityCombo)
 S3method(print, sensitivity)
 
 
-importFrom(methods, is, new, getPackageName)
 importFrom(rstan, stanc_builder, sampling, extract)
 importFrom(Rcpp, loadModule)
 

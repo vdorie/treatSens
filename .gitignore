@@ -471,5 +471,5 @@ src/config.hpp
 src/bart/config.hpp
 src/external/config.h
 *.swp
-src/Modules.cpp
-src/include/models.hpp
+src/stan_files/cont_binary_mlm.cc
+src/stan_files/cont_binary_mlm.hpp
