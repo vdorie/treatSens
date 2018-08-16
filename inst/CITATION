@@ -1,4 +1,4 @@
-authors <- c("Nicole Bohme Carnegie", "Masataka Harada", "Jennifer Hill")
+authors <- c("Nicole Bohme Carnegie", "Masataka Harada", "Vincent Dorie", "Jennifer Hill")
 
 csatitle <- "treatSens: A Package to Assess Sensitivity of Causal Analyses to Unmeasured Confounding"
 csaversion <-  paste("R package version", meta$Version)
