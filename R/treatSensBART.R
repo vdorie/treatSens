@@ -253,7 +253,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
                       standardize = standardize, weights = grid.weights, nsim = nsim, nthin = nthin, nburn = nburn, 
                       offset = TRUE, p = NULL, g = NULL, X.test = X.test, est.type = est.type, treatmentModel = trt.model, nthread = nthreads)
   
-  range <- calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt)
+  range <- calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, verbose)
   zetaZ <- range$zetaZ
   zetaY <- range$zetaY
   grid.dim <- c(length(zetaZ), length(zetaY))
