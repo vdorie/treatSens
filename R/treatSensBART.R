@@ -315,7 +315,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
 #fit.treatSens
 ###########
 
-fit.treatSens.BART <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit) {
+fit.treatSens.BART <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit, W = NULL) {
   treatmentModel = control.fit$treatmentModel
   est.type = control.fit$est.type
   X.test = control.fit$X.test
