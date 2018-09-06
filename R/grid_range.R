@@ -90,10 +90,10 @@ grid.search <- function(extreme.cors, zero.loc, Xcoef.plot, Y, Z, X,
     
     #update Zmax so that it include all plots.
     if(!is.null(X)){
-      if ((sgnTau0 == 1) && (all(Xcoef.plot[,1]<extreme.cors[2,2]*.95))) {
-        Zmax = ifelse(Zmax>max(Xcoef.plot[,1]),Zmax,max(Xcoef.plot[,1]))}
-      if ((sgnTau0 == -1) && (all(Xcoef.plot[,1]>extreme.cors[2,1]*.95))) {
-        Zmax = ifelse(Zmax<max(Xcoef.plot[,1]),Zmax,max(Xcoef.plot[,1]))}
+      if ((sgnTau0 == 1) && !all(is.na(Xcoef.plot[,1])) && all(Xcoef.plot[,1]<extreme.cors[2,2]*.95, na.rm = TRUE)) {
+        Zmax = ifelse(Zmax>max(Xcoef.plot[,1], na.rm = TRUE),Zmax,max(Xcoef.plot[,1], na.rm = TRUE))}
+      if ((sgnTau0 == -1) && !all(is.na(Xcoef.plot[,1])) && all(Xcoef.plot[,1]>extreme.cors[2,1]*.95, na.rm = TRUE)) {
+        Zmax = ifelse(Zmax<max(Xcoef.plot[,1], na.rm = TRUE),Zmax,max(Xcoef.plot[,1], na.rm = TRUE))}
     }
     Ymax = min(rY[3],sqrt(v_Y)/(1-Zmax^2/v_Z))
     if(control.fit[3] == "binomial") Ymax = rY[3]
@@ -134,10 +134,10 @@ grid.search <- function(extreme.cors, zero.loc, Xcoef.plot, Y, Z, X,
     
     #update Zmin so that it include all plots.
     if(!is.null(X)){
-      if ((sgnTau0 == 1) && all(Xcoef.plot[,1]>extreme.cors[2,1]*.95)) {
-        Zmin = ifelse(Zmin<min(Xcoef.plot[,1]),Zmin,min(Xcoef.plot[,1]))}
-      if ((sgnTau0 == -1) && all(Xcoef.plot[,1]<extreme.cors[2,2]*.95)) {
-        Zmin = ifelse(Zmin>min(Xcoef.plot[,1]),Zmin,min(Xcoef.plot[,1]))}
+      if ((sgnTau0 == 1) && !all(is.na(Xcoef.plot[,1])) && all(Xcoef.plot[,1]>extreme.cors[2,1]*.95, na.rm = TRUE)) {
+        Zmin = ifelse(Zmin<min(Xcoef.plot[,1], na.rm = TRUE),Zmin,min(Xcoef.plot[,1], na.rm = TRUE))}
+      if ((sgnTau0 == -1) && !all(is.na(Xcoef.plot[,1])) && all(Xcoef.plot[,1]<extreme.cors[2,2]*.95, na.rm = TRUE)) {
+        Zmin = ifelse(Zmin>min(Xcoef.plot[,1], na.rm = TRUE),Zmin,min(Xcoef.plot[,1], na.rm = TRUE))}
     }
     Ymin = max(rY[3],sqrt(v_Y)/(1-Zmin^2/v_Z))
     if(control.fit[3] == "binomial") Ymax = rY[3]
