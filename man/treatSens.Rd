@@ -26,7 +26,7 @@ spz.range = NULL, trim.wt = 10)
 }
   \item{theta}{this option specifies the marginal probability that a binary unobserved confounder takes one \code{(i.e Pr(U=1))}. The default is \code{0.5}.
 }
-  \item{grid.dim}{the final dimensions of output grid. \code{GLM.sens} draws \code{nsim} of unobserved confounders and corresponding treatment effect estimates for each grid cell. The first argument specifies the horizontal (treatment) dimension, and the second argument specifies the vertical (response) dimension. The default is \code{c(9, 5)}, that is, confounding effects are evaluated at 40 grid points. Note that the dimensions given will be increased by one to an odd number where necessary when \code{zero.loc = "full"} or sensitivity parameter ranges are given in order to force inclusion of 0 in the range of sensitivity parameters. 
+  \item{grid.dim}{the final dimensions of output grid. \code{GLM.sens} draws \code{nsim} of unobserved confounders and corresponding treatment effect estimates for each grid cell. The first argument specifies the horizontal (treatment) dimension, and the second argument specifies the vertical (response) dimension. The default is \code{c(9, 5)}, that is, confounding effects are evaluated at 45 grid points. Note that the dimensions given will be increased by one to an odd number where necessary when \code{zero.loc = "full"} or sensitivity parameter ranges are given in order to force inclusion of 0 in the range of sensitivity parameters. 
 }
   \item{standardize}{logical. If \code{TRUE} all variables except binary ones are standardized to have mean 0 and standard deviation 1. The default is \code{TRUE}.
 }
