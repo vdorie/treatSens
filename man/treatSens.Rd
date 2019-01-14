@@ -50,9 +50,9 @@ spz.range = NULL, trim.wt = 10)
 }
   \item{core}{number of CPU cores used for parallel processing. The default is \code{NULL}, which implies single-threading. 
 }
-  \item{spy.range}{custom range for the sensitiviy parameter associated with Y (the coefficient on U in the outcome model or partial correlation of U with Y given X), e.g. \code{c(0,2)}. When this option is specified, \code{zetaz.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
+  \item{spy.range}{custom range for the sensitiviy parameter associated with Y (the coefficient on U in the outcome model or partial correlation of U with Y given X), e.g. \code{c(0,2)}. When this option is specified, \code{spz.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
 }
-  \item{spz.range}{custom range for the sensitivity parameter associated with Z (the coefficient on U in the treatment model or partial correlation of U with Z given X), e.g. \code{c(-2,2)}. When this option is specified, \code{zetay.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
+  \item{spz.range}{custom range for the sensitivity parameter associated with Z (the coefficient on U in the treatment model or partial correlation of U with Z given X), e.g. \code{c(-2,2)}. When this option is specified, \code{spy.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
 }
   \item{trim.wt}{the maximum size of weight as a percentage of the sample size of the inferential group for the causal estimand. This option is used only when \code{weights} option is specified as  "ATE", "ATT" or "ATC". The default is \code{10}. For example, \code{trim.wt=10} in a dataset with 300 treated observations when the estimand has been set to "ATT" gives a maximum weight of 30. 
 }
