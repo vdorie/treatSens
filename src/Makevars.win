@@ -1,10 +1,5 @@
 PKG_CPPFLAGS=-Iinclude -pthread
-PKG_LIBS=glm.a external.a stan_files/cont_binary_mlm.o $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) -lpthread
-
-# from rstan.package.skeleton
-STANHEADERS_SRC = $(shell "$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "cat(' ', sep = '\n')" -e "cat(system.file('include', 'src', package = 'StanHeaders', mustWork = TRUE), sep = '\n')" | grep "StanHeaders")
-STAN_CPPFLAGS = -I"../inst/include" -I"$(STANHEADERS_SRC)" -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG
-CXX_STD = CXX14
+PKG_LIBS=glm.a external.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) -lpthread
 
 MkInclude = $(R_HOME)/etc${R_ARCH}/Makeconf
 
@@ -13,14 +8,7 @@ SUBLIBS = $(SUBDIRS:=.a)
 
 all: $(SHLIB)
 
-$(SHLIB) : sublibs stan_files/cont_binary_mlm.o
-
-stan_files/cont_binary_mlm.cc: stan_files/cont_binary_mlm.stan
-	"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "source(file.path('..', 'tools', 'make_cc.R')); make_cc(commandArgs(TRUE))" stan_files/cont_binary_mlm.stan
-
-stan_files/cont_binary_mlm.o : stan_files/cont_binary_mlm.cc
-	$(CXX) $(ALL_CPPFLAGS) $(STAN_CPPFLAGS) \
-	  $(CXXPICFLAGS) $(CXXFLAGS) -c stan_files/cont_binary_mlm.cc -o stan_files/cont_binary_mlm.o
+$(SHLIB) : sublibs
 
 sublibs:
 	@for d in $(SUBDIRS); do \
@@ -40,9 +28,4 @@ subclean:
 	@for d in $(SUBDIRS); do \
 	  (cd $${d} && MkInclude="$(MkInclude)" $(MAKE) clean) || exit 1; \
 	done
-	rm -f *.so *.dll *.o
-	rm -f stan_files/*.o
-	rm -f stan_files/*.so
-	rm -f stan_files/*.cc
-	rm -f stan_files/*.hpp
 
