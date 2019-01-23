@@ -33,10 +33,19 @@ namedList <- treatSens:::namedList
 setInList <- treatSens:::setInList
 
 test_that("treatSens runs correctly on example data", {
-  fit.bin <- suppressWarnings(treatSens(Y~Z+X, trt.family = binomial(link="probit"),nsim = 2,
-                              spy.range = c(0, 2), spz.range = c(-2, 2),grid.dim = c(2, 2),
+  fit.bin <- suppressWarnings(treatSens(Y ~ Z + X, trt.family = binomial(link = "probit"), nsim = 2,
+                              spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
                               standardize = FALSE))
   expect_is(fit.bin, "sensitivity")
+})
+
+test_that("treatSens.BART fits basic example", {
+  # sensitivity analysis
+  out.bin <- treatSens.BART(Y ~ Z + X, trt.model = probitEM, nsim = 3, nburn = 0,
+                            spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
+                            standardize = FALSE)
+  expect_is(out.bin, "sensitivity")
+
 })
 
 test_that("treatSens fails with an invalid number of iterations", {

@@ -1,48 +1,48 @@
 PKG_CPPFLAGS=-Iinclude -pthread
-PKG_LIBS=glm/libglm.a external/libexternal.a stan_files/cont_binary_mlm.o $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) -lpthread
+PKG_LIBS=glm.a external.a stan_files/cont_binary_mlm.o $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) -lpthread
 
 # from rstan.package.skeleton
-STANHEADERS_SRC = `"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" --vanilla -e "cat(system.file('include', 'src', package = 'StanHeaders'))"`
-BOOST_NOT_IN_BH_SRC = `"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" --vanilla -e "cat(system.file('include', 'boost_not_in_BH', package = 'rstan'))"`
-STAN_CPPFLAGS = -I"../inst/include" -I"$(STANHEADERS_SRC)" -I"$(BOOST_NOT_IN_BH_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG -DBOOST_NO_CXX11_RVALUE_REFERENCES
+STANHEADERS_SRC = $(shell "$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "cat(' ', sep = '\n')" -e "cat(system.file('include', 'src', package = 'StanHeaders', mustWork = TRUE), sep = '\n')" | grep "StanHeaders")
+STAN_CPPFLAGS = -I"../inst/include" -I"$(STANHEADERS_SRC)" -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG
+CXX_STD = CXX14
 
-CXX_STD = CXX11
+MkInclude = $(R_HOME)/etc${R_ARCH}/Makeconf
 
-.PHONY : all glm/libglm.a external/libexternal.a stan_files/cont_binary_mlm.o clean
+SUBDIRS = glm external
+SUBLIBS = $(SUBDIRS:=.a)
 
 all: $(SHLIB)
 
-$(SHLIB) : glm/libglm.a external/libexternal.a stan_files/cont_binary_mlm.o
+$(SHLIB) : sublibs stan_files/cont_binary_mlm.o
 
 stan_files/cont_binary_mlm.cc: stan_files/cont_binary_mlm.stan
 	"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "source(file.path('..', 'tools', 'make_cc.R')); make_cc(commandArgs(TRUE))" stan_files/cont_binary_mlm.stan
 
 stan_files/cont_binary_mlm.o : stan_files/cont_binary_mlm.cc
-	$(CXX) $(R_XTRA_CPPFLAGS) $(PKG_CPPFLAGS) $(STAN_CPPFLAGS) $(CPPFLAGS) \
-	  $(CLINK_CPPFLAGS) $(CXXPICFLAGS) $(CXXFLAGS) -c stan_files/cont_binary_mlm.cc -o stan_files/cont_binary_mlm.o
+	$(CXX) $(ALL_CPPFLAGS) $(STAN_CPPFLAGS) \
+	  $(CXXPICFLAGS) $(CXXFLAGS) -c stan_files/cont_binary_mlm.cc -o stan_files/cont_binary_mlm.o
 
-glm/libglm.a :
-	@(cd glm && $(MAKE) libglm.a \
-	  CC="$(CC)" R_XTRA_CPPFLAGS="$(R_XTRA_CPPFLAGS)" \
-	  CPPFLAGS="-pthread $(CPPFLAGS)" \
-	  CFLAGS="$(R_XTRA_CFLAGS) $(CPICFLAGS) $(CFLAGS)" \
-	  AR="$(AR)" ARFLAGS="$(ARFLAGS)" RANLIB="$(RANLIB)" \
-	  INST_DIR="$(INST_DIR)")
+sublibs:
+	@for d in $(SUBDIRS); do \
+	  (cd $${d} && $(MAKE) -f "$(MkInclude)" -f Makefile library \
+	   PTHREAD_FLAGS="$(PTHREAD_FLAGS)" \
+           CC="$(CC)" CFLAGS="$(CFLAGS) $(CPICFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) $(CXXPICFLAGS)" \
+           CLINK_CPPFLAGS="$(CLINK_CPPFLAGS)" CPPFLAGS="$(CPPFLAGS)" AR="$(AR)" ARFLAGS="$(ARFLAGS)") \
+           || exit 1; \
+	done
 
+clean: subclean
+	@-rm -rf .libs _libs
+	@-rm -f *.o $(SHLIB)
 
-external/libexternal.a :
-	@(cd external && $(MAKE) libexternal.a \
-	  CC="$(CC)" R_XTRA_CPPFLAGS="$(R_XTRA_CPPFLAGS)" \
-	  CPPFLAGS="-pthread $(CPPFLAGS)" \
-	  CFLAGS="$(R_XTRA_CFLAGS) $(CPICFLAGS) $(CFLAGS)" \
-	  AR="$(AR)" ARFLAGS="$(ARFLAGS)" RANLIB="$(RANLIB)" \
-	  INST_DIR="$(INST_DIR)")
-
-clean :
-	@(cd glm && $(MAKE) clean)
-	@(cd external && $(MAKE) clean)
+subclean:
+	@-rm -f *.a
+	@for d in $(SUBDIRS); do \
+	  (cd $${d} && MkInclude="$(MkInclude)" $(MAKE) clean) || exit 1; \
+	done
 	rm -f *.so *.dll *.o
 	rm -f stan_files/*.o
 	rm -f stan_files/*.so
 	rm -f stan_files/*.cc
 	rm -f stan_files/*.hpp
+

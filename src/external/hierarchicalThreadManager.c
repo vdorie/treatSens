@@ -12,10 +12,9 @@
 #include <external/io.h>
 
 // clock_gettime + CLOCK_REALTIME are in time.h, gettimeofday is in sys/time.h; plain time() is in time.h too
+// time.h imported from <external/thread.h>
 #if (!defined(HAVE_CLOCK_GETTIME) || !defined(CLOCK_REALTIME)) && defined(HAVE_GETTIMEOFDAY)
 #  include <sys/time.h>
-#else
-#  include <time.h>
 #endif
 
 #ifdef __GNUC__
@@ -135,7 +134,7 @@ int ext_htm_runTopLevelTasks(ext_htm_manager_t restrict manager, ext_htm_topLeve
     return result;
   }
   
-  // ext_printf("running top %lu level tasks\n", numTasks);
+  // ext_printf("running top %lu level tasks without output\n", numTasks);
   
   for (taskId = 0; taskId < numTasks; ++taskId) {
     while (stackIsEmpty(&manager->availableThreadStack)) waitOnCondition(manager->taskDone, manager->mutex);
@@ -221,7 +220,7 @@ int ext_htm_runTopLevelTasksWithOutput(ext_htm_manager_t restrict manager, ext_h
   wakeTime.tv_sec += outputDelay->tv_sec;
   wakeTime.tv_nsec += outputDelay->tv_nsec;
   
-  // ext_printf("running top %lu level tasks\n", numTasks);
+  // ext_printf("running top %lu level tasks with output\n", numTasks);
   
   for (taskId = 0; taskId < numTasks; ++taskId) {
     // while (stackIsEmpty(&manager->availableThreadStack)) waitOnCondition(manager->taskDone, manager->mutex);
@@ -237,6 +236,8 @@ int ext_htm_runTopLevelTasksWithOutput(ext_htm_manager_t restrict manager, ext_h
         getTime(&wakeTime);
         wakeTime.tv_sec += outputDelay->tv_sec;
         wakeTime.tv_nsec += outputDelay->tv_nsec;
+        wakeTime.tv_sec += wakeTime.tv_nsec / 1000000000;
+        wakeTime.tv_nsec %= 1000000000;
       }
     }
     
@@ -271,6 +272,8 @@ int ext_htm_runTopLevelTasksWithOutput(ext_htm_manager_t restrict manager, ext_h
       getTime(&wakeTime);
       wakeTime.tv_sec += outputDelay->tv_sec;
       wakeTime.tv_nsec += outputDelay->tv_nsec;
+      wakeTime.tv_sec += wakeTime.tv_nsec / 1000000000;
+      wakeTime.tv_nsec %= 1000000000;
     }
   }
   
@@ -372,7 +375,7 @@ static void* threadLoop(void* _thread)
   
   push(&manager->availableThreadStack, thread);
   manager->numThreadsAvailable++;
-   
+  
   signalCondition(manager->threadIsActive);
   
   while (true) {
@@ -683,6 +686,7 @@ static int initializeTopLevelTaskStatus(TopLevelTaskStatus* status)
   status->numThreads = 0;
   status->progress = TASK_BEFORE_START;
   status->numSubTaskPiecesInProgress = 0;
+  status->threadStack.first = NULL;
   
   int result = initializeCondition(status->taskDone);
   

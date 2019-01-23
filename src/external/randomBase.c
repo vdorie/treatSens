@@ -3,6 +3,10 @@
  * the GNU General Public License (http://www.r-project.org/Licenses/).
  */
 
+#ifdef __INTEL_COMPILER
+#  define __need_timespec 1
+#endif
+
 #include <external/random.h>
 #include "config.h"
 
@@ -20,10 +24,9 @@
 #endif
 
 // clock_gettime + CLOCK_REALTIME are in time.h, gettimeofday is in sys/time.h; plain time() is in time.h too
+#include <time.h> // need for at least struct timespec
 #if (!defined(HAVE_CLOCK_GETTIME) || !defined(CLOCK_REALTIME)) && defined(HAVE_GETTIMEOFDAY)
 #  include <sys/time.h>
-#else
-#  include <time.h>
 #endif
 
 #include <external/alloca.h>
@@ -156,13 +159,17 @@ ext_rng* ext_rng_createDefault(bool useNative)
   }
   
   // if not useNative, we at least seed from native and match its type
-  SEXP seedsExpr = Rf_findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
+  SEXP seedsExpr = PROTECT(Rf_findVarInFrame(R_GlobalEnv, R_SeedsSymbol));
   if (seedsExpr == R_UnboundValue) {
+    UNPROTECT(1);
     GetRNGstate();
     PutRNGstate();
-    seedsExpr = Rf_findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
+    seedsExpr = PROTECT(Rf_findVarInFrame(R_GlobalEnv, R_SeedsSymbol));
   }
-  if (TYPEOF(seedsExpr) == PROMSXP) seedsExpr = Rf_eval(R_SeedsSymbol, R_GlobalEnv);
+  if (TYPEOF(seedsExpr) == PROMSXP) {
+    UNPROTECT(1);
+    seedsExpr = PROTECT(Rf_eval(R_SeedsSymbol, R_GlobalEnv));
+  }
   
   bool seedFound = true;
   if (seedsExpr == R_UnboundValue) {
@@ -178,12 +185,14 @@ ext_rng* ext_rng_createDefault(bool useNative)
   
   if (!seedFound) {
     // use defaults
+    UNPROTECT(1);
     result = ext_rng_create(EXT_RNG_ALGORITHM_MERSENNE_TWISTER, NULL);
     if (result != NULL) ext_rng_setSeedFromClock(result);
     return result;
   }  
   
   uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
+  UNPROTECT(1);
   
   ext_rng_algorithm_t algorithmType      = (ext_rng_algorithm_t) (seed0 % 100);
   ext_rng_standardNormal_t stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
