@@ -28,12 +28,12 @@ treatSens.BART(formula,
                benchmarking = "2SD")
 }
 \arguments{
-  \item{formula}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a symbolic description of the model to be fitted.
-}  \item{trt.model}{an assumed fitting technique for the treatment model. The default is \code{probitEM()}. Alternatives include \code{probit()} and \code{bart()}. See the 'Details' section for arguments to these functions.}
+  \item{formula}{an object of class \code{\link{formula}} (or one that can be coerced to that class): a symbolic description of the model to be fitted.}
+  \item{trt.model}{an assumed fitting technique for the treatment model. The default is \code{probitEM()}. Alternatives include \code{probit()} and \code{bart()}. See the 'Details' section for arguments to these functions.}
   \item{theta}{this option specifies the marginal probability that a binary unobserved confounder takes one, i.e. \eqn{Pr(U = 1)}. The default is \code{0.5}.}
   \item{grid.dim}{the final dimensions of output grid. \code{GLM.sens} draws \code{nsim} of unobserved confounders and corresponding treatment effect estimates for each grid cell. The first argument specifies the horizontal (treatment) dimension, and the second argument specifies the vertical (response) dimension. The default is \code{c(8, 4)}, that is, confounding effects are evaluated at 32 grid points. Note that the dimensions given will be increased by one to an odd number where necessary when \code{zero.loc = "full"} or sensitivity parameter ranges are given in order to force inclusion of 0 in the range of sensitivity parameters.}
   \item{standardize}{logical. If \code{TRUE} all variables except binary ones are standardized to have mean 0 and standard deviation 1.}
-\item{zero.loc}{A parameter used to automatically determine the range of each axis by specifying at what point along the y=x line the "treatment effect=0" contour will cross it.  The parameter specifies the fraction of the length of the y=x line that this intersection occurs relative to the entire length of the line segment. The default is \code{1 / 3}. No need to specify when \code{spy.range} and \code{spz.range} are specified.}
+  \item{zero.loc}{A parameter used to automatically determine the range of each axis by specifying at what point along the y=x line the "treatment effect=0" contour will cross it.  The parameter specifies the fraction of the length of the y=x line that this intersection occurs relative to the entire length of the line segment. The default is \code{1 / 3}. No need to specify when \code{spy.range} and \code{spz.range} are specified.}
   \item{verbose}{logical. If \code{TRUE}, detailed messages are reported as the algorithm runs.}
   \item{buffer}{restriction to range of coefficients on U to ensure stability around the edges. This option is rarely used. }
   \item{est.type}{one of three causal estimads -- \code{"ATE"}, \code{"ATT"}, or \code{"ATC"}. See Details for information on calculation of weights.}

@@ -1,15 +1,14 @@
 INCLUDE_DIR=../include
 
 PKG_CPPFLAGS=-I$(INCLUDE_DIR)
-ALL_CPPFLAGS=$(R_XTRA_CPPFLAGS) $(PKG_CPPFLAGS) $(CPPFLAGS)
 
 LOCAL_SOURCES = glm.c
 LOCAL_OBJECTS = glm.o
 
-all : libglm.a
+all : library
 
-libglm.a : $(LOCAL_OBJECTS)
-	$(AR) $(ARFLAGS) libglm.a $(LOCAL_OBJECTS)
+library : $(LOCAL_OBJECTS)
+	$(AR) $(ARFLAGS) ../glm.a $(LOCAL_OBJECTS)
 
 clean :
 	-rm -f *.o

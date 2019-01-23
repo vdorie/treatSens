@@ -1,15 +1,14 @@
 INCLUDE_DIR=../include
 
-PKG_CPPFLAGS=-I$(INCLUDE_DIR)
-ALL_CPPFLAGS=$(R_XTRA_CPPFLAGS) $(PKG_CPPFLAGS) $(CPPFLAGS)
+PKG_CPPFLAGS=-I$(INCLUDE_DIR) $(PTHREAD_FLAGS)
 
-LOCAL_SOURCES=adaptiveRadixTree.c binaryIO.c io.c hierarchicalThreadManager.c linearAlgebra.c moments.c randomBase.c randomNorm.c random.c string.c thread.c
-LOCAL_OBJECTS=adaptiveRadixTree.o binaryIO.o io.o hierarchicalThreadManager.o linearAlgebra.o moments.o randomBase.o randomNorm.o random.o string.o thread.o
+LOCAL_SOURCES=adaptiveRadixTree.c binaryIO.c blockingThreadManager.c io.c hierarchicalThreadManager.c linearAlgebra.c moments.c randomBase.c randomNorm.c random.c string.c thread.c
+LOCAL_OBJECTS=adaptiveRadixTree.o binaryIO.o blockingThreadManager.o io.o hierarchicalThreadManager.o linearAlgebra.o moments.o randomBase.o randomNorm.o random.o string.o thread.o
 
-all : libexternal.a
+all : library
 
-libexternal.a : $(LOCAL_OBJECTS)
-	$(AR) $(ARFLAGS) libexternal.a $(LOCAL_OBJECTS)
+library : $(LOCAL_OBJECTS)
+	$(AR) $(ARFLAGS) ../external.a $(LOCAL_OBJECTS)
 
 clean :
 	-rm -f *.o
@@ -34,6 +33,9 @@ adaptiveRadixTree.o : adaptiveRadixTree.c $(INCLUDE_DIR)/external/adaptiveRadixT
 
 binaryIO.o : binaryIO.c $(INCLUDE_DIR)/external/binaryIO.h
 	$(CC) $(ALL_CPPFLAGS) $(CFLAGS) -c binaryIO.c -o binaryIO.o
+
+blockingThreadManager.o : blockingThreadManager.c $(INCLUDE_DIR)/external/thread.h
+	$(CC) $(ALL_CPPFLAGS) $(CFLAGS) -c blockingThreadManager.c -o blockingThreadManager.o
 
 io.o : io.c $(INCLUDE_DIR)/external/io.h
 	$(CC) $(ALL_CPPFLAGS) $(CFLAGS) -c io.c -o io.o
@@ -63,3 +65,4 @@ thread.o : thread.c pthread.c $(INCLUDE_DIR)/external/thread.h
 	$(CC) $(ALL_CPPFLAGS) $(CFLAGS) -c thread.c -o thread.o
 
 pthread.c :
+

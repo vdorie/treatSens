@@ -1,4 +1,4 @@
-# Part of the treatSens package for estimating model parameters
+# Part of the whatever package for estimating model parameters
 # Copyright (C) 2015, 2016, 2017 Trustees of Columbia University
 # 
 # This program is free software; you can redistribute it and/or
@@ -22,7 +22,7 @@ if (!file.exists(MODELS_HOME)) MODELS_HOME <- sub("R$", "src", getwd())
 
 stan_files <- dir(file.path(MODELS_HOME, "stan_files"),
                   pattern = "stan$", full.names = TRUE)
-stanmodels <- sapply(stan_files, function(f) {
+stanmodels <- lapply(stan_files, function(f) {
   model_cppname <- sub("\\.stan$", "", basename(f))
   stanfit <- rstan::stanc(f, allow_undefined = TRUE, 
                           obfuscate_model_name = FALSE)
@@ -32,6 +32,6 @@ stanmodels <- sapply(stan_files, function(f) {
                  mk_cppmodule = function(x) get(paste0("model_", model_cppname)))))
   }
 )
-names(stanmodels) <- sub("\\.stan$", "", basename(names(stanmodels)))
+names(stanmodels) <- sub("\\.stan$", "", basename(stan_files))
 rm(MODELS_HOME)
 # nocov end

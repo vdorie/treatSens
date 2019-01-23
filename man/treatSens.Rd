@@ -65,7 +65,7 @@ Weights are calculated for any of three different estimands.  The weights for th
 \code{treatSens} returns an object of class "\code{sensitivity}".
 
 An object of class "\code{sensitivity}" is a list containing the following components:
-\item{model.type}{estimation methods used (i.e. "\code{GLM}"").  Currently only GLM methods are available, but in future other types of models may be added. 
+\item{model.type}{estimation methods used (i.e. \code{"GLM"}).  Currently only GLM and BART methods are available, but in future other types of models may be added. 
 }
 \item{sensParam}{type of sensitivity parameter used (model coefficient or partial correlation).
 }
