@@ -310,15 +310,6 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   #fill in grid
   cell = 0
   
-  useStan <- is(trt.family, "family") && trt.family$family == "binomial" && trt.family$link == "probit" && trt.level == "indiv" &&
-    (identical(resp.family, gaussian) || (is(trt.family, "family") && resp.family$family == "gaussian"))
-
-    if (useStan) {
-    init <- "random"
-    n.cores <- if (!is.null(core)) core else getOption("mc.cores", 1L)
-    core <- NULL
-  }
-  
   #calling necessary packages for multicore processing.
   if(!is.null(core)){
     dp = requireNamespace("doParallel", quietly = TRUE)
@@ -383,21 +374,11 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
         control.fit$p = NULL
         
         if(is.null(core)){
-          if (useStan) {
-            n.warm <- if (init == "random") 100L else 25L
-            samples <- contYbinaryZU.mlm.stan(Y, Z, X, zY, zZ, theta, group, init = init, n.cores = n.cores,
-                                              n.samp = nsim %/% 4L + n.warm, n.chain = 4L, n.warm = n.warm,
-                                              verbose = verbose)
-            init <- samples$last
-          }
           
           for(k in 1:nsim){
 
             fit.sens <-
-              if (useStan)
-                fit.treatSens.mlm.u(Y, Z, X, W, samples$U[,k], zY, zZ, control.fit)
-              else
-                fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
+              fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
             
           #  control.fit$p = fit.sens$p
 

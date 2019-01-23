@@ -8,7 +8,6 @@ Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = 
              person("Jennifer",         "Hill", role = "ctb",           email = "jennifer.hill@nyu.edu"))
 Depends:
     R (>= 3.3.0),
-    Rcpp (>= 0.12.15),
     methods
 Imports:
     stats,
@@ -17,18 +16,13 @@ Imports:
     mvtnorm,
     lme4,
     nlme,
-    dbarts (>= 0.9-1),
-    rstan (>= 2.17.3)
+    dbarts (>= 0.9-1)
 Suggests:
     doParallel,
     foreach,
     testthat (>= 0.9-0)
-LinkingTo: dbarts (>= 0.9-1),
-    StanHeaders (>= 2.17.2),
-    rstan (>= 2.17.3),
-    BH (>= 1.65.0.1),
-    Rcpp (>= 0.12.15),
-    RcppEigen (>= 0.3.3.4.0)
+LinkingTo:
+    dbarts (>= 0.9-1)
 Description: Utilities to investigate sensitivity to unmeasured confounding in
     parametric models with either binary or continuous treatment.
 NeedsCompilation: yes
