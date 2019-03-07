@@ -21,6 +21,8 @@
 
 #include <external/random.h>
 
+#include <misc/simd.h>
+
 using std::size_t;
 using std::uint32_t;
 using std::strcmp;
@@ -348,148 +350,13 @@ namespace {
     
     return resultExpr;
   }
-}
-
-#include <external/linearAlgebra.h>
-
-namespace {
   
-  /* void setDims(SEXP X, size_t numRows, size_t numCols)
-  {
-    SEXP dimsExpr = allocVector(INTSXP, 2);
-    int* dims = INTEGER(dimsExpr);
-    dims[0] = (int) numRows; 
-    dims[1] = (int) numCols;
-    setAttrib(X, R_DimSymbol, dimsExpr);
-  }
-
-  SEXP chol(SEXP A) {
-    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
-    size_t dim = dims[0];
-    
-    SEXP result = PROTECT(allocVector(REALSXP, dim * dim));
-    setDims(result, dim, dim);
-    
-    ext_getSymmetricPositiveDefiniteTriangularFactorization(REAL(A), dim, EXT_TRIANGLE_TYPE_UPPER, REAL(result));
-    
-    double* res = REAL(result);
-    for (size_t col = 0; col < dim - 1; ++col) {
-      for (size_t row = col + 1; row < dim; ++row) res[row + col * dim] = 0.0;
-    }
-    
-    UNPROTECT(1);
-    
-    return result;
-  }
-  
-  SEXP crossprod(SEXP A) {
-    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
-    size_t numRows = dims[0];
-    size_t numCols = dims[1];
-    
-    SEXP result = PROTECT(allocVector(REALSXP, numCols * numCols));
-    setDims(result, numCols, numCols);
-    
-    ext_getSingleMatrixCrossproduct(REAL(A), numRows, numCols,
-                                    REAL(result), false, EXT_TRIANGLE_TYPE_BOTH);
-
-    UNPROTECT(1);
-    
-    return result;
-  }
-  
-  SEXP multiply(SEXP A, SEXP b) {
-    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
-    size_t numRows = dims[0];
-    size_t numCols = dims[1];
-    
-    SEXP result = PROTECT(allocVector(REALSXP, numCols));
-    
-    ext_multiplyMatrixIntoVector(REAL(A), numRows, numCols, true, REAL(b), REAL(result));
-    
-    UNPROTECT(1);
-    
-    return result;
-  }
-  
-  SEXP solve(SEXP A, SEXP b) {
-    int* dims = INTEGER(getAttrib(A, R_DimSymbol));
-    size_t lhsDim = dims[0];
-    
-    SEXP result = PROTECT(allocVector(REALSXP, lhsDim));
-    
-    memcpy(REAL(result), (const double*) REAL(b), lhsDim * sizeof(double));
-    
-    ext_solveTriangularSystemInPlace(REAL(A), lhsDim, true, EXT_TRIANGLE_TYPE_UPPER, REAL(result), 1);
-      
-    UNPROTECT(1);
-    
-    return result;
-  }
-  
-  SEXP test(SEXP X, SEXP Z, SEXP offset, SEXP zetaZ) {
-    int* dims = INTEGER(getAttrib(X, R_DimSymbol));
-    
-    size_t numObservations = dims[0];
-    size_t numPredictors   = dims[1];
-    
-    GetRNGstate();
-        
-    Rprintf("creating treatment model object\n");
-    
-    cibart::ProbitNormalPrior treatmentPrior;
-    double* temp = new double[numPredictors + 1];
-    for (size_t i = 0; i < numPredictors + 1; ++i) temp[i] = 2.5 * 2.5;
-    treatmentPrior.scale = temp;
-    cibart::ProbitTreatmentModel treatmentModel(cibart::PROBIT_PRIOR_NORMAL, &treatmentPrior);
-    
-    ext_rng_userFunction uniformFunction;
-    uniformFunction.f.stateless = &unif_rand;
-    uniformFunction.state = NULL;
-    ext_rng* rng = ext_rng_create(EXT_RNG_ALGORITHM_USER_UNIFORM, &uniformFunction);
-  
-    ext_rng_userFunction normalFunction;
-    normalFunction.f.stateless = &norm_rand;
-    normalFunction.state = NULL;
-    ext_rng_setStandardNormalAlgorithm(rng, EXT_RNG_STANDARD_NORMAL_USER_NORM, &normalFunction);
-    
-    Rprintf("creating treatment model scratch\n");
-    void* scratch = treatmentModel.createScratch(&treatmentModel, rng, REAL(X), numObservations, numPredictors, REAL(Z));
-    
-    Rprintf("updating parameters\n");
-    treatmentModel.updateParameters(&treatmentModel, scratch, REAL(offset));
-    
-    SEXP result = PROTECT(allocVector(REALSXP, numObservations * 2));
-    setDims(result, numObservations, 2);
-    
-    Rprintf("getting conditional probabilities\n");
-    treatmentModel.getConditionalProbabilities(&treatmentModel, scratch, REAL(zetaZ)[0], REAL(result), REAL(result) + numObservations);
-    
-    Rprintf("deleting scratch\n");
-    treatmentModel.destroyScratch(&treatmentModel, scratch);
-    
-    delete [] temp;
-    
-    PutRNGstate();
-    
-    UNPROTECT(1);
-    
-    return result;
-  } */
-}
-
-namespace {
 #define DEF_FUNC(_N_, _F_, _A_) { _N_, reinterpret_cast<DL_FUNC>(&_F_), _A_ }
   
   R_CallMethodDef R_callMethods[] = {
     DEF_FUNC("treatSens_fitSensitivityAnalysis", fitSensitivityAnalysis, 11),
     DEF_FUNC("treatSens_guessNumCores", guessNumCores, 0),
     DEF_FUNC("treatSens_glmFit", glmFit, 5),
-//    DEF_FUNC("treatSens_chol", chol, 1),
-//    DEF_FUNC("treatSens_crossprod", crossprod, 1),
-//    DEF_FUNC("treatSens_multiply", multiply, 2),
-//    DEF_FUNC("treatSens_solve", solve, 2),
-//    DEF_FUNC("treatSens_test", test, 4),
     {NULL, NULL, 0}
   };
 }
@@ -502,6 +369,8 @@ extern "C" {
   {
     R_registerRoutines(info, NULL, R_callMethods, NULL, NULL);
     R_useDynamicSymbols(info, static_cast<Rboolean>(FALSE));
+    
+    misc_simd_init();
   }
 }
 

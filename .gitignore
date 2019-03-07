@@ -468,8 +468,6 @@ config.log
 config.status
 autom4te.cache
 src/config.hpp
-src/bart/config.hpp
 src/external/config.h
+src/misc/config.h
 *.swp
-src/stan_files/cont_binary_mlm.cc
-src/stan_files/cont_binary_mlm.hpp

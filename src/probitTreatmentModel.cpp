@@ -3,11 +3,11 @@
 #include "probitTreatmentModel.hpp"
 
 #include <cstring>
+#include <misc/stddef.h>
 
-#include <external/linearAlgebra.h>
 #include <external/random.h>
 #include <external/stats.h>
-#include <external/stddef.h>
+#include <misc/linearAlgebra.h>
 
 // #include <external/io.h>
 
@@ -99,7 +99,7 @@ namespace {
     // use some default values for latents
     for (size_t i = 0; i < numObservations; ++i) scratch->latents[i] = (z[i] == 1.0 ? 0.5 : -0.5);
     scratch->coefficients = new double[numPredictors];
-    ext_setVectorToConstant(scratch->coefficients, numPredictors, 0.0);
+    misc_setVectorToConstant(scratch->coefficients, numPredictors, 0.0);
     scratch->sigma_sq = 1.0;
     
     scratch->posteriorCovarianceInverseRightFactor = new double[numPredictors * numPredictors];
@@ -199,7 +199,7 @@ namespace {
     // v - zetaZ * u
     ext_addVectorsInPlace(offset, scratch.numObservations, -1.0, scratch.latents); // clobers latents
     // X'(v - zetaZ * u)
-    ext_multiplyMatrixIntoVector(scratch.x, scratch.numObservations, scratch.numPredictors, true, scratch.latents, scratch.coefficients); // clobers coefs
+    misc_multiplyMatrixIntoVector(scratch.x, scratch.numObservations, scratch.numPredictors, true, scratch.latents, scratch.coefficients); // clobers coefs
     
     // L^{-1} X'(v - zetaZ * u)
     ext_solveTriangularSystemInPlace(scratch.posteriorCovarianceInverseRightFactor, scratch.numPredictors, true, EXT_TRIANGLE_TYPE_UPPER,
@@ -218,7 +218,7 @@ namespace {
   void sampleLatents(Scratch& restrict scratch, const double* restrict offset)
   {
     // X beta
-    ext_multiplyMatrixIntoVector(scratch.x, scratch.numObservations, scratch.numPredictors, false, scratch.coefficients, scratch.latents);
+    misc_multiplyMatrixIntoVector(scratch.x, scratch.numObservations, scratch.numPredictors, false, scratch.coefficients, scratch.latents);
     // X beta + zetaZ * u
     ext_addVectorsInPlace(offset, scratch.numObservations, 1.0, scratch.latents);
     
