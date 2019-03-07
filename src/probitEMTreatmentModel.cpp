@@ -2,8 +2,9 @@
 
 #include "probitEMTreatmentModel.hpp"
 
-#include <external/stddef.h>
+#include <misc/stddef.h>
 #include <external/stats.h>
+#include <external/random.h>
 #include <external/linearAlgebra.h>
 #include <glm/glm.h>
 

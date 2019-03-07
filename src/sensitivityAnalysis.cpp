@@ -26,15 +26,18 @@
 
 // #include <external/Rinternals.h> // SEXP
 
-#include <external/alloca.h>
+#include <misc/alloca.h>
+#include <misc/linearAlgebra.h>
+#include <misc/stats.h>
+#include <misc/thread.h>
+
 #include <external/io.h>
-#include <external/linearAlgebra.h>
 #include <external/random.h>
 #include <external/stats.h>
-#include <external/thread.h>
 
 #include <dbarts/bartFit.hpp>
 #include <dbarts/types.hpp>
+#include <dbarts/random.hpp>
 #include <dbarts/results.hpp>
 #include <dbarts/R_C_interface.hpp>
 
@@ -254,16 +257,16 @@ namespace cibart {
       endTime = time(NULL);
 #endif
     } else {
-      ext_mt_manager_t threadManager;
-      ext_mt_create(&threadManager, control.numThreads);
+      misc_mt_manager_t threadManager;
+      misc_mt_create(&threadManager, control.numThreads);
             
       size_t numCellsPerThread;
       size_t offByOneIndex;
       
-      ext_mt_getNumThreadsForJob(threadManager, numCells, 0, NULL, &numCellsPerThread, &offByOneIndex);
+      misc_mt_getNumThreadsForJob(threadManager, numCells, 0, NULL, &numCellsPerThread, &offByOneIndex);
       
-      ThreadData* threadData = ext_stackAllocate(control.numThreads, ThreadData);
-      void** threadDataPtrs  = ext_stackAllocate(control.numThreads, void*);
+      ThreadData* threadData = misc_stackAllocate(control.numThreads, ThreadData);
+      void** threadDataPtrs  = misc_stackAllocate(control.numThreads, void*);
       for (size_t i = 0; i < offByOneIndex; ++i) {
         threadData[i].gridCells         = gridCells + i * numCellsPerThread;
         threadData[i].numGridCells      = numCellsPerThread;
@@ -294,7 +297,7 @@ namespace cibart {
       startTime = time(NULL);
 #endif
       
-      ext_mt_runTasks(threadManager, sensitivityAnalysisTask, threadDataPtrs, control.numThreads);
+      misc_mt_runTasks(threadManager, sensitivityAnalysisTask, threadDataPtrs, control.numThreads);
       
 #ifdef HAVE_GETTIMEOFDAY
       gettimeofday(&endTime, NULL);
@@ -304,10 +307,10 @@ namespace cibart {
       
       for (size_t i = 0; i < control.numThreads; ++i) delete threadData[i].scratch;
       
-      ext_stackFree(threadDataPtrs);
-      ext_stackFree(threadData);
+      misc_stackFree(threadDataPtrs);
+      misc_stackFree(threadData);
       
-      ext_mt_destroy(threadManager);
+      misc_mt_destroy(threadManager);
     }
     
     if (control.verbose) ext_printf("running time (seconds): %f\n", subtractTimes(endTime, startTime));
@@ -376,18 +379,18 @@ extern "C" {
     bartControl.numChains = 1;
     bartControl.numThreads = 1;
     bartControl.treeThinningRate = static_cast<uint32_t>(control.numTreeSamplesToThin);
-    bartControl.rng_algorithm = EXT_RNG_ALGORITHM_USER_UNIFORM;
-    bartControl.rng_standardNormal = EXT_RNG_STANDARD_NORMAL_USER_NORM;
+    bartControl.rng_algorithm = dbarts::RNG_ALGORITHM_USER_UNIFORM;
+    bartControl.rng_standardNormal = dbarts::RNG_STANDARD_NORMAL_USER_NORM;
     
     dbarts::Model bartModel;
     
-    dbarts::CGMPrior* treePrior = ext_stackAllocate(1, dbarts::CGMPrior);
+    dbarts::CGMPrior* treePrior = misc_stackAllocate(1, dbarts::CGMPrior);
     control.initializeCGMPrior(treePrior, DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
     
-    dbarts::NormalPrior* muPrior = ext_stackAllocate(1, dbarts::NormalPrior);
+    dbarts::NormalPrior* muPrior = misc_stackAllocate(1, dbarts::NormalPrior);
     control.initializeNormalPrior(muPrior, &bartControl, DBARTS_DEFAULT_NORMAL_PRIOR_K);
     
-    dbarts::ChiSquaredPrior* sigmaSqPrior = ext_stackAllocate(1, dbarts::ChiSquaredPrior);
+    dbarts::ChiSquaredPrior* sigmaSqPrior = misc_stackAllocate(1, dbarts::ChiSquaredPrior);
     control.initializeChiSquaredPrior(sigmaSqPrior, DBARTS_DEFAULT_CHISQ_PRIOR_DF, DBARTS_DEFAULT_CHISQ_PRIOR_QUANTILE);
     
     bartModel.treePrior = treePrior;
@@ -398,7 +401,7 @@ extern "C" {
     bartControl.callback = control.treatmentModel.includesLatentVariables? &bartCallbackFunctionForLatents : &bartCallbackFunction;
     bartControl.callbackData = static_cast<void*>(&callbackData);
     
-    dbarts::BARTFit* fit = ext_stackAllocate(1, dbarts::BARTFit);
+    dbarts::BARTFit* fit = misc_stackAllocate(1, dbarts::BARTFit);
     control.initializeFit(fit, &bartControl, &bartModel, &bartData);
     
     ext_rng_userFunction userUniform;
@@ -420,7 +423,7 @@ extern "C" {
     dbarts::Results* bartResults = control.runSampler(fit);
     
     estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
-    standardErrors[gridCells[0].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
+    standardErrors[gridCells[0].offset] = std::sqrt(misc_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
     
     delete bartResults;
 
@@ -443,7 +446,7 @@ extern "C" {
       estimateOffset = gridCells[i].offset * control.numSimsPerCell;
       
       estimateTreatmentEffect(control, data, bartResults->trainingSamples, bartResults->testSamples, estimates + estimateOffset);
-      standardErrors[gridCells[i].offset] = std::sqrt(ext_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
+      standardErrors[gridCells[i].offset] = std::sqrt(misc_computeVariance(estimates + estimateOffset, control.numSimsPerCell, NULL));
       
       delete bartResults;
       if (control.verbose && control.numThreads == 1) {
@@ -453,14 +456,14 @@ extern "C" {
     }
     
     control.invalidateFit(fit);
-    ext_stackFree(fit);
+    misc_stackFree(fit);
     
     control.invalidateChiSquaredPrior(sigmaSqPrior);
-    ext_stackFree(sigmaSqPrior);
+    misc_stackFree(sigmaSqPrior);
     control.invalidateNormalPrior(muPrior);
-    ext_stackFree(muPrior);
+    misc_stackFree(muPrior);
     control.invalidateCGMPrior(treePrior);
-    ext_stackFree(treePrior);
+    misc_stackFree(treePrior);
     
     delete [] maxNumCuts;
     delete [] variableTypes;
@@ -514,7 +517,7 @@ namespace {
   
   void subtractConfounderFromResponse(const Data& data, Scratch& scratch, double zetaY)
   {
-    ext_addVectors(static_cast<const double*>(scratch.u), data.numObservations, -zetaY, data.y, scratch.yMinusZetaU);
+    misc_addVectors(static_cast<const double*>(scratch.u), data.numObservations, -zetaY, data.y, scratch.yMinusZetaU);
   }
   
   double estimateSigma(const Data& data, Scratch& scratch)
@@ -524,8 +527,8 @@ namespace {
     size_t numPredictors = data.numPredictors + 2;
     const double* const& lm_x(data.x_train);
     
-    double* lsSolution = ext_stackAllocate(numPredictors, double);
-    double* residuals = ext_stackAllocate(data.numObservations, double);
+    double* lsSolution = misc_stackAllocate(numPredictors, double);
+    double* residuals = misc_stackAllocate(data.numObservations, double);
     char* lsMessage;
     
     int32_t lsResult = ext_findLeastSquaresFit(scratch.yMinusZetaU, data.numObservations, lm_x, numPredictors,
@@ -534,8 +537,8 @@ namespace {
     
     double sumOfSquaredResiduals = ext_sumSquaresOfVectorElements(residuals, data.numObservations);
             
-    ext_stackFree(residuals);
-    ext_stackFree(lsSolution);
+    misc_stackFree(residuals);
+    misc_stackFree(lsSolution);
     
     return std::sqrt(sumOfSquaredResiduals / static_cast<double>(data.numObservations - numPredictors));
   }
@@ -600,7 +603,7 @@ namespace {
   void updateTreatmentModelParameters(const Control& control, const Data& data, Scratch& scratch, double zetaZ)
   {
     double*& offset(scratch.temp_numObs_1);
-    ext_scalarMultiplyVector(const_cast<const double*>(scratch.u), data.numObservations, zetaZ, offset);
+    misc_scalarMultiplyVector(const_cast<const double*>(scratch.u), data.numObservations, zetaZ, offset);
     
     control.treatmentModel.updateParameters(&control.treatmentModel, scratch.treatmentScratch, offset);
   }
@@ -608,7 +611,7 @@ namespace {
   void updateTreatmentModelLatentVariables(const Control& control, const Data& data, Scratch& scratch, double zetaZ)
   {
     double*& offset(scratch.temp_numObs_1);
-    ext_scalarMultiplyVector(const_cast<const double*>(scratch.u), data.numObservations, zetaZ, offset);
+    misc_scalarMultiplyVector(const_cast<const double*>(scratch.u), data.numObservations, zetaZ, offset);
     
     control.treatmentModel.updateLatentVariables(&control.treatmentModel, scratch.treatmentScratch, offset);
   }
@@ -647,7 +650,7 @@ namespace {
     // create matrix [ 1 X Z ]; treatmentModel may or may not need [ 1 X ], bart definitely does not
     
     double* x_temp = new double[numObservations * (numPredictors + 2)];
-    ext_setVectorToConstant(x_temp, numObservations, 1.0);
+    misc_setVectorToConstant(x_temp, numObservations, 1.0);
     std::memcpy(x_temp + numObservations, x, numObservations * numPredictors * sizeof(double));
     std::memcpy(x_temp + numObservations * (numPredictors + 1), z, numObservations * sizeof(double));
     
@@ -673,7 +676,7 @@ namespace {
     yMinusZetaU = new double[data.numObservations];
     u = new double[data.numObservations];
     p = new double[data.numObservations];
-    ext_setVectorToConstant(p, data.numObservations, control.theta);
+    misc_setVectorToConstant(p, data.numObservations, control.theta);
     
     // [ 1 X ]
     const double* treatment_x = data.x_train;

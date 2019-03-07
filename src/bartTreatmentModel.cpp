@@ -9,6 +9,7 @@
 #include <dbarts/control.hpp>
 #include <dbarts/data.hpp>
 #include <dbarts/model.hpp>
+#include <dbarts/random.hpp>
 #include <dbarts/results.hpp>
 #include <dbarts/types.hpp>
 
@@ -214,8 +215,8 @@ namespace {
     control->responseIsBinary = true;
     control->verbose = false;
     control->numThreads = 1;
-    control->rng_algorithm = EXT_RNG_ALGORITHM_USER_UNIFORM;
-    control->rng_standardNormal = EXT_RNG_STANDARD_NORMAL_USER_NORM;
+    control->rng_algorithm = dbarts::RNG_ALGORITHM_USER_UNIFORM;
+    control->rng_standardNormal = dbarts::RNG_STANDARD_NORMAL_USER_NORM;
     
     return control;
   }

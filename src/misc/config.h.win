@@ -10,6 +10,8 @@
 #  define HAVE_SSE2 1
 #endif
 
+#define XINT_TYPE uint16_t
+
 #define PACKAGE_BUGREPORT "vdorie@gmail.com"
 #define PACKAGE_NAME "dbarts"
 #define PACKAGE_STRING "dbarts 0.9.9"

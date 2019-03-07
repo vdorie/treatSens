@@ -7,7 +7,7 @@
    flags at the front, some functions in places we can find, and whatever else desired
    after that. Consider them C classes and not C++. */
 
-#include <external/stddef.h> // size_t, restrict
+#include <misc/stddef.h> // size_t, restrict
 
 struct ext_rng;
 
