@@ -126,7 +126,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     class(trt.family) != "family" || trt.family$family != "binomial" || trt.family$link != "probit")) {
     warning("iter.j option is meaningless unless trt.family = binomial(link=\"probit\")")
   } else {
-    if (!is.numeric(iter.j) || is.na(iter.j) || length(iter.j) != 1 || iter.j < 1)
+    if (!is.numeric(iter.j) || length(iter.j) != 1 || is.na(iter.j) || iter.j < 1)
     stop("iter.j must be an integer greater than or equal to 1")
     if (!is.integer(iter.j) && as.double(as.integer(iter.j)) != iter.j)
       warning("iter.j changed by coercion from double; supply an integer to be precise")
