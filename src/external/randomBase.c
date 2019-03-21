@@ -4,7 +4,7 @@
  */
 
 #ifdef __INTEL_COMPILER
-#  define __need_timespec 1
+#  define _POSIX_SOURCE 1
 #endif
 
 #include <external/random.h>
@@ -66,6 +66,7 @@ static const char* const rngNames[] = {
   "invalid"
 }; */
 
+static int rc_getRuntimeVersion(int* major, int* minor, int* revision);
 
 typedef ext_rng_mersenneTwisterState MersenneTwisterState;
 typedef ext_rng_knuthState KnuthState;
@@ -193,23 +194,36 @@ ext_rng* ext_rng_createDefault(bool useNative)
   }  
   
   uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
-  UNPROTECT(1);
   
   if (seed0 == (uint_least32_t) NA_INTEGER || seed0 > 11000) {
     ext_issueWarning("'.Random.seed' is not a valid integer, so ignored");
     result = ext_rng_create(EXT_RNG_ALGORITHM_MERSENNE_TWISTER, NULL);
     if (result != NULL) ext_rng_setSeedFromClock(result);
+    UNPROTECT(1);
     return result;
   }
   
   ext_rng_algorithm_t algorithmType      = (ext_rng_algorithm_t) (seed0 % 100);
+  
+  int major, minor, revision;
+  
+  ext_rng_standardNormal_t stdNormalType;
+  if (rc_getRuntimeVersion(&major, &minor, &revision) != 0) {
 #if R_VERSION < R_Version(3,6,0)
-  ext_rng_standardNormal_t stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
+    stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
 #else
-  ext_rng_standardNormal_t stdNormalType = (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
+    stdNormalType = (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
 #endif
+  } else {
+    if (major < 3 || (major == 3 && minor < 6)) {
+      stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
+    } else {
+      stdNormalType = (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
+    }
+  }
   
   void* state = (void*) (1 + INTEGER(seedsExpr));
+  UNPROTECT(1);
   
 #ifdef SUPPRESS_DIAGNOSTIC
 #  pragma GCC diagnostic push
@@ -349,12 +363,20 @@ ext_rng_standardNormal_t ext_rng_getDefaultStandardNormalType()
   
   uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
   
-
+  int major, minor, revision;
+  if (rc_getRuntimeVersion(&major, &minor, &revision) != 0) {
 #if R_VERSION < R_Version(3,6,0)
-  return (ext_rng_standardNormal_t) (seed0 / 100);
+    return (ext_rng_standardNormal_t) (seed0 / 100);
 #else
-  return (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
+    return (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
 #endif
+  } else {
+    if (major < 3 || (major == 3 && minor < 6)) {
+      return (ext_rng_standardNormal_t) (seed0 / 100);
+    } else {
+      return (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
+    }
+  }
 }
 
 int ext_rng_setStandardNormalAlgorithm(ext_rng* generator, ext_rng_standardNormal_t standardNormalAlgorithm, const void* state)
@@ -1021,3 +1043,52 @@ static void knuth_cycleArray(KnuthState* kt)
 #undef KKL
 #undef differenceModulo
 #undef isOdd
+
+static char* rc_strdup(const char* c) {
+  size_t len = strlen(c);
+  char* result = (char*) malloc(len + 1);
+  if (result != NULL) memcpy(result, c, len + 1);
+  return result;
+}
+
+static int rc_getRuntimeVersion(int* major, int* minor, int* revision)
+{
+  *major = -1, *minor = -1, *revision = -1;
+  SEXP versionFunction = PROTECT(Rf_findVarInFrame(R_BaseNamespace, Rf_install("R.Version")));
+  if (versionFunction == R_UnboundValue) {
+    UNPROTECT(1);
+    return ENXIO;
+  }
+  SEXP closure = PROTECT(Rf_lang1(versionFunction));
+  SEXP version = PROTECT(Rf_eval(closure, R_GlobalEnv));
+  if (Rf_isNull(version)) {
+    UNPROTECT(3);
+    return ENOSYS;
+  }
+  
+  R_xlen_t versionLength = XLENGTH(version);
+  SEXP versionNames = Rf_getAttrib(version, R_NamesSymbol);
+  for (R_xlen_t i = 0; i < versionLength; ++i) {
+    if (strcmp(CHAR(STRING_ELT(versionNames, i)), "major") == 0) {
+      *major = atoi(CHAR(STRING_ELT(VECTOR_ELT(version, i), 0)));
+    } else if (strcmp(CHAR(STRING_ELT(versionNames, i)), "minor") == 0) {
+      char* minorString = rc_strdup(CHAR(STRING_ELT(VECTOR_ELT(version, i), 0)));
+      int period = 0;
+      for ( ; minorString[period] != '.' && minorString[period] != '\0'; ++period) ;
+      if (minorString[period] == '.') {
+        minorString[period] = '\0';
+        *minor = atoi(minorString);
+        if (minorString[period + 1] != '\0')
+          *revision = atoi(minorString + period + 1);
+      } else {
+        *minor = atoi(minorString);
+        *revision = 0;
+      }
+      free(minorString);
+    }
+  }
+  UNPROTECT(3);
+  
+  return (*major >= 0 && *minor >= 0 && *revision >= 0) ? 0 : EPROTO;
+}
+
