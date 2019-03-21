@@ -1,4 +1,5 @@
-SIMD_FLAGS=@SIMD_FLAGS@
+SSE2_FLAG=@SSE2_FLAG@
+AVX_FLAG=@AVX_FLAG@
 
 PTHREAD_FLAGS=@PTHREAD_CFLAGS@
 PKG_CPPFLAGS=-Iinclude
@@ -17,7 +18,7 @@ sublibs:
 	@for d in $(SUBDIRS); do \
 	  (cd $${d} && $(MAKE) -f "$(MkInclude)" -f Makefile library \
 	   PTHREAD_FLAGS="$(PTHREAD_FLAGS)" \
-           SIMD_FLAGS="$(SIMD_FLAGS)" \
+           SSE2_FLAG="$(SSE2_FLAG)" AVX_FLAG="$(AVX_FLAG)" \
            CC="$(CC)" CFLAGS="$(CFLAGS) $(CPICFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) $(CXXPICFLAGS)" \
            CLINK_CPPFLAGS="$(CLINK_CPPFLAGS)" CPPFLAGS="$(CPPFLAGS)" AR="$(AR)" ARFLAGS="$(ARFLAGS)") \
            || exit 1; \
