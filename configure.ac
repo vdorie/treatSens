@@ -11,7 +11,8 @@ AC_CONFIG_HEADER([src/external/config.h])
 
 m4_include([tools/m4/ax_check_compile_flag.m4])
 m4_include([tools/m4/ax_pthread.m4])
-m4_include([tools/m4/ax_func_posix_memalign.m4])
+m4_include([tools/m4/ax_compiler_vendor.m4])
+m4_include([tools/m4/ax_compiler_ext.m4])
 
 # Checks for programs.
 : ${R_HOME=`R RHOME`}
@@ -41,53 +42,8 @@ AC_LANG_POP(C++)
 
 AC_C_BIGENDIAN
 
-AX_CHECK_COMPILE_FLAG(-mmmx, ax_cv_support_mmx_ext=yes, [])
-if test x"$ax_cv_support_mmx_ext" = x"yes"; then
-  SIMD_FLAGS="$SIMD_FLAGS -mmmx"
-  AC_DEFINE(HAVE_MMX,,[Support mmx instructions])
-fi
-AX_CHECK_COMPILE_FLAG(-msse, ax_cv_support_sse_ext=yes, [])
-if test x"$ax_cv_support_sse_ext" = x"yes"; then
-  SIMD_FLAGS="$SIMD_FLAGS -msse"
-fi
-
-AX_CHECK_COMPILE_FLAG(-msse2, ax_cv_support_sse2_ext=yes, [])
-if test x"$ax_cv_support_sse2_ext" = x"yes"; then
-  SIMD_FLAGS="$SIMD_FLAGS -msse2"
-  AC_DEFINE(HAVE_SSE2,,[Support SSE2 (Streaming SIMD Extensions 2) instructions])
-fi
-
-AX_CHECK_COMPILE_FLAG(-msse3, ax_cv_support_sse3_ext=yes, [])
-if test x"$ax_cv_support_sse3_ext" = x"yes"; then
-  SIMD_FLAGS="$SIMD_FLAGS -msse3"
-  AC_DEFINE(HAVE_SSE3,,[Support SSE3 (Streaming SIMD Extensions 3) instructions])
-fi
-
-AX_CHECK_COMPILE_FLAG(-msse4.1, ax_cv_support_sse41_ext=yes, [])
-if test x"$ax_cv_support_sse41_ext" = x"yes"; then
-  SIMD_FLAGS="$SIMD_FLAGS -msse4.1"
-  AC_DEFINE(HAVE_SSE4_1,,[Support SSSE4.1 (Streaming SIMD Extensions 4.1) instructions])
-fi
-
-AX_CHECK_COMPILE_FLAG(-msse4.2, ax_cv_support_sse42_ext=yes, [])
-if test x"$ax_cv_support_sse42_ext" = x"yes"; then
-  SIMD_FLAGS="$SIMD_FLAGS -msse4.2"
-  AC_DEFINE(HAVE_SSE4_2,,[Support SSSE4.2 (Streaming SIMD Extensions 4.2) instructions])
-fi
-
-AX_CHECK_COMPILE_FLAG(-mavx, ax_cv_support_avx_ext=yes, [])
-if test x"$ax_cv_support_avx_ext" = x"yes"; then
-  SIMD_FLAGS="$SIMD_FLAGS -mavx"
-  AC_DEFINE(HAVE_AVX,,[Support AVX (Advanced Vector Extensions) instructions])
-fi
-
-AX_CHECK_COMPILE_FLAG(-mavx2, ax_cv_support_avx2_ext=yes, [])
-if test x"$ax_cv_support_avx2_ext" = x"yes"; then
-  SIMD_FLAGS="$SIMD_FLAGS -mavx2"
-  AC_DEFINE(HAVE_AVX2,,[Support AVX2 (Advanced Vector Extensions 2) instructions])
-fi
-
-AC_SUBST(SIMD_FLAGS)
+AX_COMPILER_VENDOR
+AX_COMPILER_EXT
 
 # Checks for libraries.
 AX_PTHREAD
@@ -121,9 +77,6 @@ AC_CHECK_FUNCS([gettimeofday])
 AC_CHECK_FUNCS([clock_gettime])
 AC_CHECK_FUNCS([ffs])
 AC_FUNC_ALLOCA
-
-AX_FUNC_POSIX_MEMALIGN
-
 
 AC_CONFIG_FILES([src/Makevars])
 AC_OUTPUT

@@ -36,6 +36,9 @@
 /* Define 1 to if your processor supports SSE2. */
 #undef HAVE_SSE2
 
+/* Define 1 to if your processor supports AVX. */
+#undef HAVE_AVX
+
 /* Define to the integer type to be used to map the floating point x to
    integer types. Essentially limits the number of cut points allowable. */
 #undef XINT_TYPE
