@@ -1,8 +1,9 @@
 SSE2_FLAG=-msse2
 AVX_FLAG=-mavx
 
-PKG_CPPFLAGS=-Iinclude -pthread
-PKG_LIBS=glm.a external.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) -lpthread
+PTHREAD_FLAGS=-pthread
+PKG_CPPFLAGS=-Iinclude
+PKG_LIBS=glm.a external.a misc.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) -lpthread
 
 MkInclude = $(R_HOME)/etc${R_ARCH}/Makeconf
 

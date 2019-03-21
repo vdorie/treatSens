@@ -2,3 +2,4 @@
 
 cp -f src/config.hpp.win src/config.hpp
 cp -f src/external/config.h.win src/external/config.h
+cp -f src/misc/config.h.win src/misc/config.h
