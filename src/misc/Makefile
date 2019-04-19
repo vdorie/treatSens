@@ -65,14 +65,14 @@ linearAlgebra.sse2.false = touch linearAlgebra_sse2.o
 compile.linearAlgebra.sse2 = $(linearAlgebra.sse2.$(have.sse2))
 
 linearAlgebra_sse2.o : linearAlgebra_sse2.c $(INCLUDE_DIR)/misc/linearAlgebra.h
-	$(compile.linearAlgebra.sse2)
+	@$(compile.linearAlgebra.sse2)
 
 linearAlgebra.avx.true = $(CC) $(ALL_CPPFLAGS) $(AVX_FLAG) $(CFLAGS) -c linearAlgebra_avx.c -o linearAlgebra_avx.o
 linearAlgebra.avx.false = touch linearAlgebra_avx.o
 compile.linearAlgebra.avx = $(linearAlgebra.avx.$(have.avx))
 
 linearAlgebra_avx.o : linearAlgebra_avx.c $(INCLUDE_DIR)/misc/linearAlgebra.h
-	$(compile.linearAlgebra.avx)
+	@$(compile.linearAlgebra.avx)
 
 moments.o : moments.c $(INCLUDE_DIR)/misc/stats.h $(INCLUDE_DIR)/misc/simd.h
 	$(CC) $(ALL_CPPFLAGS) $(CFLAGS) -c moments.c -o moments.o
@@ -82,7 +82,7 @@ moments.sse2.false = touch moments_sse2.o
 compile.moments.sse2 = $(moments.sse2.$(have.sse2))
 
 moments_sse2.o : moments_sse2.c $(INCLUDE_DIR)/misc/stats.h
-	$(compile.moments.sse2)
+	@$(compile.moments.sse2)
 
 simd.o : simd.c $(INCLUDE_DIR)/misc/simd.h
 	$(CC) $(ALL_CPPFLAGS) $(CFLAGS) -c simd.c -o simd.o
