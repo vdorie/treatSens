@@ -1,6 +1,6 @@
 Package: treatSens
 Version: 3.0
-Date: 2019-03-20
+Date: 2019-04-19
 Title: Sensitivity Analysis for Causal Inference
 Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = "carnegin@uwm.edu"),
              person("Masataka",       "Harada", role = "aut",           email = "masatakaharada@gmail.com"),
@@ -16,13 +16,13 @@ Imports:
     mvtnorm,
     lme4,
     nlme,
-    dbarts (>= 0.9-9)
+    dbarts (>= 0.9-10)
 Suggests:
     doParallel,
     foreach,
     testthat (>= 0.9-0)
 LinkingTo:
-    dbarts (>= 0.9-9)
+    dbarts (>= 0.9-10)
 Description: Utilities to investigate sensitivity to unmeasured confounding in
     parametric models with either binary or continuous treatment.
 NeedsCompilation: yes

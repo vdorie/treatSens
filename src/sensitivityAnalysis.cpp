@@ -73,7 +73,7 @@ namespace {
     void (*setResponse)(dbarts::BARTFit* fit, const double* newResponse);
     void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double);
     void (*invalidateCGMPrior)(dbarts::CGMPrior* prior);
-    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, double);
+    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, const dbarts::Model* model, double);
     void (*invalidateNormalPrior)(dbarts::NormalPrior* prior);
     void (*initializeChiSquaredPrior)(dbarts::ChiSquaredPrior* prior, double, double);
     void (*invalidateChiSquaredPrior)(dbarts::ChiSquaredPrior* prior);
@@ -323,9 +323,9 @@ namespace {
   using namespace cibart;
   
   void bartCallbackFunction(void* v_callbackData, dbarts::BARTFit& fit, bool,
-                            const double* trainingSamples, const double*, double sigma);
+                            const double* trainingSamples, const double*, double sigma, const double* k);
   void bartCallbackFunctionForLatents(void* v_callbackData, dbarts::BARTFit& fit, bool,
-                                      const double* trainingSamples, const double*, double sigma);
+                                      const double* trainingSamples, const double*, double sigma, const double* k);
   
   struct CallbackData {
     const Control& control;
@@ -373,6 +373,7 @@ extern "C" {
                           sigmaEstimate, variableTypes, maxNumCuts);
     
     dbarts::Control bartControl; // use defaults
+    bartControl.responseIsBinary = false; // false until we implement for binary responses
     bartControl.verbose = false; // otherwise, waaaay too much
     bartControl.defaultNumSamples = control.numSimsPerCell;
     bartControl.defaultNumBurnIn = control.numInitialBurnIn;
@@ -383,12 +384,13 @@ extern "C" {
     bartControl.rng_standardNormal = dbarts::RNG_STANDARD_NORMAL_USER_NORM;
     
     dbarts::Model bartModel;
+    bartModel.nodeScale = bartControl.responseIsBinary ? 3.0 : 0.5;
     
     dbarts::CGMPrior* treePrior = misc_stackAllocate(1, dbarts::CGMPrior);
     control.initializeCGMPrior(treePrior, DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
     
     dbarts::NormalPrior* muPrior = misc_stackAllocate(1, dbarts::NormalPrior);
-    control.initializeNormalPrior(muPrior, &bartControl, DBARTS_DEFAULT_NORMAL_PRIOR_K);
+    control.initializeNormalPrior(muPrior, &bartControl, &bartModel, DBARTS_DEFAULT_NORMAL_PRIOR_K);
     
     dbarts::ChiSquaredPrior* sigmaSqPrior = misc_stackAllocate(1, dbarts::ChiSquaredPrior);
     control.initializeChiSquaredPrior(sigmaSqPrior, DBARTS_DEFAULT_CHISQ_PRIOR_DF, DBARTS_DEFAULT_CHISQ_PRIOR_QUANTILE);
@@ -473,7 +475,7 @@ extern "C" {
 namespace {
   // this gets called after BART has new samples for us
   void bartCallbackFunction(void* v_callbackData, dbarts::BARTFit& fit, bool,
-                            const double* trainingSamples, const double*, double sigma)
+                            const double* trainingSamples, const double*, double sigma, const double*)
   {
     CallbackData& callbackData(*static_cast<CallbackData*>(v_callbackData));
     
@@ -492,7 +494,7 @@ namespace {
   
   // this gets called after BART has new samples for us
   void bartCallbackFunctionForLatents(void* v_callbackData, dbarts::BARTFit& fit, bool,
-                                      const double* trainingSamples, const double*, double sigma)
+                                      const double* trainingSamples, const double*, double sigma, const double*)
   {
     CallbackData& callbackData(*static_cast<CallbackData*>(v_callbackData));
     
@@ -717,7 +719,7 @@ namespace {
     control.setResponse               = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*)>(R_GetCCallable("dbarts", "setResponse"));
     control.initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double)>(R_GetCCallable("dbarts", "initializeCGMPriorFromOptions"));
     control.invalidateCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*)>(R_GetCCallable("dbarts", "invalidateCGMPrior"));
-    control.initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, double)>(R_GetCCallable("dbarts", "initializeNormalPriorFromOptions"));
+    control.initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, const dbarts::Model*, double)>(R_GetCCallable("dbarts", "initializeNormalPriorFromOptions"));
     control.invalidateNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*)>(R_GetCCallable("dbarts", "invalidateNormalPrior"));
     control.initializeChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*, double, double)>(R_GetCCallable("dbarts", "initializeChiSquaredPriorFromOptions"));
     control.invalidateChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*)>(R_GetCCallable("dbarts", "invalidateChiSquaredPrior"));
