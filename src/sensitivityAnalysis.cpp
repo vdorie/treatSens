@@ -383,8 +383,7 @@ extern "C" {
     bartControl.rng_algorithm = dbarts::RNG_ALGORITHM_USER_UNIFORM;
     bartControl.rng_standardNormal = dbarts::RNG_STANDARD_NORMAL_USER_NORM;
     
-    dbarts::Model bartModel;
-    bartModel.nodeScale = bartControl.responseIsBinary ? 3.0 : 0.5;
+    dbarts::Model bartModel(bartControl.responseIsBinary);
     
     dbarts::CGMPrior* treePrior = misc_stackAllocate(1, dbarts::CGMPrior);
     control.initializeCGMPrior(treePrior, DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
