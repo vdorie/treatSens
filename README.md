@@ -5,13 +5,11 @@ Utilities to investigate sensitivity to unmeasured confounding in parametric mod
 
 A package for R, with C/C++.
 
-Pre-built binaries of the package are built by [CRAN](https://cran.r-project.org/package=treatSens). These can be installed from within R using the typical `install.packages()` mechanism.
-
-Steps to install from source:
+The pre-built binary on CRAN has been archived. Please install from source:
 
 1. Install development tools for your operating system:
     1. Linux/Unix should already have this installed; if not, use your package manager to install a C/C++ compiler.
-    2. OS X: [clang and gfortran](https://cran.r-project.org/bin/macosx/tools/)
+    2. OS X: [XCode and gfortran](https://mac.r-project.org/tools/)
     3. Windows: [Rtools](https://cran.r-project.org/bin/windows/Rtools/)
 
 2. Install the `remotes` package from within R:
