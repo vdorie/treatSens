@@ -76,7 +76,7 @@ test_that("treatSens fails with an invalid trim weight parameter", {
     do.call(treatSens, setInList(baseArgs, trim.wt = NA_integer_)))
   expect_error(
     do.call(treatSens, setInList(baseArgs, trim.wt = c(2, 10))))
-})    
+})
 
 test_that("treatSens fails with overridden zero.loc parameter", {
   expect_warning(

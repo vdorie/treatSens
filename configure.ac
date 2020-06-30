@@ -21,7 +21,6 @@ if test -z "${R_HOME}"; then
   exit 1
 fi
 CC=`"${R_HOME}/bin/R" CMD config CC`
-CPP=`"${R_HOME}/bin/R" CMD config CPP`
 CXX=`"${R_HOME}/bin/R" CMD config CXX`
 CFLAGS=`"${R_HOME}/bin/R" CMD config CFLAGS`
 CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
@@ -42,13 +41,53 @@ AC_LANG_POP(C++)
 
 AC_C_BIGENDIAN
 
+AC_CANONICAL_HOST
 AX_COMPILER_VENDOR
+AC_SUBST(COMPILER_VENDOR, $ax_cv_c_compiler_vendor)
 AX_COMPILER_EXT
+
+# on SOLARIS, need to strip out some hardware flags from the library,
+# so we test for those that are explicitly added with intrinsics
+# but not supported by the CPU
+mapfile_flag=
+case $host_os in
+  solaris*)
+    case $host_cpu in
+      i[[3456]]86*|x86_64*|amd64*)
+        if test "$ax_cv_c_compiler_vendor" = sun; then
+          m4_include([tools/m4/ax_ext_solaris.m4])
+          m4_include([tools/m4/ax_gcc_x86_cpuid.m4])
+          m4_include([tools/m4/ax_gcc_x86_avx_xgetbv.m4])
+          AX_EXT_SOLARIS
+          
+          unsupported_isets=
+          # only test for those that we explicitly add beyond what
+          # the compiler will come up with on "-xarch=native"
+          for iset in "avx;AVX" "sse4_1;SSE4_1" "avx2;AVX2"; do
+            iset_varname=$(echo $iset | cut -d ";" -f 1)
+            iset_mapname=$(echo $iset | cut -d ";" -f 2)
+            # have variables test for CPU and OS support
+            if test x"$(eval echo \$ax_cv_have_${iset_varname}_ext)" = x"no"; then
+              unsupported_isets="${unsupported_isets} ${iset_mapname}"
+            fi
+          done
+          if test ! -z "${unsupported_isets}"; then
+            unsupported_isets=${unsupported_isets##[[:space:]]} # remove leading space
+            echo "creating mapfile to remove ${unsupported_isets} instruction set(s)"
+            echo "\$mapfile_version 2\nCAPABILITY {\n  HW -= ${unsupported_isets};\n};\n" > src/mapfile.solaris
+            mapfile_flag="-M mapfile.solaris"
+          fi
+        fi
+      ;;
+    esac
+  ;;
+esac
+
+AC_SUBST(MAPFILE_FLAG, $mapfile_flag)
 
 # Checks for libraries.
 AX_PTHREAD
 AC_SUBST(PTHREAD_CFLAGS)
-AC_SUBST(PTHREAD_LDFLAGS)
 AC_SUBST(PTHREAD_LIBS)
 
 # Checks for header files.

@@ -1,6 +1,27 @@
 /*
- * Much of this is based off of R's RNG.c, available at r-project.org and published under
- * the GNU General Public License (http://www.r-project.org/Licenses/).
+ * This wraps around some parts of R's RNG.c, available at r-project.org and published under
+ * the GNU General Public License (http://www.r-project.org/Licenses/). This encapsulates
+ * the RNG into a thread-safe object.
+ *
+ * The original copyright notice for that is:
+ *
+ *  R : A Computer Language for Statistical Data Analysis
+ *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
+ *  Copyright (C) 1997--2019  The R Core Team
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, a copy is available at
+ *  https://www.R-project.org/Licenses/
  */
 
 #ifdef __INTEL_COMPILER
@@ -31,6 +52,7 @@
 
 #include <misc/alloca.h>
 #include <external/io.h>
+#include <rc/util.h>
 
 #define STANDARD_NORMAL_DEFAULT EXT_RNG_STANDARD_NORMAL_INVERSION
 
@@ -66,7 +88,6 @@ static const char* const rngNames[] = {
   "invalid"
 }; */
 
-static int rc_getRuntimeVersion(int* major, int* minor, int* revision);
 
 typedef ext_rng_mersenneTwisterState MersenneTwisterState;
 typedef ext_rng_knuthState KnuthState;
@@ -377,6 +398,14 @@ ext_rng_standardNormal_t ext_rng_getDefaultStandardNormalType()
       return (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
     }
   }
+}
+
+const char* ext_rng_getAlgorithmName(ext_rng_algorithm_t algorithm)
+{
+  if (algorithm > EXT_RNG_ALGORITHM_INVALID || EXT_RNG_ALGORITHM_INVALID < EXT_RNG_ALGORITHM_WICHMANN_HILL)
+    algorithm = EXT_RNG_ALGORITHM_INVALID;
+  
+  return rngNames[algorithm];
 }
 
 int ext_rng_setStandardNormalAlgorithm(ext_rng* generator, ext_rng_standardNormal_t standardNormalAlgorithm, const void* state)
@@ -1043,52 +1072,3 @@ static void knuth_cycleArray(KnuthState* kt)
 #undef KKL
 #undef differenceModulo
 #undef isOdd
-
-static char* rc_strdup(const char* c) {
-  size_t len = strlen(c);
-  char* result = (char*) malloc(len + 1);
-  if (result != NULL) memcpy(result, c, len + 1);
-  return result;
-}
-
-static int rc_getRuntimeVersion(int* major, int* minor, int* revision)
-{
-  *major = -1, *minor = -1, *revision = -1;
-  SEXP versionFunction = PROTECT(Rf_findVarInFrame(R_BaseNamespace, Rf_install("R.Version")));
-  if (versionFunction == R_UnboundValue) {
-    UNPROTECT(1);
-    return ENXIO;
-  }
-  SEXP closure = PROTECT(Rf_lang1(versionFunction));
-  SEXP version = PROTECT(Rf_eval(closure, R_GlobalEnv));
-  if (Rf_isNull(version)) {
-    UNPROTECT(3);
-    return ENOSYS;
-  }
-  
-  R_xlen_t versionLength = XLENGTH(version);
-  SEXP versionNames = Rf_getAttrib(version, R_NamesSymbol);
-  for (R_xlen_t i = 0; i < versionLength; ++i) {
-    if (strcmp(CHAR(STRING_ELT(versionNames, i)), "major") == 0) {
-      *major = atoi(CHAR(STRING_ELT(VECTOR_ELT(version, i), 0)));
-    } else if (strcmp(CHAR(STRING_ELT(versionNames, i)), "minor") == 0) {
-      char* minorString = rc_strdup(CHAR(STRING_ELT(VECTOR_ELT(version, i), 0)));
-      int period = 0;
-      for ( ; minorString[period] != '.' && minorString[period] != '\0'; ++period) ;
-      if (minorString[period] == '.') {
-        minorString[period] = '\0';
-        *minor = atoi(minorString);
-        if (minorString[period + 1] != '\0')
-          *revision = atoi(minorString + period + 1);
-      } else {
-        *minor = atoi(minorString);
-        *revision = 0;
-      }
-      free(minorString);
-    }
-  }
-  UNPROTECT(3);
-  
-  return (*major >= 0 && *minor >= 0 && *revision >= 0) ? 0 : EPROTO;
-}
-

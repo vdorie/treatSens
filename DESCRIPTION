@@ -1,11 +1,22 @@
 Package: treatSens
 Version: 3.0
-Date: 2019-04-19
+Date: 2020-06-10
 Title: Sensitivity Analysis for Causal Inference
-Authors@R: c(person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = "carnegin@uwm.edu"),
-             person("Masataka",       "Harada", role = "aut",           email = "masatakaharada@gmail.com"),
-             person("Vincent",         "Dorie", role = "aut",           email = "vjd4@nyu.edu"),
-             person("Jennifer",         "Hill", role = "ctb",           email = "jennifer.hill@nyu.edu"))
+Authors@R: c(
+  person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = "carnegin@uwm.edu"),
+  person("Masataka", "Harada", role = "aut", email = "masatakaharada@gmail.com"),
+  person("Vincent", "Dorie", role = "aut", email = "vdorie@gmail.com", comment = c(ORCID = "0000-0002-9576-3064")),
+  person("Jennifer", "Hill", role = "ctb", email = "jennifer.hill@nyu.edu"),
+  person("R Core Team", role = "ctb", comment = "basis of RNG"),
+  person("Guido U", "Draheim", role = "ctb", comment = "ax_check_compile_flag.m4"),
+  person("Maarten", "Bosmans", role = "ctb", comment = "ax_check_compile_flag.m4"),
+  person("Christophe", "Tournayre", role = "ctb", comment = "ax_compiler_ext.m4, ax_ext.m4"),
+  person("Michael", "Petch", role = "ctb", comment = "ax_compiler_ext.m4, ax_ext.m4, ax_gcc_x86_avx_xgetbv.m4, ax_gcc_x86_cpuid.m4"),
+  person("Rafael", "de Lucena Valle", role = "ctb", comment = "ax_compiler_ext.m4, ax_ext.m4"),
+  person("Steven G.", "Johnson", role = "ctb", comment = c("ax_compiler_vendor.m4, ax_gcc_x86_cpuid.m4, ax_pthread.m4", ORCID = "0000-0001-7327-4967")),
+  person("Matteo", "Frigo", role = "ctb", comment = "ax_compiler_vendor.m4, ax_gcc_x86_cpuid.m4"),
+  person("John", "Zaitseff", role = "ctb", comment = "ax_compiler_vendor.m4"),
+  person("Daniel", "Richard G.", role = "ctb", comment = "ax_pthread.m4"))
 Depends:
     R (>= 3.3.0),
     methods

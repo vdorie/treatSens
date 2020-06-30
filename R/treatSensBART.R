@@ -263,7 +263,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   
   #######################
   #Call cibart sensitivity analysis
-  cat("Computing final grid...\n")
+  if (verbose) cat("Computing final grid...\n")
   
   control.sens <- cibartControl(n.sim       = nsim,
                                 n.burn.init = nburn,

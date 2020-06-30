@@ -1,13 +1,15 @@
 SSE2_FLAG=-msse2
 AVX_FLAG=-mavx
 
-PTHREAD_FLAGS=-pthread
-PKG_CPPFLAGS=-Iinclude
-PKG_LIBS=glm.a external.a misc.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) -lpthread
+PTHREAD_CPPFLAGS=$(SHLIB_PTHREAD_FLAGS)
+PTHREAD_LIBS=$(SHLIB_PTHREAD_FLAGS)
+
+PKG_CPPFLAGS=-Iinclude $(PTHREAD_CPPFLAGS)
+PKG_LIBS= glm.a external.a misc.a rc.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) $(PTHREAD_LIBS)
 
 MkInclude = $(R_HOME)/etc${R_ARCH}/Makeconf
 
-SUBDIRS = glm external misc
+SUBDIRS = glm external misc rc
 SUBLIBS = $(SUBDIRS:=.a)
 
 all: $(SHLIB)
@@ -25,6 +27,7 @@ sublibs:
 	done
 
 clean: subclean
+	@-rm -f ../inst/include/dbarts/types.hpp include/misc/types.h config.hpp
 	@-rm -rf .libs _libs
 	@-rm -f *.o $(SHLIB)
 

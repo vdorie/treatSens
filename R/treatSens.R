@@ -27,8 +27,8 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   matchedCall <- match.call()
   
   #this code let R issue warnings as they occur.
-  oldWarnings <- options()$warn
-  options(warn=1)
+  #oldWarnings <- options()$warn
+  #options(warn=1)
   
   #return error if sensitivity parameter type is illegal
   if (!(sensParam == "coef" | sensParam == "cor")){
@@ -417,7 +417,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   
   if(!is.null(core) && dp) parallel::stopCluster(cl)   # Stop using multicore.
   
-  options(warn = oldWarnings)
+  #options(warn = oldWarnings)
   
   return(result)
 }
