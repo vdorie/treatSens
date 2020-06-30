@@ -47,7 +47,6 @@ is.binary <- function(x) {
 ###
 
 parse.formula <- function(formula, resp.cov, data) {
-  
   allVarsRec <- function(object){
     if (is.list(object)) {
       unlist(lapply(object, allVarsRec))
@@ -71,7 +70,7 @@ parse.formula <- function(formula, resp.cov, data) {
     stop("Formula RHS empty")
   }
   else {
-    x <- model.matrix(mt, mf, contrasts)
+    x <- model.matrix(mt, mf)
   }
   
   #extract variables from formula & data

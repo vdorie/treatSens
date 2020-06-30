@@ -118,3 +118,4 @@ test_that("treatSens runs correctly with numerical zero.loc", {
   fit <- treatSens(testFormula, grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = 1 / 3) 
   expect_is(fit, "sensitivity")
 })
+
