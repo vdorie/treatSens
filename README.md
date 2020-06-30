@@ -21,5 +21,5 @@ install.packages("remotes")
 3. Run:
 
 ```R
-remotes::install_github("vdorie/dbarts")
+remotes::install_github("vdorie/treatSens")
 ```
