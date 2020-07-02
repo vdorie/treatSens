@@ -54,7 +54,7 @@ Unique options to \code{treatSens.BART} are given by the argument \code{trt.mode
 \itemize{
   \item \code{probitEM(maxBackstepIterations = 30L)} - uses glm to perform stochastic expectation maximization; backstep iterations are an internal parameter to glm.fit
   \item \code{probit(family = "cauchy", ...)} - family can be \code{"cauchy"}, \code{"t"}, \code{"normal"}, or \code{"flat"}. Additional options are, \code{scale = 4}, \code{c(df = 3, scale = 4)}, \code{scale = 4}, and none, respectively.
-  \item \code{bart(k = 2, ntree = 50, keepevery = 10)} - uses binary \code{\link{bart}} with the given parameters.
+  \item \code{bart(k = chi(1.25, Inf), ntree = 50, keepevery = 10)} - uses binary \code{\link{bart}} with the given parameters. By default the node sensitivity parameter, \code{k}, is given a chi hyperprior.
 }
 }
 \value{
