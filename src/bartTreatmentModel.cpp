@@ -4,6 +4,7 @@
 
 #include <new>
 #include <dbarts/cstdint.hpp>
+#include <math.h> // nan
 
 #include <dbarts/bartFit.hpp>
 #include <dbarts/control.hpp>
@@ -38,17 +39,19 @@ namespace cibart {
     void (*invalidateFit)(dbarts::BARTFit* fit);
     void (*setRNGState)(dbarts::BARTFit* fit, const void* const* uniformState, const void* const* normalState);
     dbarts::Results* (*runSampler)(dbarts::BARTFit* fit);
-    void (*setOffset)(dbarts::BARTFit* fit, const double* offset);
+    void (*setOffset)(dbarts::BARTFit* fit, const double* offset, bool updateScale);
     void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double);
     void (*invalidateCGMPrior)(dbarts::CGMPrior* prior);
-    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, double);
+    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, const dbarts::Model* model, double);
     void (*invalidateNormalPrior)(dbarts::NormalPrior* prior);
+    void (*initializeChiHyperprior)(dbarts::ChiHyperprior* prior, double, double);
+    void (*invalidateChiHyperprior)(dbarts::ChiHyperprior* prior);
     void (*initializeChiSquaredPrior)(dbarts::ChiSquaredPrior* prior, double, double);
     void (*invalidateChiSquaredPrior)(dbarts::ChiSquaredPrior* prior);
   };
   
-  BARTTreatmentModel::BARTTreatmentModel(voidPtrFunctionLookup lookup, size_t numTrees, size_t numThin, double nodePriorParameter) :
-    numTrees(numTrees), numThin(numThin), nodePriorParameter(nodePriorParameter)
+  BARTTreatmentModel::BARTTreatmentModel(voidPtrFunctionLookup lookup, size_t numTrees, size_t numThin, double nodePriorParameter, double scale) :
+    numTrees(numTrees), numThin(numThin), nodePriorParameter(nodePriorParameter), scale(scale)
   {
     predictorsIncludeIntercept = false;
     includesLatentVariables = false;
@@ -157,7 +160,7 @@ namespace {
     Scratch* scratch = static_cast<Scratch*>(scratchPtr);
     
         
-    functionTable.setOffset(scratch->bartFit, offset);
+    functionTable.setOffset(scratch->bartFit, offset, true);
     
     scratch->bartResults = functionTable.runSampler(scratch->bartFit);
     
@@ -195,11 +198,13 @@ namespace {
     functionTable->invalidateFit             = reinterpret_cast<void (*)(dbarts::BARTFit*)>(lookupFunction("dbarts", "invalidateFit"));
     functionTable->setRNGState               = reinterpret_cast<void (*)(dbarts::BARTFit*, const void* const* uniformState, const void* const* normalState)>(lookupFunction("dbarts", "setRNGState"));
     functionTable->runSampler                = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*)>(lookupFunction("dbarts", "runSampler"));
-    functionTable->setOffset                 = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*)>(lookupFunction("dbarts", "setOffset"));
+    functionTable->setOffset                 = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*, bool)>(lookupFunction("dbarts", "setOffset"));
     functionTable->initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double)>(lookupFunction("dbarts", "initializeCGMPriorFromOptions"));
     functionTable->invalidateCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*)>(lookupFunction("dbarts", "invalidateCGMPrior"));
-    functionTable->initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, double)>(lookupFunction("dbarts", "initializeNormalPriorFromOptions"));
+    functionTable->initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, const dbarts::Model*, double)>(lookupFunction("dbarts", "initializeNormalPriorFromOptions"));
     functionTable->invalidateNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*)>(lookupFunction("dbarts", "invalidateNormalPrior"));
+    functionTable->initializeChiHyperprior   = reinterpret_cast<void (*)(dbarts::ChiHyperprior*, double, double)>(lookupFunction("dbarts", "initializeChiHyperpriorFromOptions"));
+    functionTable->invalidateChiHyperprior   = reinterpret_cast<void (*)(dbarts::ChiHyperprior* prior)>(lookupFunction("dbarts", "invalidateChiHyperprior"));
     functionTable->initializeChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*, double, double)>(lookupFunction("dbarts", "initializeChiSquaredPriorFromOptions"));
     functionTable->invalidateChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*)>(lookupFunction("dbarts", "invalidateChiSquaredPrior"));
   }
@@ -259,7 +264,13 @@ namespace {
     functionTable.initializeCGMPrior(static_cast<dbarts::CGMPrior*>(bartModel->treePrior), DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
     
     bartModel->muPrior = static_cast<dbarts::NormalPrior*>(::operator new (sizeof(dbarts::NormalPrior)));
-    functionTable.initializeNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior), bartControl, model.nodePriorParameter);
+    if (isnan(model.scale)) {
+      functionTable.initializeNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior), bartControl, bartModel, model.nodePriorParameter);
+    } else {
+      functionTable.initializeNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior), bartControl, bartModel, 2);
+      bartModel->kPrior = static_cast<dbarts::ChiHyperprior*>(::operator new (sizeof(dbarts::ChiHyperprior)));
+      functionTable.initializeChiHyperprior(static_cast<dbarts::ChiHyperprior*>(bartModel->kPrior), model.nodePriorParameter, model.scale);
+    }
     
     bartModel->sigmaSqPrior = static_cast<dbarts::ChiSquaredPrior*>(::operator new (sizeof(dbarts::ChiSquaredPrior)));
     functionTable.initializeChiSquaredPrior(static_cast<dbarts::ChiSquaredPrior*>(bartModel->sigmaSqPrior), DBARTS_DEFAULT_CHISQ_PRIOR_DF, DBARTS_DEFAULT_CHISQ_PRIOR_QUANTILE);
@@ -274,6 +285,10 @@ namespace {
     functionTable.invalidateChiSquaredPrior(static_cast<dbarts::ChiSquaredPrior*>(bartModel->sigmaSqPrior));
     ::operator delete(bartModel->sigmaSqPrior);
     
+    if (!isnan(model.scale)) {
+      functionTable.invalidateChiHyperprior(static_cast<dbarts::ChiHyperprior*>(bartModel->kPrior));
+      ::operator delete(bartModel->kPrior);
+    }
     functionTable.invalidateNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior));
     ::operator delete(bartModel->muPrior);
     

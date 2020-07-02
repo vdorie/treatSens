@@ -138,8 +138,13 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
                       lapply(seq_len(ncol(X)), function(j) { m <- mean(X[,j]); s <- sd(X[,j]); c(m - 0.5 * s, m + 0.5 * s) })
                     else
                       list({ m <- mean(X); s <- sd(X); c(m - 0.5 * s, m + 0.5 * s) })
-      null.bart <- pdbart(X, Z, levs = diffLevels, pl = FALSE, verbose = FALSE,
-                          k = trt.model$k, ntree = trt.model$ntree, nskip = nburn, ndpost = nsim)
+      if (is.numeric(trt.model$k)) {
+        null.bart <- pdbart(X, Z, levs = diffLevels, pl = FALSE, verbose = FALSE,
+                            k = trt.model$k, ntree = trt.model$ntree, nskip = nburn, ndpost = nsim)
+      } else {
+        null.bart <- pdbart(X, Z, levs = diffLevels, pl = FALSE, verbose = FALSE,
+                            k = chi(trt.model$k$degreesOfFreedom, trt.model$k$scale), ntree = trt.model$ntree, nskip = nburn, ndpost = nsim)
+      }
       null.trt  <- list(fitted.values = apply(pnorm(null.bart$yhat.train), 2, mean),
                         coef = c(NA_real_, sapply(null.bart$fd, function(pd) mean(apply(pd, 1, diff)))))
     } else {

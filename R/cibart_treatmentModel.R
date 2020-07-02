@@ -3,12 +3,53 @@ probitEM <- function(maxBackstepIterations = 30L) {
   structure(namedList(maxIter = maxBackstepIterations), class = "probitEMTreatmentModel")
 }
 
-bart <- function(k = 2, ntree = 50, keepevery = 10)
+bart <- function(k = chi(1.25, Inf), ntree = 50, keepevery = 10)
 {
-  if (k <= 0.0 || ntree <= 0 || keepevery <= 0)
-    stop('illegal binary bart option')
+  matchedCall <- match.call()
+  evalEnv <- new.env(parent = parent.frame())
+  evalEnv$chi <- function(degreesOfFreedom = 1.25, scale = Inf) namedList(degreesOfFreedom, scale)
   
-  structure(namedList(k = as.double(k), ntree = as.integer(ntree), keepevery = as.integer(keepevery)),
+  if (!is.null(matchedCall[["k"]])) {
+    kExpr <- matchedCall[["k"]]
+    for (i in seq_len(2L)) {
+      if (is.numeric(kExpr) || (is.list(kExpr) && length(kExpr) == 2L && all(names(kExpr) %in% c("degreesOfFreedom", "scale"))))
+        break
+      
+      if (is.character(kExpr)) {
+        if (startsWith(kExpr, "chi")) {
+          kExpr <- parse(text = kExpr)[[1L]]
+          if (!is.call(kExpr))
+            kExpr <- call(as.character(kExpr))
+        }
+        else kExpr <- coerceOrError(kExpr, "double")
+      }
+      if (is.symbol(kExpr) && !is.call(kExpr) && startsWith(as.character(kExpr), "chi"))
+        kExpr <- call(as.character(kExpr))
+      
+      # the below evaluation might only lead to a lookup, in which case we have to do an
+      # additional level of casting/eval
+      kExpr <- eval(kExpr, evalEnv)
+    }
+    k <- kExpr
+  } else {
+    k <- eval(formals()[["k"]], evalEnv)
+  }
+
+  
+  if (ntree <= 0)
+    stop('illegal bart treatment model: ntree must be > 0')
+  if (keepevery <= 0)
+    stop('illegal bart treatment model: keepevery must be > 0')
+  if (is.numeric(k) && k <= 0)
+    stop('illegal bart treatment model: k must be > 0')
+  else {
+    if (k$degreesOfFreedom < 0)
+      stop('illegal bart treatment model: degreesOfFreedom for k must be >= 0')
+    if (k$scale < 0) 
+      stop('illegal bart treatment model: scale for k must be >= 0')
+  }
+  
+  structure(namedList(k, ntree = as.integer(ntree), keepevery = as.integer(keepevery)),
             class = "bartTreatmentModel")
 }
 

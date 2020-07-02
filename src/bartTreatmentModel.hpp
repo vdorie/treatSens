@@ -19,10 +19,11 @@ namespace cibart {
     std::size_t numThin;
     
     double nodePriorParameter;
+    double scale;
     
     BARTTreatmentModelFunctionTable* functionTable;
     
-    BARTTreatmentModel(voidPtrFunctionLookup lookup, std::size_t numTrees, std::size_t numThin, double nodePriorParameter);
+    BARTTreatmentModel(voidPtrFunctionLookup lookup, std::size_t numTrees, std::size_t numThin, double nodePriorParameter, double scale);
     ~BARTTreatmentModel();
   };
 }

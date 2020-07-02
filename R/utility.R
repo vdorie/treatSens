@@ -1,3 +1,16 @@
+coerceOrError <- function(x, type)
+{
+  mc <- match.call()
+  
+  if (is.null(x)) stop("'", mc[[2L]], "' cannot be NULL")
+  
+  func <- switch(type, logical = as.logical, integer = as.integer, numeric = as.numeric, double = as.double)
+  result <- tryCatch(func(x), warning = function(e) e)
+  if (is(result, "warning")) stop("'", mc[[2L]], "' must be coercible to type: ", type)
+  
+  result
+}
+
 ## from lme4
 namedList <- function(...) {
   result <- list(...)

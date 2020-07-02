@@ -4,6 +4,7 @@
 #include <dbarts/cstdint.hpp>
 #include <cstdlib> // malloc, free for PoDs
 #include <cstring>
+#include <math.h> // nan
 
 #include <R.h>
 #include <Rdefines.h>
@@ -90,11 +91,19 @@ namespace {
     if (strcmp(className, "bartTreatmentModel") == 0) {
       *modelType = BART;
       
-      double nodePriorParameter = REAL(getListElement(modelExpr, "k"))[0];
+      SEXP kExpr = getListElement(modelExpr, "k");
+      double nodePriorParameter;
+      double scale = nan("");
+      if (Rf_isReal(kExpr)) {
+        nodePriorParameter = REAL(kExpr)[0];
+      } else { 
+        nodePriorParameter = REAL(getListElement(kExpr, "degreesOfFreedom"))[0];
+        scale = REAL(getListElement(kExpr, "scale"))[0];
+      }
       size_t numTrees = static_cast<size_t>(INTEGER(getListElement(modelExpr, "ntree"))[0]);
       size_t numThin  = static_cast<size_t>(INTEGER(getListElement(modelExpr, "keepevery"))[0]);
      
-      return new cibart::BARTTreatmentModel(&R_GetCCallable, numTrees, numThin, nodePriorParameter);
+      return new cibart::BARTTreatmentModel(&R_GetCCallable, numTrees, numThin, nodePriorParameter, scale);
     }
     
     error("unrecognized treatment model: '%s'", className);
