@@ -39,13 +39,20 @@ test_that("treatSens runs correctly on example data", {
   expect_is(fit.bin, "sensitivity")
 })
 
-test_that("treatSens.BART fits basic example", {
+test_that("treatSens.BART fits basic example with probitEM", {
   # sensitivity analysis
   out.bin <- treatSens.BART(Y ~ Z + X, trt.model = probitEM, nsim = 3, nburn = 0,
                             spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
                             standardize = FALSE)
   expect_is(out.bin, "sensitivity")
+})
 
+test_that("treatSens.BART fits basic example with bart treatment model", {
+  # sensitivity analysis
+  out.bin <- treatSens.BART(Y ~ Z + X, trt.model = bart, nsim = 3, nburn = 0,
+                            spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
+                            standardize = FALSE)
+  expect_is(out.bin, "sensitivity")
 })
 
 test_that("treatSens fails with an invalid number of iterations", {
