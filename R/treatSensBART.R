@@ -142,6 +142,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
         null.bart <- pdbart(X, Z, levs = diffLevels, pl = FALSE, verbose = FALSE,
                             k = trt.model$k, ntree = trt.model$ntree, nskip = nburn, ndpost = nsim)
       } else {
+        chi <- function(...) invisible(NULL) # R CMD check
         null.bart <- pdbart(X, Z, levs = diffLevels, pl = FALSE, verbose = FALSE,
                             k = chi(trt.model$k$degreesOfFreedom, trt.model$k$scale), ntree = trt.model$ntree, nskip = nburn, ndpost = nsim)
       }

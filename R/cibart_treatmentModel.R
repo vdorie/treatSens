@@ -3,6 +3,7 @@ probitEM <- function(maxBackstepIterations = 30L) {
   structure(namedList(maxIter = maxBackstepIterations), class = "probitEMTreatmentModel")
 }
 
+chi <- function(...) invisible(NULL) # R CMD check
 bart <- function(k = chi(1.25, Inf), ntree = 50, keepevery = 10)
 {
   matchedCall <- match.call()
