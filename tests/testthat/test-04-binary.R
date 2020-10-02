@@ -48,8 +48,7 @@ test_that("treatSens.BART fits basic example with probitEM", {
 })
 
 test_that("treatSens.BART fits basic example with bart treatment model", {
-  # sensitivity analysis
-  out.bin <- treatSens.BART(Y ~ Z + X, trt.model = bart, nsim = 3, nburn = 0,
+  out.bin <- treatSens.BART(Y ~ Z + X, trt.model = bart, nsim = 3, nburn = 1,
                             spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
                             standardize = FALSE)
   expect_is(out.bin, "sensitivity")

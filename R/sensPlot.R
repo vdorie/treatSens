@@ -50,31 +50,34 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   ##############  
   #######Only include X on the plot for GLM-style
   ############
-  Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
-  Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
-  if(!is.null(Xpart) & is.null(dim(Xpart))){
-    Xpart = matrix(Xpart, nrow = 1)
-    Xpart.plot = matrix(Xpart.plot, nrow = 1)
-  
-  } 
-  
-  Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,2)) #MH: add sign of coef of X on Y to Xpart  
-  if(!is.null(Xpart.plot2) & is.null(dim(Xpart.plot2))){
-    Xpart.plot2 = matrix(Xpart.plot2, nrow = 1)
-  } 
+  Xpart <- NULL
+  if (!is.null(x$Xcoef)) {
+    Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
+    Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
+    if (!is.null(Xpart) & is.null(dim(Xpart))){
+      Xpart = matrix(Xpart, nrow = 1)
+      Xpart.plot = matrix(Xpart.plot, nrow = 1)
+    }
     
-  #note that due to correlation among Xs, some may not appear on plot
-  #because observed partial cors don't map directly to coefs in this case
-  #forcing inclusion can lead to difficult to read plot.  
-  if(is.null(X.pch)){
-    out.pch = 1
-    X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
-  }else{
-    out.pch = X.pch[3]
-    X.pch = ifelse(Xpart[,2]>=0,X.pch[1],X.pch[2])	
-  }
-  if (any(Xpart[,2]<0)) {
-    cat("Note: Predictors with negative coefficients for the response surface have been transformed through multiplication by -1 and are displayed as inverted triangles.", "\n")    
+    Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,2)) #MH: add sign of coef of X on Y to Xpart  
+    if(!is.null(Xpart.plot2) & is.null(dim(Xpart.plot2))){
+      Xpart.plot2 = matrix(Xpart.plot2, nrow = 1)
+    }
+  
+    
+    #note that due to correlation among Xs, some may not appear on plot
+    #because observed partial cors don't map directly to coefs in this case
+    #forcing inclusion can lead to difficult to read plot.  
+    if(is.null(X.pch)){
+      out.pch = 1
+      X.pch = ifelse(Xpart[,2]>=0,3,6) # plus sign for non-transformed plots, reverse triangle for transformed plots
+    } else{
+      out.pch = X.pch[3]
+      X.pch = ifelse(Xpart[,2]>=0,X.pch[1],X.pch[2])	
+    }
+    if (any(Xpart[,2]<0)) {
+      cat("Note: Predictors with negative coefficients for the response surface have been transformed through multiplication by -1 and are displayed as inverted triangles.", "\n")    
+    }
   }
     
   
@@ -112,36 +115,41 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
     ylab = expression(paste("Coef. on U in model for response, ", zeta^y))
   }
   
-  if (limit.Xplot) {
-    #old codes
-    plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[Xpart.plot2[,3]], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
-         ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)), pch = X.pch, xlab = xlab, ylab = ylab)
-    outsidePts = Xpart.plot2[(Xpart.plot[,1] < min(Zcors, na.rm = T)) | (Xpart.plot[,1] > max(Zcors, na.rm = T)) | (Xpart.plot[,2] > max(Ycors, na.rm = T)),]
-    if(length(outsidePts) > 0){
-      if(is.null(dim(outsidePts))){
-        outsidePts[1] = max(outsidePts[1], min(Zcors, na.rm = T))
-        outsidePts[1] = min(outsidePts[1], max(Zcors, na.rm = T))
-        outsidePts[2] = min(outsidePts[2], max(Ycors, na.rm = T))
-        outsidePts = matrix(outsidePts, nrow = 1)
-      }else{
-        outsidePts[,1] = apply(cbind(outsidePts[,1], min(Zcors, na.rm = T)), 1, max)
-        outsidePts[,1] = apply(cbind(outsidePts[,1], max(Zcors, na.rm = T)), 1, min)
-        outsidePts[,2] = apply(cbind(outsidePts[,2], max(Ycors, na.rm = T)), 1, min)
+  if (!is.null(Xpart)) {
+    if (limit.Xplot) {
+      #old codes
+      plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[Xpart.plot2[,3]], xlim = c(min(Zcors, na.rm = T),max(Zcors, na.rm = T)), 
+           ylim = c(min(Ycors, na.rm = T),max(Ycors, na.rm = T)), pch = X.pch, xlab = xlab, ylab = ylab)
+      outsidePts = Xpart.plot2[(Xpart.plot[,1] < min(Zcors, na.rm = T)) | (Xpart.plot[,1] > max(Zcors, na.rm = T)) | (Xpart.plot[,2] > max(Ycors, na.rm = T)),]
+      if(length(outsidePts) > 0){
+        if(is.null(dim(outsidePts))){
+          outsidePts[1] = max(outsidePts[1], min(Zcors, na.rm = T))
+          outsidePts[1] = min(outsidePts[1], max(Zcors, na.rm = T))
+          outsidePts[2] = min(outsidePts[2], max(Ycors, na.rm = T))
+          outsidePts = matrix(outsidePts, nrow = 1)
+        }else{
+          outsidePts[,1] = apply(cbind(outsidePts[,1], min(Zcors, na.rm = T)), 1, max)
+          outsidePts[,1] = apply(cbind(outsidePts[,1], max(Zcors, na.rm = T)), 1, min)
+          outsidePts[,2] = apply(cbind(outsidePts[,2], max(Ycors, na.rm = T)), 1, min)
+        }
+        points(outsidePts[,1], outsidePts[,2], col=c("red","blue")[outsidePts[,3]], pch = out.pch, cex = 1.5, lwd = 3)
+        warning("Note: predictors outside plot region plotted at margin with O")
       }
-      points(outsidePts[,1], outsidePts[,2], col=c("red","blue")[outsidePts[,3]], pch = out.pch, cex = 1.5, lwd = 3)
-      warning("Note: predictors outside plot region plotted at margin with O")
+    } else {
+      #MH: define max, min of plots
+      xplot.min = ifelse(min(Zcors, na.rm = T)<min(Xpart.plot[,1]),min(Zcors, na.rm = T),min(Xpart.plot[,1]))
+      xplot.max = ifelse(max(Zcors, na.rm = T)>max(Xpart.plot[,1]),max(Zcors, na.rm = T),max(Xpart.plot[,1]))
+      yplot.max = ifelse(max(Ycors, na.rm = T)>max(Xpart.plot[,2]),max(Ycors, na.rm = T),max(Xpart.plot[,2]))  
+      plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(xplot.min,xplot.max),
+           ylim = c(0,yplot.max), pch = X.pch, xlab = xlab, ylab = ylab)
     }
   } else {
-    #MH: define max, min of plots
-    xplot.min = ifelse(min(Zcors, na.rm = T)<min(Xpart.plot[,1]),min(Zcors, na.rm = T),min(Xpart.plot[,1]))
-    xplot.max = ifelse(max(Zcors, na.rm = T)>max(Xpart.plot[,1]),max(Zcors, na.rm = T),max(Xpart.plot[,1]))
-    yplot.max = ifelse(max(Ycors, na.rm = T)>max(Xpart.plot[,2]),max(Ycors, na.rm = T),max(Xpart.plot[,2]))  
-    plot(Xpart.plot2[,1], Xpart.plot2[,2], col=c("red","blue")[as.factor(Xpart.plot2[,3])], xlim = c(xplot.min,xplot.max),
-         ylim = c(0,yplot.max), pch = X.pch, xlab = xlab, ylab = ylab)
+    plot(NULL, type = "n", xlim = range(Zcors, na.rm = TRUE), ylim = c(0, max(Ycors, na.rm = TRUE)),
+         xlab = xlab, ylab = ylab)
   }
   
   #codes for txtlab
-  if (txtlab) {
+  if (txtlab && !is.null(Xpart)) {
     if (is.null(which.txtlab)) { #show all text label
       text(Xpart.plot2[,1], Xpart.plot2[,2], labels=x$varnames[-c(1,2)], cex=labcex, pos=1)
     } else { #show selected label
@@ -172,43 +180,45 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
           levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = col.insig,
           lty = lty.insig, labcex = labcex, lwd = 2,...)
   
-  if (all(sign(Xpart[,1])!=sign(x$tau0))){
-     warning("Cannot add data line because XXXXX.")
-  }else{
-     if(data.line & length(Xpart)>1){
-      proj.pts = apply(Xpart.plot^2, 1, mean)
-      max.pt = Xpart.plot[proj.pts == max(proj.pts),]
-      max.pt[1] = sign(x$tau0)*abs(max.pt[1])
-      Zdiff = (Zcors-max.pt[1])*sign(max.pt[1])
-      Zgrt = which(Zdiff < 0)
-      zcor = Zgrt[which(Zdiff[Zgrt] == max(Zdiff[Zgrt]))]  
-      if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ 
-        zpts = c(zcor-1, zcor)
-      }else{
-        zpts = c(zcor, zcor+1)
-      }
-      Ydiff = Ycors-max.pt[2]
-      Ygrt = which(Ydiff < 0)
-      ycor = Ygrt[which(Ydiff[Ygrt] == max(Ydiff[Ygrt]))]
-      if((Ycors[ycor] > max.pt[2] & ycor > 1)||(ycor==length(Ycors))){ 
-        ypts = c(ycor-1, ycor)
-      }else{
-        ypts = c(ycor, ycor+1)
-      }
-      clevel = ((Zcors[zpts[2]] - Zcors[zpts[1]])*(Ycors[ypts[2]] - Ycors[ypts[1]]))^(-1)*
-          sum(taus[zpts, ypts]*
-                matrix(c(-(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]), 
-                         (Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]),
-                         (Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2]),
-                         -(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
-                       nrow = 2, byrow = T))
-      contour(Zcors, Ycors, taus, levels = round(clevel,2),
-                add = T, col = "grey",labcex = labcex, lwd = 2,...)
-      }else{
-        if(data.line)
-          warning("Cannot add data line because there are no non-treatment covariates.")
+  if (!is.null(Xpart)) {
+    if (all(sign(Xpart[,1])!=sign(x$tau0))){
+       warning("Cannot add data line because XXXXX.")
+    }else{
+       if (data.line & length(Xpart)>1){
+        proj.pts = apply(Xpart.plot^2, 1, mean)
+        max.pt = Xpart.plot[proj.pts == max(proj.pts),]
+        max.pt[1] = sign(x$tau0)*abs(max.pt[1])
+        Zdiff = (Zcors-max.pt[1])*sign(max.pt[1])
+        Zgrt = which(Zdiff < 0)
+        zcor = Zgrt[which(Zdiff[Zgrt] == max(Zdiff[Zgrt]))]  
+        if((Zcors[zcor] > max.pt[1] & zcor > 1)||(zcor==length(Zcors))){ 
+          zpts = c(zcor-1, zcor)
+        }else{
+          zpts = c(zcor, zcor+1)
+        }
+        Ydiff = Ycors-max.pt[2]
+        Ygrt = which(Ydiff < 0)
+        ycor = Ygrt[which(Ydiff[Ygrt] == max(Ydiff[Ygrt]))]
+        if((Ycors[ycor] > max.pt[2] & ycor > 1)||(ycor==length(Ycors))){ 
+          ypts = c(ycor-1, ycor)
+        }else{
+          ypts = c(ycor, ycor+1)
+        }
+        clevel = ((Zcors[zpts[2]] - Zcors[zpts[1]])*(Ycors[ypts[2]] - Ycors[ypts[1]]))^(-1)*
+            sum(taus[zpts, ypts]*
+                  matrix(c(-(Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]), 
+                           (Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[1]] - max.pt[2]),
+                           (Zcors[zpts[2]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2]),
+                           -(Zcors[zpts[1]] - max.pt[1])*(Ycors[ypts[2]] - max.pt[2])), 
+                         nrow = 2, byrow = T))
+        contour(Zcors, Ycors, taus, levels = round(clevel,2),
+                  add = T, col = "grey",labcex = labcex, lwd = 2,...)
+      } else{
+          if(data.line)
+            warning("Cannot add data line because there are no non-treatment covariates.")
       }
     }
+  }
 }
 
 

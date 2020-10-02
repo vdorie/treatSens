@@ -264,7 +264,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     warning("buffer is set to 0 because some of residual variances are too small")
   }
    
-  
+  Xcoef.plot <- NULL
   if(!is.null(X) & sensParam == "coef") {
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
