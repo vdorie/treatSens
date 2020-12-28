@@ -4,7 +4,7 @@ guessNumCores <- function(logical = FALSE) {
   if (is.na(logical)) stop("logical cannot be NA")
   if (length(logical) != 1) stop("logical must be length 1")
   
-  cGuess <- .Call(C_dbarts_guessNumCores)
+  cGuess <- .Call("treatSens_guessNumCores")
   if (logical == FALSE && !is.na(cGuess[1])) return(cGuess[1])
   if (logical == TRUE  && !is.na(cGuess[2])) return(cGuess[2])
 
