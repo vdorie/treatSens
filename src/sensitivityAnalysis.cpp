@@ -73,8 +73,10 @@ namespace {
     void (*setResponse)(dbarts::BARTFit* fit, const double* newResponse);
     void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double);
     void (*invalidateCGMPrior)(dbarts::CGMPrior* prior);
-    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, const dbarts::Model* model, double);
+    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, const dbarts::Model* model);
     void (*invalidateNormalPrior)(dbarts::NormalPrior* prior);
+    void (*initializeFixedHyperprior)(dbarts::FixedHyperprior* prior, double);
+    void (*invalidateFixedHyperprior)(dbarts::FixedHyperprior* prior);
     void (*initializeChiSquaredPrior)(dbarts::ChiSquaredPrior* prior, double, double);
     void (*invalidateChiSquaredPrior)(dbarts::ChiSquaredPrior* prior);
   };
@@ -389,7 +391,10 @@ extern "C" {
     control.initializeCGMPrior(treePrior, DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
     
     dbarts::NormalPrior* muPrior = misc_stackAllocate(1, dbarts::NormalPrior);
-    control.initializeNormalPrior(muPrior, &bartControl, &bartModel, DBARTS_DEFAULT_NORMAL_PRIOR_K);
+    control.initializeNormalPrior(muPrior, &bartControl, &bartModel);
+    
+    dbarts::FixedHyperprior *kPrior = misc_stackAllocate(1, dbarts::FixedHyperprior);
+    control.initializeFixedHyperprior(kPrior, DBARTS_DEFAULT_NORMAL_PRIOR_K);
     
     dbarts::ChiSquaredPrior* sigmaSqPrior = misc_stackAllocate(1, dbarts::ChiSquaredPrior);
     control.initializeChiSquaredPrior(sigmaSqPrior, DBARTS_DEFAULT_CHISQ_PRIOR_DF, DBARTS_DEFAULT_CHISQ_PRIOR_QUANTILE);
@@ -397,6 +402,7 @@ extern "C" {
     bartModel.treePrior = treePrior;
     bartModel.muPrior = muPrior;
     bartModel.sigmaSqPrior = sigmaSqPrior;
+    bartModel.kPrior = kPrior;
     
     CallbackData callbackData = { control, data, scratch, gridCells[0].zetaY, gridCells[0].zetaZ };
     bartControl.callback = control.treatmentModel.includesLatentVariables? &bartCallbackFunctionForLatents : &bartCallbackFunction;
@@ -718,8 +724,10 @@ namespace {
     control.setResponse               = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*)>(R_GetCCallable("dbarts", "setResponse"));
     control.initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double)>(R_GetCCallable("dbarts", "initializeCGMPriorFromOptions"));
     control.invalidateCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*)>(R_GetCCallable("dbarts", "invalidateCGMPrior"));
-    control.initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, const dbarts::Model*, double)>(R_GetCCallable("dbarts", "initializeNormalPriorFromOptions"));
+    control.initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, const dbarts::Model*)>(R_GetCCallable("dbarts", "initializeNormalPriorFromOptions"));
     control.invalidateNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*)>(R_GetCCallable("dbarts", "invalidateNormalPrior"));
+    control.initializeFixedHyperprior = reinterpret_cast<void (*)(dbarts::FixedHyperprior*, double)>(R_GetCCallable("dbarts", "initializeFixedHyperpriorFromOptions"));
+    control.invalidateFixedHyperprior = reinterpret_cast<void (*)(dbarts::FixedHyperprior*)>(R_GetCCallable("dbarts", "invalidateFixedHyperprior"));
     control.initializeChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*, double, double)>(R_GetCCallable("dbarts", "initializeChiSquaredPriorFromOptions"));
     control.invalidateChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*)>(R_GetCCallable("dbarts", "invalidateChiSquaredPrior"));
   }
