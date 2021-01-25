@@ -42,10 +42,12 @@ namespace cibart {
     void (*setOffset)(dbarts::BARTFit* fit, const double* offset, bool updateScale);
     void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double);
     void (*invalidateCGMPrior)(dbarts::CGMPrior* prior);
-    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, const dbarts::Model* model, double);
+    void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, const dbarts::Model* model);
     void (*invalidateNormalPrior)(dbarts::NormalPrior* prior);
     void (*initializeChiHyperprior)(dbarts::ChiHyperprior* prior, double, double);
     void (*invalidateChiHyperprior)(dbarts::ChiHyperprior* prior);
+    void (*initializeFixedHyperprior)(dbarts::FixedHyperprior* prior, double);
+    void (*invalidateFixedHyperprior)(dbarts::FixedHyperprior* prior);
     void (*initializeChiSquaredPrior)(dbarts::ChiSquaredPrior* prior, double, double);
     void (*invalidateChiSquaredPrior)(dbarts::ChiSquaredPrior* prior);
   };
@@ -201,10 +203,12 @@ namespace {
     functionTable->setOffset                 = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*, bool)>(lookupFunction("dbarts", "setOffset"));
     functionTable->initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double)>(lookupFunction("dbarts", "initializeCGMPriorFromOptions"));
     functionTable->invalidateCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*)>(lookupFunction("dbarts", "invalidateCGMPrior"));
-    functionTable->initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, const dbarts::Model*, double)>(lookupFunction("dbarts", "initializeNormalPriorFromOptions"));
+    functionTable->initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, const dbarts::Model*)>(lookupFunction("dbarts", "initializeNormalPriorFromOptions"));
     functionTable->invalidateNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*)>(lookupFunction("dbarts", "invalidateNormalPrior"));
     functionTable->initializeChiHyperprior   = reinterpret_cast<void (*)(dbarts::ChiHyperprior*, double, double)>(lookupFunction("dbarts", "initializeChiHyperpriorFromOptions"));
     functionTable->invalidateChiHyperprior   = reinterpret_cast<void (*)(dbarts::ChiHyperprior* prior)>(lookupFunction("dbarts", "invalidateChiHyperprior"));
+    functionTable->initializeFixedHyperprior   = reinterpret_cast<void (*)(dbarts::FixedHyperprior*, double)>(lookupFunction("dbarts", "initializeChiHyperpriorFromOptions"));
+    functionTable->invalidateFixedHyperprior   = reinterpret_cast<void (*)(dbarts::FixedHyperprior* prior)>(lookupFunction("dbarts", "invalidateFixedHyperprior"));
     functionTable->initializeChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*, double, double)>(lookupFunction("dbarts", "initializeChiSquaredPriorFromOptions"));
     functionTable->invalidateChiSquaredPrior = reinterpret_cast<void (*)(dbarts::ChiSquaredPrior*)>(lookupFunction("dbarts", "invalidateChiSquaredPrior"));
   }
@@ -264,10 +268,11 @@ namespace {
     functionTable.initializeCGMPrior(static_cast<dbarts::CGMPrior*>(bartModel->treePrior), DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
     
     bartModel->muPrior = static_cast<dbarts::NormalPrior*>(::operator new (sizeof(dbarts::NormalPrior)));
+    functionTable.initializeNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior), bartControl, bartModel);
     if (isnan(model.scale)) {
-      functionTable.initializeNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior), bartControl, bartModel, model.nodePriorParameter);
+      bartModel->kPrior = static_cast<dbarts::FixedHyperprior*>(::operator new (sizeof(dbarts::FixedHyperprior)));
+      functionTable.initializeFixedHyperprior(static_cast<dbarts::FixedHyperprior*>(bartModel->kPrior), model.nodePriorParameter);
     } else {
-      functionTable.initializeNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior), bartControl, bartModel, 2);
       bartModel->kPrior = static_cast<dbarts::ChiHyperprior*>(::operator new (sizeof(dbarts::ChiHyperprior)));
       functionTable.initializeChiHyperprior(static_cast<dbarts::ChiHyperprior*>(bartModel->kPrior), model.nodePriorParameter, model.scale);
     }
@@ -285,10 +290,13 @@ namespace {
     functionTable.invalidateChiSquaredPrior(static_cast<dbarts::ChiSquaredPrior*>(bartModel->sigmaSqPrior));
     ::operator delete(bartModel->sigmaSqPrior);
     
-    if (!isnan(model.scale)) {
+    if (isnan(model.scale)) {
+      functionTable.invalidateFixedHyperprior(static_cast<dbarts::FixedHyperprior*>(bartModel->kPrior));
+    } else {
       functionTable.invalidateChiHyperprior(static_cast<dbarts::ChiHyperprior*>(bartModel->kPrior));
-      ::operator delete(bartModel->kPrior);
     }
+    ::operator delete(bartModel->kPrior);
+    
     functionTable.invalidateNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior));
     ::operator delete(bartModel->muPrior);
     
