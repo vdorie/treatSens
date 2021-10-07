@@ -4,7 +4,8 @@
 #
 # DESCRIPTION
 #
-#   Checks compiler for support for SIMD extensions.#
+#   Checks compiler for support for SIMD extensions.
+#
 #   This macro calls:
 #
 #     AC_SUBST(SSE2_FLAGS)
@@ -29,7 +30,7 @@
 #   and this notice are preserved. This file is offered as-is, without any
 #   warranty.
 
-#serial 18
+#serial 1
 
 AC_SUBST(SSE2_FLAG)
 AC_SUBST(SSE4_1_FLAG)
@@ -63,10 +64,14 @@ AC_DEFUN([AX_COMPILER_EXT],
       ])
       AC_CHECK_HEADER("immintrin.h",[
         ax_cv_support_avx_ext=yes
-        ax_cv_support_avx2_ext=yes
         AVX_FLAG="-xarch=avx"
-        AVX2_FLAG="-xarch=avx2"
       ])
+      if test x$"ax_cv_support_avx_ext" = x"yes"; then
+        AX_CHECK_COMPILE_FLAG("-xarch=avx2",[
+          ax_cv_support_avx2_ext=yes
+          AVX2_FLAG="-xarch=avx2"
+        ])
+      fi
       ;;
     
     *)
@@ -97,7 +102,7 @@ AC_DEFUN([AX_COMPILER_EXT],
     esac
   ;;
   esac
-        
+  
   if test x"$ax_cv_support_sse2_ext" = x"yes"; then
     AC_DEFINE(HAVE_SSE2,1,[Support SSE2 (Streaming SIMD Extensions 2) instructions])
   fi

@@ -18,13 +18,17 @@
 #  include <time.h>
 #endif
 
-// #include <R.h>
-// #include <Rdefines.h>
-// #include <Rinternals.h>
-// #include <Rmath.h>
+
+#include <Rversion.h>
+
+#if R_VERSION >= R_Version(3, 6, 2)
+#define USE_FC_LEN_T
+#endif
+
 #include <R_ext/Rdynload.h>
 
-// #include <external/Rinternals.h> // SEXP
+#undef USE_FC_LEN_T
+
 
 #include <misc/alloca.h>
 #include <misc/linearAlgebra.h>
@@ -194,7 +198,8 @@ namespace cibart {
                          bool verbose)
   {
     Control control = { estimand, treatmentModel, numSimsPerCell, numInitialBurnIn, numCellSwitchBurnIn,
-                        numTreeSamplesToThin, numThreads, theta, verbose, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                        numTreeSamplesToThin, numThreads, theta, verbose,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       
     lookupBARTFunctions(control);
     
