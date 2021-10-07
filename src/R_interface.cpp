@@ -6,9 +6,21 @@
 #include <cstring>
 #include <math.h> // nan
 
-#include <R.h>
+
+// R headers
+#include <external/R.h>
+
+#include <Rversion.h>
+
+#if R_VERSION >= R_Version(3, 6, 2)
+#define USE_FC_LEN_T
+#endif
+
 #include <Rdefines.h>
 #include <R_ext/Rdynload.h>
+
+#undef USE_FC_LEN_T
+
 
 #include "sensitivityAnalysis.hpp"
 #include "guessNumCores.hpp"
@@ -28,10 +40,6 @@ using std::size_t;
 using std::uint32_t;
 using std::strcmp;
 
-extern "C" {
-  // void R_init_treatSens(DllInfo* info);
-}
-
 namespace {
   SEXP getListElement(SEXP list, const char *str);
     
@@ -44,7 +52,7 @@ namespace {
   cibart::TreatmentModel* createTreatmentModel(SEXP modelExpr, TreatmentModelType* modelType)
   {
     SEXP classExpr = GET_CLASS(modelExpr);
-    if (isNull(classExpr) || !IS_CHARACTER(classExpr)) error("treatment model not of appropriate class");
+    if (isNull(classExpr) || !IS_CHARACTER(classExpr)) Rf_error("treatment model not of appropriate class");
     
     const char* className = CHAR(STRING_ELT(classExpr, 0));
     if (strcmp(className, "probitEMTreatmentModel") == 0) {
@@ -56,7 +64,7 @@ namespace {
       *modelType = PROBIT;
       
       SEXP familyExpr = getListElement(modelExpr, "family");
-      if (isNull(familyExpr) || !IS_CHARACTER(familyExpr)) error("probit treatment model lacks family attribute");
+      if (isNull(familyExpr) || !IS_CHARACTER(familyExpr)) Rf_error("probit treatment model lacks family attribute");
       
       cibart::ProbitPriorType family;
       const char* familyName = CHAR(STRING_ELT(familyExpr, 0));
@@ -66,7 +74,7 @@ namespace {
         family = cibart::PROBIT_PRIOR_NORMAL;
       } else if (strcmp(familyName, "flat") == 0) {
         family = cibart::PROBIT_PRIOR_FLAT;
-      } else error("unrecognized probit treatment model family: '%s'", familyName);
+      } else Rf_error("unrecognized probit treatment model family: '%s'", familyName);
       
       cibart::ProbitPrior* prior = NULL;
       switch(family) {
@@ -106,7 +114,7 @@ namespace {
       return new cibart::BARTTreatmentModel(&R_GetCCallable, numTrees, numThin, nodePriorParameter, scale);
     }
     
-    error("unrecognized treatment model: '%s'", className);
+    Rf_error("unrecognized treatment model: '%s'", className);
   }
   
   void destroyTreatmentModel(cibart::TreatmentModel* treatmentModelPtr, TreatmentModelType modelType)
@@ -136,7 +144,7 @@ namespace {
     double* yPtr = NULL;
     size_t numObs = static_cast<size_t>(XLENGTH(y));
     if (!isReal(y)) {
-      if (!isInteger(y)) error("y must be of type real or integer");
+      if (!isInteger(y)) Rf_error("y must be of type real or integer");
       yPtr = new double[numObs];
       int* yInt = INTEGER(y);
       
@@ -144,32 +152,32 @@ namespace {
         yPtr[i] = (yInt[i] != 0.0 ? 1.0 : 0.0);
     }
       
-    if (!isReal(x)) error("x must be of type real");
+    if (!isReal(x)) Rf_error("x must be of type real");
     
     int* dims;
     
     SEXP dimsExpr = GET_DIM(x);
-    if (length(dimsExpr) != 2) error("x must be a matrix");
+    if (length(dimsExpr) != 2) Rf_error("x must be a matrix");
     dims = INTEGER(dimsExpr);
-    if (static_cast<size_t>(dims[0]) != numObs) error("num rows in x must match length of y");
+    if (static_cast<size_t>(dims[0]) != numObs) Rf_error("num rows in x must match length of y");
     
     size_t numCoefs = static_cast<size_t>(dims[1]);
     
     double* nPtr = NULL;
     if (!isNull(n)) {
-      if (static_cast<size_t>(XLENGTH(n)) != numObs) error("length of n must match that of y");
+      if (static_cast<size_t>(XLENGTH(n)) != numObs) Rf_error("length of n must match that of y");
       nPtr = REAL(n);
     }
     
     double* wPtr = NULL;
     if (!isNull(w)) {
-      if (static_cast<size_t>(XLENGTH(w)) != numObs) error("length of w must match that of y");
+      if (static_cast<size_t>(XLENGTH(w)) != numObs) Rf_error("length of w must match that of y");
       wPtr = REAL(w);
     }
     
     double* offsetPtr = NULL;
     if (!isNull(offset)) {
-      if (static_cast<size_t>(XLENGTH(offset)) != numObs) error("length of offset must match that of y");
+      if (static_cast<size_t>(XLENGTH(offset)) != numObs) Rf_error("length of offset must match that of y");
       offsetPtr = REAL(offset);
     }
     
@@ -197,45 +205,45 @@ namespace {
   {
     int* dims;
     
-    if (!isReal(y)) error("y must be of type real.");
-    if (!isReal(z)) error("z must be of type real.");
-    if (!isReal(xExpr)) error("x must be of type real.");
+    if (!isReal(y)) Rf_error("y must be of type real.");
+    if (!isReal(z)) Rf_error("z must be of type real.");
+    if (!isReal(xExpr)) Rf_error("x must be of type real.");
     
     size_t numObservations = static_cast<size_t>(XLENGTH(y));
-    if (numObservations == 0) error("y must have positive length");
-    if (static_cast<size_t>(XLENGTH(z)) != numObservations) error("length of z and y must be equal");
+    if (numObservations == 0) Rf_error("y must have positive length");
+    if (static_cast<size_t>(XLENGTH(z)) != numObservations) Rf_error("length of z and y must be equal");
     
     size_t numPredictors = 0;
     const double* x = NULL;
     if (XLENGTH(xExpr) > 0) {
       dims = INTEGER(getAttrib(xExpr, R_DimSymbol));
-      if (dims == NULL || XLENGTH(getAttrib(xExpr, R_DimSymbol)) != 2) error("x must be a matrix");
-      if (static_cast<size_t>(dims[0]) != numObservations) error("num rows of x and length of y must be equal");
+      if (dims == NULL || XLENGTH(getAttrib(xExpr, R_DimSymbol)) != 2) Rf_error("x must be a matrix");
+      if (static_cast<size_t>(dims[0]) != numObservations) Rf_error("num rows of x and length of y must be equal");
       
       numPredictors = static_cast<size_t>(dims[1]);
       x = REAL(xExpr);
     }
     
-    if (!isReal(x_testExpr)) error("x_test must be of type real.");
+    if (!isReal(x_testExpr)) Rf_error("x_test must be of type real.");
     
     size_t numTestObservations = 0;
     const double* x_test = NULL;
     if (XLENGTH(x_testExpr) > 0) {
       dims = INTEGER(getAttrib(x_testExpr, R_DimSymbol));
-      if (dims == NULL || XLENGTH(getAttrib(x_testExpr, R_DimSymbol)) != 2) error("x_test must be a matrix");
-      if (static_cast<size_t>(dims[1]) != numPredictors + 1) error("num columns of x_test must be equal to that of the column-combined z vector and x matrix");
+      if (dims == NULL || XLENGTH(getAttrib(x_testExpr, R_DimSymbol)) != 2) Rf_error("x_test must be a matrix");
+      if (static_cast<size_t>(dims[1]) != numPredictors + 1) Rf_error("num columns of x_test must be equal to that of the column-combined z vector and x matrix");
 
       numTestObservations = static_cast<size_t>(dims[0]);
       x_test = REAL(x_testExpr);
     }
     
-    if (!isReal(zetaY)) error("zetaY must be of type real");
-    if (!isReal(zetaZ)) error("zetaZ must be of type real");
+    if (!isReal(zetaY)) Rf_error("zetaY must be of type real");
+    if (!isReal(zetaZ)) Rf_error("zetaZ must be of type real");
     
     size_t numZetaY = static_cast<size_t>(XLENGTH(zetaY));
     size_t numZetaZ = static_cast<size_t>(XLENGTH(zetaZ));
     
-    if (!isString(estimandExpr)) error("estimand must be of type char");
+    if (!isString(estimandExpr)) Rf_error("estimand must be of type char");
     
     // turn estimand name into enum
     const char* estimandName = CHAR(STRING_ELT(estimandExpr, 0));
@@ -247,34 +255,34 @@ namespace {
     } else if (strncmp(estimandName, "ATC", 4) == 0) {
       estimand = cibart::ATC;
     } else {
-      error("Illegal estimand type: %s. Must be 'ATE', 'ATT', or 'ATC'", estimandName);
+      Rf_error("Illegal estimand type: %s. Must be 'ATE', 'ATT', or 'ATC'", estimandName);
     }
     
     TreatmentModelType treatmentModelType;
     cibart::TreatmentModel* treatmentModel = createTreatmentModel(treatmentModelExpr, &treatmentModelType);
     
     SEXP sensParameterExpr = getListElement(sensControl, "n.sim");
-    if (sensParameterExpr == R_NilValue) error("n.sim must be specified in iteration control");
+    if (sensParameterExpr == R_NilValue) Rf_error("n.sim must be specified in iteration control");
     size_t numSimsPerCell = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
     sensParameterExpr = getListElement(sensControl, "n.burn.init");
-    if (sensParameterExpr == R_NilValue) error("n.burn.init must be specified in iteration control");
+    if (sensParameterExpr == R_NilValue) Rf_error("n.burn.init must be specified in iteration control");
     size_t numInitialBurnIn = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
     sensParameterExpr = getListElement(sensControl, "n.burn.cell");
-    if (sensParameterExpr == R_NilValue) error("n.burn.cell must be specified in iteration control");
+    if (sensParameterExpr == R_NilValue) Rf_error("n.burn.cell must be specified in iteration control");
     size_t numCellSwitchBurnIn = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
     sensParameterExpr = getListElement(sensControl, "n.thin");
-    if (sensParameterExpr == R_NilValue) error("n.thin must be specified in iteration control");
+    if (sensParameterExpr == R_NilValue) Rf_error("n.thin must be specified in iteration control");
     size_t numTreeSamplesToThin = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
     sensParameterExpr = getListElement(sensControl, "n.thread");
-    if (sensParameterExpr == R_NilValue) error("n.thread must be specified in iteration control");
+    if (sensParameterExpr == R_NilValue) Rf_error("n.thread must be specified in iteration control");
     size_t numThreads = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
-    if (!isLogical(verboseExpr)) error("verbose must be of type logical");
-    if (length(verboseExpr) == 0) error("verbose must be of length at least 1");
+    if (!isLogical(verboseExpr)) Rf_error("verbose must be of type logical");
+    if (length(verboseExpr) == 0) Rf_error("verbose must be of length at least 1");
     bool verbose = LOGICAL(verboseExpr)[0] != 0;
      
     

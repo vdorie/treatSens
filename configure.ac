@@ -5,9 +5,9 @@ AC_PREREQ(2.64)
 AC_INIT(treatSens, 3.0, vdorie@gmail.com)
 AC_CONFIG_SRCDIR([src/R_interface.cpp])
 AC_CONFIG_AUX_DIR([tools/build-aux])
-AC_CONFIG_HEADER([src/config.hpp])
-AC_CONFIG_HEADER([src/misc/config.h])
-AC_CONFIG_HEADER([src/external/config.h])
+AC_CONFIG_HEADERS([src/config.hpp])
+AC_CONFIG_HEADERS([src/misc/config.h])
+AC_CONFIG_HEADERS([src/external/config.h])
 
 m4_include([tools/m4/ax_check_compile_flag.m4])
 m4_include([tools/m4/ax_pthread.m4])
@@ -29,7 +29,6 @@ CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
 CXXPICFLAGS=`"${R_HOME}/bin/R" CMD config CXXPICFLAGS`
 
 AC_PROG_CC
-AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_CXX
 AC_PROG_CXXCPP
@@ -63,18 +62,21 @@ case $host_os in
           unsupported_isets=
           # only test for those that we explicitly add beyond what
           # the compiler will come up with on "-xarch=native"
-          for iset in "avx;AVX" "sse4_1;SSE4_1" "avx2;AVX2"; do
+          for iset in "avx;AVX" "sse41;SSE4_1" "avx2;AVX2"; do
             iset_varname=$(echo $iset | cut -d ";" -f 1)
             iset_mapname=$(echo $iset | cut -d ";" -f 2)
-            # have variables test for CPU and OS support
-            if test x"$(eval echo \$ax_cv_have_${iset_varname}_ext)" = x"no"; then
-              unsupported_isets="${unsupported_isets} ${iset_mapname}"
+            # If instruction set is supported by the compiler but not both of the
+            # OS and CPU, remove it
+            if test x"$(eval echo \$ax_cv_have_${iset_varname}_ext)" != x"yes"; then
+              if test x"$(eval echo \$ax_cv_support_${iset_varname}_ext)" = x"yes"; then
+                unsupported_isets="${unsupported_isets} ${iset_mapname}"
+              fi
             fi
           done
           if test ! -z "${unsupported_isets}"; then
             unsupported_isets=${unsupported_isets##[[:space:]]} # remove leading space
             echo "creating mapfile to remove ${unsupported_isets} instruction set(s)"
-            echo "\$mapfile_version 2\nCAPABILITY {\n  HW -= ${unsupported_isets};\n};\n" > src/mapfile.solaris
+            printf "\$mapfile_version 2\nCAPABILITY {\n  HW -= %s;\n};\n" "${unsupported_isets}" > src/mapfile.solaris
             mapfile_flag="-M mapfile.solaris"
           fi
         fi
