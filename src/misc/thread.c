@@ -186,7 +186,7 @@ int misc_mt_runTasks(misc_mt_manager_t restrict manager, misc_mt_taskFunction_t 
   return result;
 }
 
-inline static void getTime(struct timespec* ts)
+static inline void getTime(struct timespec* ts)
 {
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
   clock_gettime(CLOCK_REALTIME, ts);
@@ -343,6 +343,7 @@ static int initializeManager(misc_mt_manager_t manager, size_t numThreads)
   bool mutexInitialized = false;
   bool threadIsActiveInitialized = false;
   bool taskDoneInitialized = false;
+  bool threadQueueInitialized = false;
   
   manager->threads = (Thread*) malloc(numThreads * sizeof(Thread));
   if (manager->threads == NULL) { result = ENOMEM; goto misc_mt_initialization_failed; }
@@ -352,6 +353,7 @@ static int initializeManager(misc_mt_manager_t manager, size_t numThreads)
     
   result = initializeIndexArrayQueue(&manager->threadQueue, numThreads);
   if (result != 0) goto misc_mt_initialization_failed;
+  threadQueueInitialized = true;
   
   result = initializeMutex(manager->mutex);
   if (result != 0) {
@@ -377,7 +379,7 @@ misc_mt_initialization_failed:
   if (manager->threads != NULL) { free(manager->threads); manager->threads = NULL; }
   if (manager->threadData != NULL) { free(manager->threadData); manager->threadData = NULL; }
   
-  invalidateIndexArrayQueue(&manager->threadQueue);
+  if (threadQueueInitialized) invalidateIndexArrayQueue(&manager->threadQueue);
   
   if (mutexInitialized) destroyMutex(manager->mutex);
   if (threadIsActiveInitialized) destroyCondition(manager->threadIsActive);
@@ -445,6 +447,7 @@ static void destroyIndexArrayQueue(IndexArrayQueue* queue)
 static void invalidateIndexArrayQueue(IndexArrayQueue* queue)
 {
   if (queue == NULL || queue->elements == NULL) return;
+  
   free(queue->elements);
   queue->elements = NULL;
 }
