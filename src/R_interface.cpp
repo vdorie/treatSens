@@ -411,6 +411,9 @@ bit_cast(const From& src)
 
 #  endif
 
+}
+
+#endif
 
 extern "C" {
 
