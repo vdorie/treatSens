@@ -1,9 +1,9 @@
 #include "config.hpp"
 
-#include <cstddef>
+#include <cstddef> // size_t
 #include <dbarts/cstdint.hpp>
 #include <cstdlib> // malloc, free for PoDs
-#include <cstring>
+#include <cstring> // memcpy
 #include <math.h> // nan
 
 
@@ -373,10 +373,10 @@ namespace {
 #  include <bit>
 #else
 
-namespace std {
-
 #  if __cplusplus >= 201103L
 #    include <type_traits>
+
+namespace std {
 
 template <class To, class From>
 typename std::enable_if<
