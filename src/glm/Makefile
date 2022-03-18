@@ -11,8 +11,8 @@ library : $(LOCAL_OBJECTS)
 	$(AR) $(ARFLAGS) ../glm.a $(LOCAL_OBJECTS)
 
 clean :
-	-rm -f *.o
-	-rm -f *.a
+	@-rm -f *.o
+	@-rm -f *.a
 
 rebuild : clean all
 

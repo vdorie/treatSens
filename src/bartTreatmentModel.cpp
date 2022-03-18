@@ -40,7 +40,7 @@ namespace cibart {
     void (*setRNGState)(dbarts::BARTFit* fit, const void* const* uniformState, const void* const* normalState);
     dbarts::Results* (*runSampler)(dbarts::BARTFit* fit);
     void (*setOffset)(dbarts::BARTFit* fit, const double* offset, bool updateScale);
-    void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double);
+    void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double, const double*);
     void (*invalidateCGMPrior)(dbarts::CGMPrior* prior);
     void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, const dbarts::Model* model);
     void (*invalidateNormalPrior)(dbarts::NormalPrior* prior);
@@ -201,7 +201,7 @@ namespace {
     functionTable->setRNGState               = reinterpret_cast<void (*)(dbarts::BARTFit*, const void* const* uniformState, const void* const* normalState)>(lookupFunction("dbarts", "setRNGState"));
     functionTable->runSampler                = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*)>(lookupFunction("dbarts", "runSampler"));
     functionTable->setOffset                 = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*, bool)>(lookupFunction("dbarts", "setOffset"));
-    functionTable->initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double)>(lookupFunction("dbarts", "initializeCGMPriorFromOptions"));
+    functionTable->initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double, const double*)>(lookupFunction("dbarts", "initializeCGMPriorFromOptions"));
     functionTable->invalidateCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*)>(lookupFunction("dbarts", "invalidateCGMPrior"));
     functionTable->initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, const dbarts::Model*)>(lookupFunction("dbarts", "initializeNormalPriorFromOptions"));
     functionTable->invalidateNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*)>(lookupFunction("dbarts", "invalidateNormalPrior"));
@@ -265,7 +265,7 @@ namespace {
     dbarts::Model* bartModel = new dbarts::Model;
     
     bartModel->treePrior = static_cast<dbarts::CGMPrior*>(::operator new (sizeof(dbarts::CGMPrior)));
-    functionTable.initializeCGMPrior(static_cast<dbarts::CGMPrior*>(bartModel->treePrior), DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
+    functionTable.initializeCGMPrior(static_cast<dbarts::CGMPrior*>(bartModel->treePrior), DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER, NULL);
     
     bartModel->muPrior = static_cast<dbarts::NormalPrior*>(::operator new (sizeof(dbarts::NormalPrior)));
     functionTable.initializeNormalPrior(static_cast<dbarts::NormalPrior*>(bartModel->muPrior), bartControl, bartModel);
