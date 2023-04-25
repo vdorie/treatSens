@@ -1,6 +1,10 @@
 #!/bin/sh
 
-export SHLIB=treatSens`R CMD config SHLIB_EXT`
+if [ -z ${SHLIB+x} ]; then
+  SHLIB="treatSens"`R CMD config SHLIB_EXT`
+  export SHLIB
+fi
+
 if [ -f src/Makevars ]; then
   (cd src; make -f Makevars clean)
 else
