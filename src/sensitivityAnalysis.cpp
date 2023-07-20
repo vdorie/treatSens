@@ -75,7 +75,7 @@ namespace {
     dbarts::Results* (*runSampler)(dbarts::BARTFit* fit);
     dbarts::Results* (*runSamplerForIterations)(dbarts::BARTFit* fit, size_t numBurnIn, size_t numSamples);
     void (*setResponse)(dbarts::BARTFit* fit, const double* newResponse);
-    void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double);
+    void (*initializeCGMPrior)(dbarts::CGMPrior* prior, double, double, const double*);
     void (*invalidateCGMPrior)(dbarts::CGMPrior* prior);
     void (*initializeNormalPrior)(dbarts::NormalPrior* prior, const dbarts::Control* control, const dbarts::Model* model);
     void (*invalidateNormalPrior)(dbarts::NormalPrior* prior);
@@ -393,7 +393,7 @@ extern "C" {
     dbarts::Model bartModel(bartControl.responseIsBinary);
     
     dbarts::CGMPrior* treePrior = misc_stackAllocate(1, dbarts::CGMPrior);
-    control.initializeCGMPrior(treePrior, DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER);
+    control.initializeCGMPrior(treePrior, DBARTS_DEFAULT_TREE_PRIOR_BASE, DBARTS_DEFAULT_TREE_PRIOR_POWER, NULL);
     
     dbarts::NormalPrior* muPrior = misc_stackAllocate(1, dbarts::NormalPrior);
     control.initializeNormalPrior(muPrior, &bartControl, &bartModel);
@@ -727,7 +727,7 @@ namespace {
     control.runSampler                = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*)>(R_GetCCallable("dbarts", "runSampler"));
     control.runSamplerForIterations   = reinterpret_cast<dbarts::Results* (*)(dbarts::BARTFit*, size_t, size_t)>(R_GetCCallable("dbarts", "runSamplerForIterations"));
     control.setResponse               = reinterpret_cast<void (*)(dbarts::BARTFit*, const double*)>(R_GetCCallable("dbarts", "setResponse"));
-    control.initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double)>(R_GetCCallable("dbarts", "initializeCGMPriorFromOptions"));
+    control.initializeCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*, double, double, const double*)>(R_GetCCallable("dbarts", "initializeCGMPriorFromOptions"));
     control.invalidateCGMPrior        = reinterpret_cast<void (*)(dbarts::CGMPrior*)>(R_GetCCallable("dbarts", "invalidateCGMPrior"));
     control.initializeNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*, const dbarts::Control*, const dbarts::Model*)>(R_GetCCallable("dbarts", "initializeNormalPriorFromOptions"));
     control.invalidateNormalPrior     = reinterpret_cast<void (*)(dbarts::NormalPrior*)>(R_GetCCallable("dbarts", "invalidateNormalPrior"));

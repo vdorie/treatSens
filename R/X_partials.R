@@ -14,12 +14,12 @@
 ####
 
 X.partials <- function(Y, Z, X, XY, resp.family, trt.family) {
-	if(class(resp.family) == "function"){
-		fname = "X.partials.GLM"
-	}else{
-		fname <- "X.partials.GLM"
-	}
-	do.call(fname, list(Y, Z, X, XY, resp.family, trt.family))
+  if (inherits(resp.family, "function")) {
+          fname = "X.partials.GLM"
+  } else {
+          fname <- "X.partials.GLM"
+  }
+  do.call(fname, list(Y, Z, X, XY, resp.family, trt.family))
 }
 
 ####

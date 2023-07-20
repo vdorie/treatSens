@@ -30,6 +30,18 @@ PKG_CPPFLAGS=-Iinclude $(PTHREAD_CPPFLAGS)
 # since there is no PKG_LDFLAGS, we include that here
 PKG_LIBS=@MAPFILE_FLAG@ glm.a external.a misc.a rc.a $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) $(PTHREAD_LIBS)
 
+
+BOOL,true = true
+BOOL,false = false
+BOOL, = true
+arflags_set.test, = false
+arflags_set = $(BOOL,$(arflags_set.test,$(ARFLAGS)))
+
+arflags.true = $(ARFLAGS)
+arflags.false = -cr
+
+PKG_ARFLAGS = $(arflags.$(arflags_set))
+
 MkInclude = $(R_HOME)/etc${R_ARCH}/Makeconf
 
 SUBDIRS = glm external misc rc
@@ -45,7 +57,8 @@ sublibs:
 	         PTHREAD_CPPFLAGS="$(PTHREAD_CPPFLAGS)" \
            SSE2_FLAG="$(SSE2_FLAG)" SSE4_1_FLAG="$(SSE4_1_FLAG)" AVX_FLAG="$(AVX_FLAG)" AVX2_FLAG="$(AVX2_FLAG)" \
            CC="$(CC)" CFLAGS="$(CFLAGS) $(CPICFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS) $(CXXPICFLAGS)" \
-           CLINK_CPPFLAGS="$(CLINK_CPPFLAGS)" CPPFLAGS="$(CPPFLAGS)" AR="$(AR)" ARFLAGS="$(ARFLAGS)") \
+           CLINK_CPPFLAGS="$(CLINK_CPPFLAGS)" CPPFLAGS="$(CPPFLAGS)" AR="$(AR)" ARFLAGS="$(PKG_ARFLAGS)" \
+           RANLIB="$(RANLIB)") \
            || exit 1; \
 	done
 
