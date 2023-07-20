@@ -189,7 +189,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   nc = sum(Z==0)
   
   if (!is.null(weights)) {
-    if (identical(class(weights),"character")) {
+    if (is.character(weights)) {
       
       if (!any(weights==c("ATE","ATT","ATC"))) {
         stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
@@ -227,7 +227,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
           stop(paste("trim.wt must be a number greater than 0."))}
       }
       weights <- wts
-    } else if (identical(class(weights),"numeric") & length(weights)==n.obs) {
+    } else if (is.numeric(weights) && length(weights)==n.obs) {
       cat("User-supplied weight is used.","\n")
     } else {
       stop(paste("Weights must be either \"ATE\", \"ATT\", \"ATC\" or a user-specified vector."))}
@@ -249,25 +249,26 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   }else{
     null.resp <- suppressWarnings(gls(Y~Z, correlation = corCompSymm(form = ~1|group), weights=~1/weights))
   }
-  sgnTau0 = sign(null.resp$coef[2])
+  sgnTau0 <- sign(null.resp$coef[2])
 
   #n = length(Y)
   Y.res <- residuals(null.resp, type = "response")
-  r = coef(null.resp$modelStruct, unconstrained = FALSE)
-  v_Y = null.resp$sigma^2*r
+  r <- coef(null.resp$modelStruct, unconstrained = FALSE)
+  v_Y <- null.resp$sigma^2*r
   v_alpha <- v_Y*(1-r)/r  
   
   if(!is.null(allX)) {
-    zXcoef = switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1])
-    Xcoef = cbind(zXcoef, 
-                  null.resp$coef[3:(2+length(zXcoef))])
+    #zXcoef = switch(as.integer(inherits(null.trt, "glm"))+1, fixef(null.trt)[-1], coef(null.trt)[-1])
+    zXcoef <- if (inherits(null.trt, "glm")) coef(null.trt)[-1] else fixef(null.trt)[-1]
+    Xcoef <- cbind(zXcoef, 
+                   null.resp$coef[3:(2+length(zXcoef))])
   }else{
     Xcoef <- Xcoef.plot<- NULL
   }
 
   # change buffer = 0 when v_Y or v_Z is small.
   if ((v_Y-buffer<=0)||(v_Z-buffer<=0)||(v_Z/(theta*(1-theta))-buffer<=0)) {
-    buffer = 0
+    buffer <- 0
     warning("Buffer is set to 0 because some of residual variances are too small.")
   }
    
@@ -287,10 +288,14 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     }
       
     #Transform covars with neg. reln to Y to limit plot to 1 & 2 quadrants.
-    Xcoef.flg =  as.vector(ifelse(Xcoef[,2]>=0,1,-1))
-    X.positive = t(t(cbind(Wboth,X))*Xcoef.flg)
+    Xcoef.flg <- as.vector(ifelse(Xcoef[,2]>=0,1,-1))
+    X.positive <- t(t(cbind(Wboth,X))*Xcoef.flg)
     null.resp.plot <- switch(is.null(Wresp)+1, suppressWarnings(gls(Y~Z+X.positive+Wresp, correlation = corCompSymm(form = ~1|group), weights=~1/weights)), suppressWarnings(gls(Y~Z+X.positive, correlation = corCompSymm(form = ~1|group), weights=~1/weights)))
-    Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), null.resp.plot$coef[3:(2+length(zXcoef))])
+    #Xcoef.plot = cbind(switch((class(null.trt)[1]=="glm")+1, fixef(null.trt)[-1], coef(null.trt)[-1]), null.resp.plot$coef[3:(2+length(zXcoef))])
+    Xcoef.plot <- cbind(
+      if (inherits(null.trt, "glm")) coef(null.trt)[-1] else fixef(null.trt)[-1],
+      null.resp.plot$coef[3:(2+length(zXcoef))]
+    )
   }
     
   #register control.fit
@@ -476,10 +481,12 @@ fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
   
   fit.glm <- suppressWarnings(do.call("glmer", args.resp))
   
-  sens.se <- switch(class(weights),
-                    "NULL" = summary(fit.glm)$coefficients[2,2],
-                    "character" = pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights), #pweight is custom function
-                    "numeric"   = pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights)) #pweight is custom function
+  if (is.character(weights) || is.numeric(weights)) {
+    sens.se <- pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights)
+  } else {
+    sens.se <- summary(fit.glm)$coefficients[2,2]
+  }
+  
   fit.trt <- do.call(if (trt.level == "indiv") "glmer" else glm, args.trt)
   
   list(sens.coef = fixef(fit.glm)[2],
@@ -571,9 +578,9 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
   }
   
   if(U.model == "binomial"){
-    reps = 0
+    reps <- 0
     repeat{
-      reps = reps+1
+      reps <- reps+1
       if(identical(trt.family$link,"probit")){
         if(trt.level == "indiv"){
           if(!is.null(X)) {
@@ -592,28 +599,28 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
             out.contYbinaryZU <- try(contYbinaryZU.mlm.gp.noX(Y, Z, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
           }
         }
-      }else{
+       }else {
         stop(paste("Only probit link is allowed."))
       }
-      if(!(class(out.contYbinaryZU) == "try-error")){
-        U = out.contYbinaryZU$U
-        p.est = out.contYbinaryZU$p
-        if(length(unique(U))>1 && !identical(U,Z) && !identical(U,1-Z)) break
+      if (!inherits(out.contYbinaryZU, "try-error")) {
+        U <- out.contYbinaryZU$U
+        p.est <- out.contYbinaryZU$p
+        if (length(unique(U))>1 && !identical(U,Z) && !identical(U,1-Z)) break
       }
-      if(reps > 5000){
-        U = "No non-constant simulated U vectors in 5000 tries"
-        p.est = NULL
-        class(U) = "try-error" #stop("No non-constant simulated U vectors in 5000 tries")
+      if (reps > 5000) {
+        U <- "No non-constant simulated U vectors in 5000 tries"
+        p.est <- NULL
+        class(U) <- "try-error" #stop("No non-constant simulated U vectors in 5000 tries")
         break
       } 
     }
   }
   
-  if(!(class(U) == "try-error")){
+  if (!inherits(U, "try-error")) {
     #try keeps loop from failing 
     #Do we want to return a warning/the error message/our own error message if try fails?
     #fit models with U
-    if(std) U = std.nonbinary(U)
+    if (std) U <- std.nonbinary(U)
 
     result <- fit.treatSens.mlm.u(Y, Z, X, W, U, zetaY, zetaZ, control.fit)
     result$p <- p.est

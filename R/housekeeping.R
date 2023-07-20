@@ -150,11 +150,14 @@ parse.formula.mlm <- function(formula, resp.cov, data) {
 
 std.nonbinary <- function(X) {
   #returns standardized values of vector not consisting of only 0s and 1s
-  if(class(X) == "factor" | class(X) == "character")
+  if (inherits(X, "factor") || inherits(X, "character"))
     return(X)
-  if(length(unique(X))!=2)
+
+  if (length(unique(X)) != 2) {
     X = (X - mean(X, na.rm = T))/sd(X, na.rm = T)
-  else if(!is.binary(X))
+  } else if (!is.binary(X)) {
     X = (X - mean(X, na.rm = T))/sd(X, na.rm = T)
+  }
+
   return(X)
 }

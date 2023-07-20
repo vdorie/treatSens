@@ -27,7 +27,7 @@ Imports:
     mvtnorm,
     lme4,
     nlme,
-    dbarts (>= 0.9-11)
+    dbarts (>= 0.9-21)
 Suggests:
     doParallel,
     foreach,

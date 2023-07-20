@@ -17,9 +17,9 @@ sensPlot = function(x,
                   which.txtlab = NULL, #enter numeric vector to specify which label to show. e.g. c(1:3) shows first 3 covariates.
                   ...) {
   #note in help: if contours are too rough, up nsim in sens fn
-  if(class(x) == "sensitivity"){  
+  if (inherits(x, "sensitivity")) {
     sensPlotMain(x, contour.levels, col.zero, lty.zero, col.insig, lty.insig, data.line, X.pch, signif.level, labcex, limit.Xplot, txtlab, which.txtlab,...)
-  }else if(class(x) == "sensitivityCombo"){
+  }else if (inherits(x, "sensitivityCombo")) {
     sensPlotCombo(x, contour.levels, col.zero, lty.zero, col.insig, lty.insig, data.line, X.pch, signif.level, labcex, limit.Xplot, txtlab, which.txtlab,...)
   }else{
     stop("x must be of class sensitivity or sensitivity.combo")
@@ -54,13 +54,13 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
   if (!is.null(x$Xcoef)) {
     Xpart = x$Xcoef[!is.na(x$Xcoef[,1]) & !is.na(x$Xcoef[,2]),] #coefficients of null model.  
     Xpart.plot = x$Xcoef.plot[!is.na(x$Xcoef.plot[,1]) & !is.na(x$Xcoef.plot[,2]),]
-    if (!is.null(Xpart) & is.null(dim(Xpart))){
+    if (!is.null(Xpart) && is.null(dim(Xpart))){
       Xpart = matrix(Xpart, nrow = 1)
       Xpart.plot = matrix(Xpart.plot, nrow = 1)
     }
     
     Xpart.plot2 = cbind(Xpart.plot[,1],Xpart.plot[,2], ifelse(Xpart[,2]>=0,1,2)) #MH: add sign of coef of X on Y to Xpart  
-    if(!is.null(Xpart.plot2) & is.null(dim(Xpart.plot2))){
+    if(!is.null(Xpart.plot2) && is.null(dim(Xpart.plot2))){
       Xpart.plot2 = matrix(Xpart.plot2, nrow = 1)
     }
   

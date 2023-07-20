@@ -123,7 +123,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
   }
   
   if (!is.null(matchedCall[["iter.j"]]) && (
-    class(trt.family) != "family" || trt.family$family != "binomial" || trt.family$link != "probit")) {
+    !inherits(trt.family, "family") || trt.family$family != "binomial" || trt.family$link != "probit")) {
     warning("iter.j option is meaningless unless trt.family = binomial(link=\"probit\")")
   } else {
     if (!is.numeric(iter.j) || length(iter.j) != 1 || is.na(iter.j) || iter.j < 1)
@@ -427,15 +427,15 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
 ###########
 
 fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_Z, theta, control.fit, W = NULL) {
-  resp.family = control.fit$resp.family
-  trt.family = control.fit$trt.family
-  U.model = control.fit$U.model
-  std = control.fit$standardize
-  weights = control.fit$weights
-  iter.j = control.fit$iter.j
-  offset = control.fit$offset
-  p = control.fit$p
-  XY = control.fit$XY
+  resp.family <- control.fit$resp.family
+  trt.family <- control.fit$trt.family
+  U.model <- control.fit$U.model
+  std <- control.fit$standardize
+  weights <- control.fit$weights
+  iter.j <- control.fit$iter.j
+  offset <- control.fit$offset
+  p <- control.fit$p
+  XY <- control.fit$XY
   
   #Generate U w/Y.res, Z.res 
   if(U.model == "normal"){  
@@ -454,15 +454,15 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
       stop("only probit link is allowed")
     }
 
-    U = out.contYbinaryZU$U
-    p = out.contYbinaryZU$p
+    U <- out.contYbinaryZU$U
+    p <- out.contYbinaryZU$p
   }
   
-  if(!(class(U) == "try-error")){
+  if (!inherits(U, "try-error")) {
     #try keeps loop from failing 
     #Do we want to return a warning/the error message/our own error message if try fails?
     #fit models with U
-    if(std) U = std.nonbinary(U)
+    if(std) U <- std.nonbinary(U)
     
     if(!is.null(X)) {
       if(!is.null(XY)){
@@ -470,19 +470,21 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
                         "FALSE" = glm(Y~Z+U+X+XY, family=resp.family, weights=weights),
                         "TRUE" = glm(Y~Z+X+XY, family=resp.family, weights=weights, offset=zetaY*U))   
       
-        sens.se <- switch(class(weights),
-                        "NULL" = summary(fit.glm)$coefficients[2,2],
-                        "character" = pweight(Z=Z, X=cbind(X,XY), r=fit.glm$residuals, wt=weights), #pweight is custom function
-                        "numeric" = pweight(Z=Z, X=cbind(X,XY), r=fit.glm$residuals, wt=weights)) #pweight is custom function
-      }else{
+        if (is.character(weights) || is.numeric(weights)) {
+          sens.se <- pweight(Z=Z, X=cbind(X,XY), r=fit.glm$residuals, wt=weights)
+        } else {
+          sens.se <- summary(fit.glm)$coefficients[2,2]
+        }
+      } else {
         fit.glm <- switch(offset+1,
                           "FALSE" = glm(Y~Z+U+X, family=resp.family, weights=weights),
                           "TRUE" = glm(Y~Z+X, family=resp.family, weights=weights, offset=zetaY*U))   
         
-        sens.se <- switch(class(weights),
-                          "NULL" = summary(fit.glm)$coefficients[2,2],
-                          "character" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights), #pweight is custom function
-                          "numeric" = pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)) #pweight is custom function
+        if (is.character(weights) || is.numeric(weights)) {
+          sens.se <- pweight(Z=Z, X=X, r=fit.glm$residuals, wt=weights)
+        } else {
+          sens.se <- summary(fit.glm)$coefficients[2,2]
+        }
       }
       fit.trt <- glm(Z~U+X, family=trt.family)
     }else{
@@ -490,15 +492,17 @@ fit.treatSens <- function(sensParam, Y, Z, Y.res, Z.res, X, zetaY, zetaZ,v_Y, v_
         fit.glm <- switch(offset+1,
                         "FALSE" = glm(Y~Z+U+XY, family=resp.family, weights=weights),
                         "TRUE" = glm(Y~Z+XY, family=resp.family, weights=weights, offset=zetaY*U))   
-        sens.se = switch(class(weights),
-                         "NULL" = summary(fit.glm)$coefficients[2,2],
-                         "character" = pweight(Z=Z, X=XY, r=fit.glm$residuals, wt=weights), #pweight is custom function
-                         "numeric" = pweight(Z=Z, X=XY, r=fit.glm$residuals, wt=weights)) #pweight is custom function
+
+        if (is.character(weights) || is.numeric(weights)) {
+          sens.se <- pweight(Z=Z, X=XY, r=fit.glm$residuals, wt=weights)
+        } else {
+          sens.se <- summary(fit.glm)$coefficients[2,2]
+        }
       }else{
         fit.glm <- switch(offset+1,
                           "FALSE" = glm(Y~Z+U, family=resp.family, weights=weights),
                           "TRUE" = glm(Y~Z, family=resp.family, weights=weights, offset=zetaY*U))   
-        sens.se = summary(fit.glm)$coefficients[2,2]
+        sens.se <- summary(fit.glm)$coefficients[2,2]
       }
       fit.trt <- glm(Z~U, family=trt.family)		
     }

@@ -1,30 +1,22 @@
-authors <- c("Nicole Bohme Carnegie", "Masataka Harada", "Vincent Dorie", "Jennifer Hill")
+citation(auto = meta)
 
-csatitle <- "treatSens: A Package to Assess Sensitivity of Causal Analyses to Unmeasured Confounding"
-csaversion <-  paste("R package version", meta$Version)
-csayear <- sub(".*(2[[:digit:]]{3})-.*", "\\1", meta$Date)
-      
-
-citHeader(
-  "To cite the package 'treatSens', please use the citation below.\n\n",
-   'For BibTeX format, use toBibtex(citation("treatSens")).',
-   sep="")
-   
-citEntry(entry="Manual",
-         author = authors,
-         title = csatitle,
-         year         = csayear,
-         note         = paste("Version ", csaversion,
-                        sep=""),
-         address      = "New York, NY",
-         url          = "https://CRAN.R-project.org/package=treatSens",
-         textVersion = paste(paste(authors, collapse=", "), " (", csayear,
-               "), ", csatitle, ". Version ", csaversion,
-               sep="")
-         )
-
-         
-citFooter("We have invested a lot of time and effort in creating the",
-          "'treatSens' package for use by other researchers.",
-          "Please cite it in all papers where it is used.")
+bibentry(
+  bibtype = "Manual",
+  author = c(
+    person(given = c("Nicole", "Bohme"), family = "Carnegie"),
+    person(given = "Masataka", family = "Harada"),
+    person(given = "Vincent", family = "Dorie"),
+    person(given = "Jennifer", family = "Hill")
+  ),
+  title = "treatSens: A Package to Assess Sensitivity of Causal Analyses to Unmeasured Confounding",
+  year = sub(".*(2[[:digit:]]{3})-.*", "\\1", meta$Date),
+  note = sprintf("R package version %s", meta$Version),
+  address = "New York, NY",
+  header = "To cite the package 'treatSens', please use the citation below.\n\n",
+  footer = paste(
+    "We have invested a lot of time and effort in creating the",
+    "'treatSens' package for use by other researchers.",
+    "Please cite it in all papers where it is used."
+  )
+)
           

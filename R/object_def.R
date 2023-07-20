@@ -3,13 +3,13 @@
 #combines the results in two sensitivity objects into single object for plotting
 ############
 combine.sensitivity <- function(x1, x2){
-  if(!class(x1) == "sensitivity" | !class(x2) == "sensitivity")
+  if (!inherits(x1, "sensitivity") || !inherits(x2, "sensitivity"))
     stop("Objects must be of class \"sensitivity\"")
-  if(!all.equal(c(x1$Y, x1$Z), c(x2$Y, x2$Z)))
+  if (!all.equal(c(x1$Y, x1$Z), c(x2$Y, x2$Z)))
     stop("Combining objects only allowed for sensitivity analyses on same data set")
-  if(!(x1$sensParam == x2$sensParam))
+  if (!(x1$sensParam == x2$sensParam))
     stop("Combining objects only allowed for sensitivity analyses using same type of sensitivity parameter")
-  if(!(x1$model.type == x2$model.type))
+  if (!(x1$model.type == x2$model.type))
     stop("Combining objects only allowed for sensitivity analyses using same model")
 
   grid1 = expand.grid(as.numeric(dimnames(x1$sp.y)[[1]]), as.numeric(dimnames(x1$sp.z)[[2]]))
@@ -64,7 +64,7 @@ summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,
   }
   
   zeroCoords = contourLines(trt.coef, resp.coef, taus, levels = 0)
-  if(class(unlist(zeroCoords))=="NULL") {
+  if (inherits(unlist(zeroCoords), "NULL")) {
     cat("Sensitivity parameters where tau = 0 could not be calculated.\n\n")
   } else {    
     zeroCors = round(cbind(zeroCoords[[1]]$y, zeroCoords[[1]]$x),digits)
@@ -81,7 +81,7 @@ summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,
   se.est = t(sqrt(W+(1+1/K)*B))
   
   noSigCoords = contourLines(trt.coef, resp.coef, taus/t(se.est), levels = -sign(object$tau0)*qnorm(signif.level/2))
-  if(class(unlist(noSigCoords))=="NULL") {
+  if (inherits(unlist(noSigCoords), "NULL")) {
     cat("Sensitivity parameters where significance level", signif.level, "is lost could not be calculated.\n\n")
   } else {
     noSigCors = round(cbind(noSigCoords[[1]]$y, noSigCoords[[1]]$x),digits)
@@ -128,7 +128,7 @@ summary.sensitivityCombo.default <- function(object, digits = 3, signif.level = 
   }
   
   zeroCoords = contourLines(trt.coef, resp.coef, taus, levels = 0)
-  if(class(unlist(zeroCoords))=="NULL") {
+  if (inherits(unlist(zeroCoords), "NULL")) {
     cat("Sensitivity parameters where tau = 0 could not be calculated.\n\n")
   } else {    
     zeroCors = round(cbind(zeroCoords[[1]]$y, zeroCoords[[1]]$x),digits)
@@ -145,7 +145,7 @@ summary.sensitivityCombo.default <- function(object, digits = 3, signif.level = 
   se.est = sqrt(W+(1+1/K)*B)
     
   noSigCoords = contourLines(trt.coef, resp.coef, taus/se.est, levels = -sign(object$tau0)*qnorm(signif.level/2))
-  if(class(unlist(noSigCoords))=="NULL") {
+  if (inherits(unlist(noSigCoords), "NULL")) {
     cat("Sensitivity parameters where significance level", signif.level, "is lost could not be calculated.\n\n")
   } else {
     noSigCors = round(cbind(noSigCoords[[1]]$y, noSigCoords[[1]]$x),digits)

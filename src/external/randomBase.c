@@ -352,7 +352,8 @@ int ext_rng_createAndSeed(ext_rng** result, ext_rng_algorithm_t algorithm, ext_r
   return errorCode;
 }
 
-bool ext_rng_seedsAreEqual(const ext_rng* rng1, const ext_rng* rng2){
+bool ext_rng_seedsAreEqual(const ext_rng* rng1, const ext_rng* rng2)
+{
   if (rng1->algorithm != rng2->algorithm) return false;
   
   size_t stateLength = stateLengths[rng1->algorithm];
@@ -360,7 +361,7 @@ bool ext_rng_seedsAreEqual(const ext_rng* rng1, const ext_rng* rng2){
   return memcmp(rng1->state, rng2->state, stateLength) == 0;
 }
 
-ext_rng_algorithm_t ext_rng_getDefaultAlgorithmType()
+ext_rng_algorithm_t ext_rng_getDefaultAlgorithmType(void)
 {
   SEXP seedsExpr = Rf_findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
   if (seedsExpr == R_UnboundValue) {
@@ -378,7 +379,7 @@ ext_rng_algorithm_t ext_rng_getDefaultAlgorithmType()
   return (ext_rng_algorithm_t) (seed0 % 100);
 }
 
-ext_rng_standardNormal_t ext_rng_getDefaultStandardNormalType()
+ext_rng_standardNormal_t ext_rng_getDefaultStandardNormalType(void)
 {
   SEXP seedsExpr = Rf_findVarInFrame(R_GlobalEnv, R_SeedsSymbol);
   if (seedsExpr == R_UnboundValue) {
