@@ -49,6 +49,16 @@
 
 #define DEFAULT_BART_MAX_NUM_CUTS 100u
 
+#if __cplusplus < 201112L
+#  if defined(_WIN64) || SIZEOF_SIZE_T == 8
+#    define SIZE_T_SPECIFIER "%lu"
+#  else
+#    define SIZE_T_SPECIFIER "%u"
+#  endif
+#else
+#  define SIZE_T_SPECIFIER "%zu"
+#endif
+
 using std::size_t;
 using std::uint32_t;
 using std::uint_least32_t;
@@ -440,7 +450,7 @@ extern "C" {
     delete bartResults;
 
     if (control.verbose && control.numThreads == 1) {
-      ext_printf("Completed cell %u of %u cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
+      ext_printf("Completed cell " SIZE_T_SPECIFIER " of " SIZE_T_SPECIFIER " cells.\n", gridCells[0].cellNumber + 1, threadData.totalNumGridCells);
       ext_fflush_stdout();
     }
     
@@ -462,7 +472,7 @@ extern "C" {
       
       delete bartResults;
       if (control.verbose && control.numThreads == 1) {
-        ext_printf("Completed cell %u of %u cells.\n", gridCells[i].cellNumber + 1, threadData.totalNumGridCells);
+        ext_printf("Completed cell " SIZE_T_SPECIFIER " of " SIZE_T_SPECIFIER " cells.\n", gridCells[i].cellNumber + 1, threadData.totalNumGridCells);
         ext_fflush_stdout();
       }
     }

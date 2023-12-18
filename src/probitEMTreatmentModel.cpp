@@ -47,7 +47,7 @@ namespace {
     
     /* ext_printf("probit EM model:\n");
     cibart::ProbitEMTreatmentModel& model(*((cibart::ProbitEMTreatmentModel*) modelPtr));
-    ext_printf("  max iter: %lu\n", model.maxIterations); */
+    ext_printf("  max iter: %z\n", model.maxIterations); */
     
     scratch->x = x;
     scratch->numObservations = numObservations;
