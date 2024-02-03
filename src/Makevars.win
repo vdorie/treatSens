@@ -1,5 +1,8 @@
-SSE2_FLAG=-msse2
-AVX_FLAG=-mavx
+ARCH=$(shell "${R_HOME}/bin/R" --no-echo -e 'cat(R.version$$arch)')
+ifeq "$(ARCH)" "x86_64"
+  SSE2_FLAG=-msse2
+  AVX_FLAG=-mavx
+endif
 
 PTHREAD_CPPFLAGS=$(SHLIB_PTHREAD_FLAGS)
 PTHREAD_LIBS=$(SHLIB_PTHREAD_FLAGS)
