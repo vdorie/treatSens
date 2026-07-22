@@ -2,7 +2,7 @@ cibartControl <- function(n.sim = 20L,
                           n.burn.init = 500L,
                           n.burn.cell = as.integer(n.burn.init / 5L),
                           n.thin = 10L,
-                          n.thread = 1L) {
+                          n.thread = guessNumCores()) {
   for (name in names(formals(cibartControl))) assign(name, as.integer(get(name)))
   
   structure(namedList(n.sim,

@@ -42,7 +42,7 @@ treatSens.BART(formula,
   \item{nsim}{number of simulated \eqn{U}s to generate (and hence to average over) per cell in grid.}
   \item{nthin}{number of BART tree draws to make per every draw of \eqn{U}.}
   \item{nburn}{number of draws of \eqn{U} to make and throw away at the start of a run.}
-  \item{nthreads}{number of worker processes used to evaluate the sensitivity grid in parallel. \code{NULL} (the default) runs the grid sequentially. A value greater than one partitions the grid into contiguous \code{zeta.z} slabs and evaluates them concurrently, using forked processes on Unix and macOS or a socket cluster on Windows. The grid is reproducible for a fixed \code{nthreads} and \code{seed}, but because each slab warm-starts its own MCMC chain the parallel draws differ from the sequential ones and from those obtained with a different \code{nthreads}.}
+  \item{nthreads}{number of worker processes used to evaluate the sensitivity grid in parallel. \code{NULL} (the default) uses a guess of the number of available processor cores, evaluating the grid concurrently as in previous versions; set \code{nthreads = 1} to run sequentially. Parallel evaluation partitions the grid into contiguous \code{zeta.z} slabs, using forked processes on Unix and macOS or a socket cluster on Windows. The grid is reproducible for a fixed \code{nthreads} and \code{seed}, but because each slab warm-starts its own MCMC chain the parallel draws differ from those obtained with a different \code{nthreads} (including \code{nthreads = 1}).}
   \item{spy.range}{custom range for the sensitiviy parameter associated with Y (the coefficient on U in the outcome model or partial correlation of U with Y given X), e.g. \code{c(0,2)}. When this option is specified, \code{zetaz.range} must be also specified and \code{zero.loc} will be overridden.}
   \item{spz.range}{custom range for the sensitivity parameter associated with Z (the coefficient on U in the treatment model or partial correlation of U with Z given X), e.g. \code{c(-2,2)}. When this option is specified, \code{zetay.range} must be also specified and \code{zero.loc} will be overridden.}
   \item{trim.wt}{the maximum size of weight as a percentage of the sample size of the inferential group for the causal estimand. For example, \code{trim.wt = 10} in a dataset with 300 treated observations when the estimand has been set to "ATT" gives a maximum weight of 30.}
@@ -88,10 +88,11 @@ Y0 <- X \%*\% betay + zetay * (U - 0.5) + epsilon       # potential outcome(Z=0)
 Y1 <- X \%*\% betay + zetay * (U - 0.5) + tau + epsilon # potential outcome(Z=1)
 Y  <- Y0 * (1 - Z) + Y1 * Z                             # realization of potential outcome
 
-# sensitivity analysis
+# sensitivity analysis (nthreads = 1 here to keep the example single-core; omit
+# to evaluate the grid in parallel over a guess of the available cores)
 out.bin <- treatSens.BART(Y ~ Z + X, nsim = 3, nthin = 2, nburn = 0,
                           spy.range = c(0, 4), spz.range = c(-2 , 2), grid.dim = c(5, 3),
-                          standardize = FALSE, verbose = TRUE)
+                          standardize = FALSE, verbose = TRUE, nthreads = 1)
 
 sensPlot(out.bin) # draw contour plot
 
