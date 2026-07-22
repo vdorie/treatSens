@@ -84,6 +84,18 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   if (!is.integer(seed) && as.double(as.integer(seed)) != seed)
     warning("seed changed by coercion from double; supply an integer to be precise")
   set.seed(seed)
+
+  # nthreads: NULL means run the grid sequentially; a value > 1 evaluates it in
+  # parallel over zeta.z slabs (see cibart)
+  if (!is.null(nthreads)) {
+    if (!is.numeric(nthreads) || length(nthreads) != 1L || anyNA(nthreads))
+      stop("nthreads must be NULL or a single positive integer")
+    if (nthreads < 1)
+      stop("nthreads must be a positive integer")
+    if (as.double(as.integer(nthreads)) != nthreads)
+      warning("nthreads changed by coercion from double; supply an integer to be precise")
+    nthreads <- as.integer(nthreads)
+  }
   
   #extract variables from formula
   form.vars <- parse.formula(formula, resp.cov = NULL, data)
@@ -274,7 +286,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   control.sens <- cibartControl(n.sim       = nsim,
                                 n.burn.init = nburn,
                                 n.thin      = nthin,
-                                n.thread    = if (is.null(nthreads)) guessNumCores() else nthreads)
+                                n.thread    = if (is.null(nthreads)) 1L else nthreads)
 
   ## this trick sets up the call in the frame the called us, so that any parameters
   ## used in the trt.model specification are looked up there

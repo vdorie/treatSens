@@ -2,7 +2,7 @@ cibartControl <- function(n.sim = 20L,
                           n.burn.init = 500L,
                           n.burn.cell = as.integer(n.burn.init / 5L),
                           n.thin = 10L,
-                          n.thread = guessNumCores()) {
+                          n.thread = 1L) {
   for (name in names(formals(cibartControl))) assign(name, as.integer(get(name)))
   
   structure(namedList(n.sim,
@@ -89,6 +89,50 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
   list(control = control.bart, model = model.bart, data = data.bart)
 }
 
+## One contiguous zeta.z column-slab of the sensitivity grid, run in a worker.
+## Seeds R's RNG deterministically first: the confounder generator is seeded
+## from R's stream inside the C driver and the outcome / propensity BART chains
+## are seeded at dbarts_sampler_create, so a fixed per-chunk seed makes the slab
+## reproducible without any per-thread RNG injection (which the flat C API drops).
+fitSensitivityChunk <- function(seed, Y, Z, X, X.test, zetaY, zetaZ, theta,
+                                est.type, treatmentModel, control, verbose,
+                                outcomeSpecs, propSpecs)
+{
+  set.seed(seed)
+  .Call("treatSens_fitSensitivityAnalysis",
+        Y, Z, X,
+        X.test,
+        zetaY, zetaZ,
+        theta, est.type, treatmentModel,
+        control, verbose,
+        outcomeSpecs$control, outcomeSpecs$model, outcomeSpecs$data,
+        propSpecs$control, propSpecs$model, propSpecs$data)
+}
+
+## Fan the column-slabs out across workers: forked processes on Unix/macOS, a
+## socket cluster on Windows (no fork). Each worker is single-threaded; the
+## enclosing frame's bindings are what the closure serializes to socket workers,
+## so keep them exactly the slab inputs.
+runSensitivityChunks <- function(colGroups, chunkSeeds, Y, Z, X, X.test, zetaY, zetaZ,
+                                 theta, est.type, treatmentModel, control, verbose,
+                                 outcomeSpecs, propSpecs)
+{
+  worker <- function(k)
+    fitSensitivityChunk(chunkSeeds[k], Y, Z, X, X.test, zetaY, zetaZ[colGroups[[k]]],
+                        theta, est.type, treatmentModel, control, verbose,
+                        outcomeSpecs, propSpecs)
+
+  ks <- seq_along(colGroups)
+  if (.Platform$OS.type == "windows") {
+    cl <- parallel::makeCluster(length(colGroups))
+    on.exit(parallel::stopCluster(cl))
+    parallel::clusterEvalQ(cl, requireNamespace("treatSens", quietly = TRUE))
+    parallel::parLapply(cl, ks, worker)
+  } else {
+    parallel::mclapply(ks, worker, mc.cores = length(colGroups))
+  }
+}
+
 cibart <- function(Y, Z, X, X.test,
                    zetaY, zetaZ, theta,
                    est.type, treatmentModel = probitEM(),
@@ -103,6 +147,9 @@ cibart <- function(Y, Z, X, X.test,
   if (is(treatmentModel, "probitTreatmentModel") && !identical(treatmentModel$family, "flat")) {
     treatmentModel$scale <- rep_len(treatmentModel$scale, ncol(X) + 1L)
   }
+
+  ## the dbarts spec triples depend only on the data (X, Y, Z, X.test), not on
+  ## the sensitivity parameters, so build them once and share across grid chunks
 
   ## outcome BART: predictors [X Z], counterfactual test matrix X.test, response Y
   outcomeSpecs <- makeBartSpecs(cbind(X, Z), as.double(Y), X.test, binary = FALSE,
@@ -121,12 +168,62 @@ cibart <- function(Y, Z, X, X.test,
                                n.sim = 1L, n.burn = 0L, node.prior = nodePrior)
   }
 
-  .Call("treatSens_fitSensitivityAnalysis",
-        Y, Z, X,
-        X.test,
-        zetaY, zetaZ,
-        theta, est.type, treatmentModel,
-        control, verbose,
-        outcomeSpecs$control, outcomeSpecs$model, outcomeSpecs$data,
-        propSpecs$control, propSpecs$model, propSpecs$data)
+  numZetaZ <- length(zetaZ)
+  n.thread <- if (is.null(control$n.thread) || is.na(control$n.thread)) 1L else as.integer(control$n.thread)
+  nChunks  <- min(n.thread, numZetaZ)
+  ## R-level parallelism forks the grid; the flat C API drives BART on the main
+  ## R thread only, so Windows without fork uses a socket cluster instead
+  forkable <- requireNamespace("parallel", quietly = TRUE)
+
+  ## sequential path (also the default): one call runs the whole grid as a single
+  ## warm-started chain - the most burn-in-efficient arrangement, and identical
+  ## to the pre-parallel behavior so its draws are unchanged
+  if (nChunks <= 1L || !forkable) {
+    if (nChunks > 1L && !forkable && verbose)
+      cat("parallel grid evaluation needs the 'parallel' package; running sequentially\n")
+    return(.Call("treatSens_fitSensitivityAnalysis",
+                 Y, Z, X,
+                 X.test,
+                 zetaY, zetaZ,
+                 theta, est.type, treatmentModel,
+                 control, verbose,
+                 outcomeSpecs$control, outcomeSpecs$model, outcomeSpecs$data,
+                 propSpecs$control, propSpecs$model, propSpecs$data))
+  }
+
+  ## contiguous zeta.z slabs keep each worker's sub-grid adjacent, so the cheap
+  ## warm-started cell-switches inside the C driver still apply within a slab
+  colGroups <- parallel::splitIndices(numZetaZ, nChunks)
+  colGroups <- colGroups[lengths(colGroups) > 0L]
+
+  ## one seed per slab, drawn from the (deterministic) parent stream: reproducible
+  ## for a fixed nthreads + seed, though different from the sequential draws and
+  ## from other nthreads values because each slab warm-starts its own chain
+  chunkSeeds <- sample.int(.Machine$integer.max, length(colGroups))
+
+  chunkControl <- control
+  chunkControl$n.thread <- 1L
+
+  results <- runSensitivityChunks(colGroups, chunkSeeds, Y, Z, X, X.test, zetaY, zetaZ,
+                                  theta, est.type, treatmentModel, chunkControl, verbose,
+                                  outcomeSpecs, propSpecs)
+
+  ok <- vapply(results, function(r) is.list(r) && !is.null(r$sens.coef), logical(1))
+  if (!all(ok))
+    stop("parallel sensitivity grid evaluation failed in ", sum(!ok), " of ", length(ok),
+         " chunk(s); rerun with nthreads = 1 to diagnose")
+
+  ## reassemble the slabs into the single-call layout so the caller is oblivious:
+  ## sens.coef is [n.sim, numZetaY, numZetaZ], sens.se is [numZetaY, numZetaZ]
+  nsim     <- control$n.sim
+  numZetaY <- length(zetaY)
+  sens.coef <- array(0.0, dim = c(nsim, numZetaY, numZetaZ))
+  sens.se   <- array(0.0, dim = c(numZetaY, numZetaZ))
+  for (k in seq_along(colGroups)) {
+    cols <- colGroups[[k]]
+    sens.coef[, , cols] <- results[[k]]$sens.coef
+    sens.se[, cols]     <- results[[k]]$sens.se
+  }
+
+  list(sens.coef = sens.coef, sens.se = sens.se)
 }
