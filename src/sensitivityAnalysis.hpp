@@ -2,6 +2,9 @@
 #define CIBART_SENSITIVITY_ANALYSIS_HPP
 
 #include <cstddef> // size_t
+#include <stdint.h> // uint_least32_t
+
+#include <external/Rinternals.h> // SEXP
 
 namespace cibart {
   enum EstimandType {
@@ -9,15 +12,15 @@ namespace cibart {
     ATT,
     ATC
   };
-  
+
   // not used at the moment
   /* enum ConfounderModelType {
     NORMAL,
     BINOMIAL
   }; */
-  
+
   struct TreatmentModel;
-  
+
   void
   fitSensitivityAnalysis(const double* y,     // numObs x 1
                          const double* z,     // numObs x 1
@@ -37,7 +40,12 @@ namespace cibart {
                          std::size_t numInitialBurnIn,
                          std::size_t numCellSwitchBurnIn,
                          std::size_t numTreeSamplesToThin,
-                         std::size_t numThreads,
+                         // the outcome BART's fully-resolved dbarts spec triple,
+                         // built R-side and re-created through the flat C API
+                         SEXP outcomeControlExpr,
+                         SEXP outcomeModelExpr,
+                         SEXP outcomeDataExpr,
+                         uint_least32_t rngSeed, // seeds the confounder rng
                          double* estimates,      // numSimsPerCell x numZetaY x numZetaZ
                          double* standardErrors, // numZetaY x numZetaZ
                          bool verbose);

@@ -1,7 +1,7 @@
 #include "config.hpp"
 
 #include <cstddef> // size_t
-#include <dbarts/cstdint.hpp>
+#include <cstdint>
 #include <cstdlib> // malloc, free for PoDs
 #include <cstring> // memcpy
 #include <math.h> // nan
@@ -18,9 +18,14 @@
 
 #include <Rdefines.h>
 #include <R_ext/Rdynload.h>
+#include <R_ext/Random.h> // GetRNGstate, unif_rand
 
 #undef USE_FC_LEN_T
 
+// the flat C API of the installed dbarts (dbarts.h); the stubs resolve each
+// entry point through R_GetCCallable on first use
+#define DBARTS_USE_STUBS
+#include <dbarts/dbarts.h>
 
 #include "sensitivityAnalysis.hpp"
 #include "guessNumCores.hpp"
@@ -49,7 +54,8 @@ namespace {
     BART
   };
   
-  cibart::TreatmentModel* createTreatmentModel(SEXP modelExpr, TreatmentModelType* modelType)
+  cibart::TreatmentModel* createTreatmentModel(SEXP modelExpr, TreatmentModelType* modelType,
+                                               SEXP propControlExpr, SEXP propModelExpr, SEXP propDataExpr)
   {
     SEXP classExpr = GET_CLASS(modelExpr);
     if (isNull(classExpr) || !IS_CHARACTER(classExpr)) Rf_error("treatment model not of appropriate class");
@@ -98,20 +104,13 @@ namespace {
     
     if (strcmp(className, "bartTreatmentModel") == 0) {
       *modelType = BART;
-      
-      SEXP kExpr = getListElement(modelExpr, "k");
-      double nodePriorParameter;
-      double scale = nan("");
-      if (Rf_isReal(kExpr)) {
-        nodePriorParameter = REAL(kExpr)[0];
-      } else { 
-        nodePriorParameter = REAL(getListElement(kExpr, "degreesOfFreedom"))[0];
-        scale = REAL(getListElement(kExpr, "scale"))[0];
-      }
-      size_t numTrees = static_cast<size_t>(INTEGER(getListElement(modelExpr, "ntree"))[0]);
-      size_t numThin  = static_cast<size_t>(INTEGER(getListElement(modelExpr, "keepevery"))[0]);
-     
-      return new cibart::BARTTreatmentModel(&R_GetCCallable, numTrees, numThin, nodePriorParameter, scale);
+
+      // the propensity model's dbarts spec triple is built R-side; ntree /
+      // keepevery / k are baked into it, so nothing is read off modelExpr here
+      if (propControlExpr == R_NilValue || propModelExpr == R_NilValue || propDataExpr == R_NilValue)
+        Rf_error("bart treatment model requires its dbarts specification");
+
+      return new cibart::BARTTreatmentModel(propControlExpr, propModelExpr, propDataExpr);
     }
     
     Rf_error("unrecognized treatment model: '%s'", className);
@@ -201,7 +200,9 @@ namespace {
                               SEXP x_testExpr,
                               SEXP zetaY, SEXP zetaZ, SEXP theta,
                               SEXP estimandExpr, SEXP treatmentModelExpr,
-                              SEXP sensControl, SEXP verboseExpr)
+                              SEXP sensControl, SEXP verboseExpr,
+                              SEXP outcomeControlExpr, SEXP outcomeModelExpr, SEXP outcomeDataExpr,
+                              SEXP propControlExpr, SEXP propModelExpr, SEXP propDataExpr)
   {
     int* dims;
     
@@ -259,7 +260,8 @@ namespace {
     }
     
     TreatmentModelType treatmentModelType;
-    cibart::TreatmentModel* treatmentModel = createTreatmentModel(treatmentModelExpr, &treatmentModelType);
+    cibart::TreatmentModel* treatmentModel = createTreatmentModel(treatmentModelExpr, &treatmentModelType,
+                                                                  propControlExpr, propModelExpr, propDataExpr);
     
     SEXP sensParameterExpr = getListElement(sensControl, "n.sim");
     if (sensParameterExpr == R_NilValue) Rf_error("n.sim must be specified in iteration control");
@@ -277,10 +279,10 @@ namespace {
     if (sensParameterExpr == R_NilValue) Rf_error("n.thin must be specified in iteration control");
     size_t numTreeSamplesToThin = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
     
-    sensParameterExpr = getListElement(sensControl, "n.thread");
-    if (sensParameterExpr == R_NilValue) Rf_error("n.thread must be specified in iteration control");
-    size_t numThreads = static_cast<size_t>(INTEGER(sensParameterExpr)[0]);
-    
+    // n.thread is honored no longer: the flat C API drives BART on the main R
+    // thread only, so the grid runs sequentially (the classic C-level grid
+    // parallelism relied on the removed per-thread RNG injection)
+
     if (!isLogical(verboseExpr)) Rf_error("verbose must be of type logical");
     if (length(verboseExpr) == 0) Rf_error("verbose must be of length at least 1");
     bool verbose = LOGICAL(verboseExpr)[0] != 0;
@@ -314,8 +316,13 @@ namespace {
     SET_STRING_ELT(namesExpr, 0, mkChar("sens.coef"));
     SET_STRING_ELT(namesExpr, 1, mkChar("sens.se"));
     
+    // draw the confounder-generator seed from R's stream in a narrow bracket;
+    // the dbarts_sampler_* entry points manage R's RNG internally afterwards, so
+    // no outer bracket may span them (it would double-bracket R's stream)
     GetRNGstate();
-    
+    uint_least32_t rngSeed = static_cast<uint_least32_t>(unif_rand() * 4294967295.0);
+    PutRNGstate();
+
     cibart::fitSensitivityAnalysis(REAL(y), REAL(z), x,
                                    numObservations, numPredictors,
                                    x_test,
@@ -327,13 +334,12 @@ namespace {
                                    numInitialBurnIn,
                                    numCellSwitchBurnIn,
                                    numTreeSamplesToThin,
-                                   numThreads,
+                                   outcomeControlExpr, outcomeModelExpr, outcomeDataExpr,
+                                   rngSeed,
                                    REAL(fittedCoefficients),
                                    REAL(standardErrors),
                                    verbose);
-    
-    PutRNGstate();
-    
+
     UNPROTECT(3);
     
     destroyTreatmentModel(treatmentModel, treatmentModelType);
@@ -420,7 +426,7 @@ extern "C" {
 #define DEF_FUNC(_N_, _F_, _A_) { _N_, std::bit_cast<DL_FUNC>(&_F_), _A_ }
   
   R_CallMethodDef R_callMethods[] = {
-    DEF_FUNC("treatSens_fitSensitivityAnalysis", fitSensitivityAnalysis, 11),
+    DEF_FUNC("treatSens_fitSensitivityAnalysis", fitSensitivityAnalysis, 17),
     DEF_FUNC("treatSens_guessNumCores", guessNumCores, 0),
     DEF_FUNC("treatSens_glmFit", glmFit, 5),
     {NULL, NULL, 0}
@@ -435,7 +441,12 @@ extern "C" {
   {
     R_registerRoutines(info, NULL, R_callMethods, NULL, NULL);
     R_useDynamicSymbols(info, static_cast<Rboolean>(FALSE));
-    
+
+    // dbarts flat C API handshake: major must match, minor must be at least ours
+    if (dbarts_apiMajorVersion() != DBARTS_C_API_MAJOR || dbarts_apiMinorVersion() < DBARTS_C_API_MINOR)
+      Rf_error("treatSens was built against dbarts C API %d.%d but the installed dbarts provides %d.%d; reinstall treatSens",
+               DBARTS_C_API_MAJOR, DBARTS_C_API_MINOR, dbarts_apiMajorVersion(), dbarts_apiMinorVersion());
+
     misc_simd_init();
   }
 }

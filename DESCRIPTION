@@ -3,9 +3,9 @@ Version: 3.0
 Date: 2024-02-03
 Title: Sensitivity Analysis for Causal Inference
 Authors@R: c(
-  person("Nicole Bohme", "Carnegie", role = c("aut", "cre"), email = "carnegin@uwm.edu"),
+  person("Nicole Bohme", "Carnegie", role = "aut", email = "carnegin@uwm.edu"),
   person("Masataka", "Harada", role = "aut", email = "masatakaharada@gmail.com"),
-  person("Vincent", "Dorie", role = "aut", email = "vdorie@gmail.com", comment = c(ORCID = "0000-0002-9576-3064")),
+  person("Vincent", "Dorie", role = c("aut", "cre"), email = "vdorie@gmail.com", comment = c(ORCID = "0000-0002-9576-3064")),
   person("Jennifer", "Hill", role = "ctb", email = "jennifer.hill@nyu.edu"),
   person("R Core Team", role = "ctb", comment = "basis of RNG"),
   person("Guido U", "Draheim", role = "ctb", comment = "ax_check_compile_flag.m4"),
@@ -27,13 +27,13 @@ Imports:
     mvtnorm,
     lme4,
     nlme,
-    dbarts (>= 0.9-21)
+    dbarts (>= 1.0-0)
 Suggests:
     doParallel,
     foreach,
     testthat (>= 0.9-0)
 LinkingTo:
-    dbarts (>= 0.9-21)
+    dbarts (>= 1.0-0)
 Description: Utilities to investigate sensitivity to unmeasured confounding in
     parametric models with either binary or continuous treatment.
 NeedsCompilation: yes
