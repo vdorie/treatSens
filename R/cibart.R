@@ -56,6 +56,15 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
                else dbarts::dbartsData(x, y, unname(as.matrix(x.test)))
   data.bart@n.cuts <- rep_len(100L, ncol(data.bart@x))
 
+  ## the flat C API's dbarts_sampler_create trusts data@sigma to calibrate the
+  ## residual-variance (chisq) prior scale; dbarts() fills an NA estimate before
+  ## building the engine, so mirror that here or the very first sigma draw is
+  ## NaN (gaussian only - probit is a fixed unit-scale family with no sigma)
+  if (!binary && is.na(data.bart@sigma)) {
+    estimateSigmaFromLinearModel <- get("estimateSigmaFromLinearModel", envir = asNamespace("dbarts"))
+    data.bart@sigma <- estimateSigmaFromLinearModel(data.bart)
+  }
+
   control.bart <- dbarts::dbartsControl(n.chains = 1L, n.samples = as.integer(n.sim),
                                         n.burn = as.integer(max(0L, n.burn)),
                                         n.thin = as.integer(n.thin), n.threads = 1L,
