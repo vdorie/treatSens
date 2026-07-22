@@ -54,6 +54,40 @@ test_that("treatSens.BART fits basic example with bart treatment model", {
   expect_is(out.bin, "sensitivity")
 })
 
+test_that("treatSens.BART evaluates the grid in parallel with a finite result", {
+  skip_on_os("windows")  # keep the socket-cluster path out of routine CRAN checks
+  skip_if_not_installed("parallel")
+
+  out.par <- treatSens.BART(Y ~ Z + X, trt.model = probitEM, nsim = 3, nburn = 1,
+                            spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
+                            standardize = FALSE, nthreads = 2)
+  expect_is(out.par, "sensitivity")
+  # gate the numbers, not just the class: the NA-poisoning failure mode showed a
+  # valid "sensitivity" object with an all-NA grid, so assert the grid is finite.
+  # zeta.z is bumped to an odd count to bracket 0, so nthreads = 2 partitions a
+  # >= 2 column grid into two slabs - a genuine parallel run
+  expect_length(dim(out.par$tau), 3L)
+  expect_gte(dim(out.par$tau)[2L], 2L)
+  expect_identical(dim(out.par$tau)[3L], 3L)
+  expect_true(all(is.finite(out.par$tau)))
+  expect_true(all(is.finite(out.par$se.tau)))
+})
+
+test_that("treatSens.BART rejects an invalid nthreads", {
+  expect_error(
+    treatSens.BART(Y ~ Z + X, trt.model = probitEM, nsim = 2, nburn = 0,
+                   spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
+                   standardize = FALSE, nthreads = 0))
+  expect_error(
+    treatSens.BART(Y ~ Z + X, trt.model = probitEM, nsim = 2, nburn = 0,
+                   spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
+                   standardize = FALSE, nthreads = "not-a-number"))
+  expect_error(
+    treatSens.BART(Y ~ Z + X, trt.model = probitEM, nsim = 2, nburn = 0,
+                   spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
+                   standardize = FALSE, nthreads = NA_integer_))
+})
+
 test_that("treatSens fails with an invalid number of iterations", {
   baseArgs <- namedList(formula = Y ~ Z + X, trt.family = binomial(link = "probit"),
                         grid.dim = c(2, 2), nsim = 1, standardize = FALSE)
