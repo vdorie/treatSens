@@ -5,28 +5,20 @@
 
 #include <cstddef> // size_t
 
-// this unusual set of declarations solves a rather obscure warning on Solaris
-typedef void* (*C_voidPtrFunction)(void);
-extern "C" typedef C_voidPtrFunction (*C_voidPtrFunctionLookup)(const char* _namespace, const char* name);
+#include <external/Rinternals.h> // SEXP
 
 namespace cibart {
-  struct BARTTreatmentModelFunctionTable;
-  
-  typedef C_voidPtrFunctionLookup voidPtrFunctionLookup;
-  
+  // Optional propensity model: a probit BART fit of Z on X, driven through the
+  // flat C API (dbarts.h). The fully-resolved dbarts spec triple is built in R
+  // and borrowed here (kept alive R-side for the analysis's duration).
   struct BARTTreatmentModel : TreatmentModel {
-    std::size_t numTrees;
-    std::size_t numThin;
-    
-    double nodePriorParameter;
-    double scale;
-    
-    BARTTreatmentModelFunctionTable* functionTable;
-    
-    BARTTreatmentModel(voidPtrFunctionLookup lookup, std::size_t numTrees, std::size_t numThin, double nodePriorParameter, double scale);
+    SEXP controlExpr;
+    SEXP modelExpr;
+    SEXP dataExpr;
+
+    BARTTreatmentModel(SEXP controlExpr, SEXP modelExpr, SEXP dataExpr);
     ~BARTTreatmentModel();
   };
 }
 
 #endif // CIBART_BART_TREATMENT_MODEL_HPP
-

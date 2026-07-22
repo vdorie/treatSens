@@ -40,25 +40,84 @@ evaluateTreatmentModelArgument <- function(arg)
   result
 }
 
+## Builds the fully-resolved dbarts spec triple (control, model, data) that the
+## flat C API (dbarts.h) re-creates its engine from. The classic in-C++ Control/
+## Model/Data construction is gone with the old ABI, so we assemble the S4 specs
+## in R using dbarts's own constructors and prior resolution.
+makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, node.prior)
+{
+  ## placate R CMD check; these names resolve inside dbarts's parsePriors env
+  cgm <- chisq <- gaussian <- NULL
+
+  # drop dimnames so the engine matches the counterfactual test matrix to the
+  # training predictors by position (they are column-aligned by construction)
+  x <- unname(as.matrix(x))
+  data.bart <- if (is.null(x.test)) dbarts::dbartsData(x, y)
+               else dbarts::dbartsData(x, y, unname(as.matrix(x.test)))
+  data.bart@n.cuts <- rep_len(100L, ncol(data.bart@x))
+
+  control.bart <- dbarts::dbartsControl(n.chains = 1L, n.samples = as.integer(n.sim),
+                                        n.burn = as.integer(max(0L, n.burn)),
+                                        n.thin = as.integer(n.thin), n.threads = 1L,
+                                        n.trees = as.integer(n.trees), n.cuts = 100L,
+                                        keepTrainingFits = TRUE, updateState = FALSE,
+                                        verbose = FALSE)
+  control.bart@binary <- binary
+
+  parsePriors <- get("parsePriors", envir = asNamespace("dbarts"))
+  priorsCall <- as.call(list(parsePriors, control.bart, data.bart,
+                             tree.prior = quote(cgm), node.prior = node.prior,
+                             resid.prior = quote(chisq), resid.dist = quote(gaussian),
+                             parentEnv = environment()))
+  priors <- eval(priorsCall)
+
+  model.bart <- methods::new("dbartsModel",
+                             priors$tree.prior, priors$node.prior,
+                             priors$node.hyperprior, priors$resid.prior,
+                             node.scale = if (binary) 3.0 else 0.5,
+                             family = if (binary) "probit" else "gaussian")
+
+  list(control = control.bart, model = model.bart, data = data.bart)
+}
+
 cibart <- function(Y, Z, X, X.test,
                    zetaY, zetaZ, theta,
                    est.type, treatmentModel = probitEM(),
                    control = cibartControl(), verbose = FALSE)
 {
   matchedCall <- match.call()
-  
+
   if (!is(control, "cibartControl")) stop("control must be of class cibartControl; call cibartControl() to create");
 
   treatmentModel <- evaluateTreatmentModelArgument(matchedCall$treatmentModel)
-    
+
   if (is(treatmentModel, "probitTreatmentModel") && !identical(treatmentModel$family, "flat")) {
     treatmentModel$scale <- rep_len(treatmentModel$scale, ncol(X) + 1L)
   }
-  
+
+  ## outcome BART: predictors [X Z], counterfactual test matrix X.test, response Y
+  outcomeSpecs <- makeBartSpecs(cbind(X, Z), as.double(Y), X.test, binary = FALSE,
+                                n.trees = 200L, n.thin = control$n.thin,
+                                n.sim = control$n.sim, n.burn = control$n.burn.init,
+                                node.prior = quote(normal(2.0)))
+
+  ## optional propensity BART: predictors X, response Z (probit); no test data
+  propSpecs <- NULL
+  if (is(treatmentModel, "bartTreatmentModel")) {
+    k <- treatmentModel$k
+    nodePrior <- if (is.numeric(k)) bquote(normal(.(k)))
+                 else bquote(normal(chi(.(k$degreesOfFreedom), .(k$scale))))
+    propSpecs <- makeBartSpecs(X, as.double(Z), NULL, binary = TRUE,
+                               n.trees = treatmentModel$ntree, n.thin = treatmentModel$keepevery,
+                               n.sim = 1L, n.burn = 0L, node.prior = nodePrior)
+  }
+
   .Call("treatSens_fitSensitivityAnalysis",
         Y, Z, X,
         X.test,
         zetaY, zetaZ,
         theta, est.type, treatmentModel,
-        control, verbose)
+        control, verbose,
+        outcomeSpecs$control, outcomeSpecs$model, outcomeSpecs$data,
+        propSpecs$control, propSpecs$model, propSpecs$data)
 }

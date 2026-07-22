@@ -58,5 +58,14 @@ int rc_getRuntimeVersion(int* major, int* minor, int* revision);
 }
 #endif
 
+// R 4.5.0 gated Rf_findVarInFrame behind ENABLE_LEGACY_NONAPI_FUNS; R_getVar is
+// the supported single-frame lookup (errors when the symbol is absent, which
+// suits callers that look up names known to exist)
+#if R_VERSION >= R_Version(4, 5, 0)
+#  define rc_getVariableInEnvironment(__ENV__, __SYM__) R_getVar(__SYM__, __ENV__, FALSE)
+#else
+#  define rc_getVariableInEnvironment(__ENV__, __SYM__) Rf_findVarInFrame(__ENV__, __SYM__)
+#endif
+
 #endif // RC_UTIL_H
 
