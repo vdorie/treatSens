@@ -48,13 +48,13 @@ treatSens.BART(formula,
   \item{trim.wt}{the maximum size of weight as a percentage of the sample size of the inferential group for the causal estimand. For example, \code{trim.wt = 10} in a dataset with 300 treated observations when the estimand has been set to "ATT" gives a maximum weight of 30.}
   \item{benchmarking}{either "2SD" or "1SD". Used to determine the "marginal effects" corresponding to predictors for the plot, where the number of SD units given is the full spread, i.e. distance from below the mean to above.}
 }
-\details{This function performs a dual-parameter sensitivity analysis for unobserved confounding by drawing simulated potential confounders U from the conditional distribution of U given observed response, treatment and covariates. Bayesian Additive Regression Trees (\link{bart}) are used to fit the response surface and potentially the treatment as well. See \link{treatSens} for details of the sensitivity anaylsis algorithm.
+\details{This function performs a dual-parameter sensitivity analysis for unobserved confounding by drawing simulated potential confounders U from the conditional distribution of U given observed response, treatment and covariates. Bayesian Additive Regression Trees (\link[dbarts]{bart}) are used to fit the response surface and potentially the treatment as well. See \link{treatSens} for details of the sensitivity anaylsis algorithm.
 
 Unique options to \code{treatSens.BART} are given by the argument \code{trt.model}. It is specified as an delayed-evaluation function call of the form:
 \itemize{
   \item \code{probitEM(maxBackstepIterations = 30L)} - uses glm to perform stochastic expectation maximization; backstep iterations are an internal parameter to glm.fit
   \item \code{probit(family = "cauchy", ...)} - family can be \code{"cauchy"}, \code{"t"}, \code{"normal"}, or \code{"flat"}. Additional options are, \code{scale = 4}, \code{c(df = 3, scale = 4)}, \code{scale = 4}, and none, respectively.
-  \item \code{bart(k = chi(1.25, Inf), ntree = 50, keepevery = 10)} - uses binary \code{\link{bart}} with the given parameters. By default the node sensitivity parameter, \code{k}, is given a chi hyperprior.
+  \item \code{bart(k = chi(1.25, Inf), ntree = 50, keepevery = 10)} - uses binary \code{\link[dbarts]{bart}} with the given parameters. By default the node sensitivity parameter, \code{k}, is given a chi hyperprior.
 }
 }
 \value{

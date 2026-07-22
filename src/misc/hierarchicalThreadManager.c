@@ -233,7 +233,7 @@ int misc_htm_runTopLevelTasksWithOutput(misc_htm_manager_t restrict manager, mis
       int waitStatus = waitOnConditionForTime(manager->taskDone, manager->mutex, wakeTime);
       if (waitStatus == ETIMEDOUT) {
         if (manager->bufferPos != 0) {
-          ext_printf(manager->buffer);
+          ext_printf("%s", manager->buffer);
           ext_fflush_stdout();
           manager->bufferPos = 0;
         }
@@ -269,7 +269,7 @@ int misc_htm_runTopLevelTasksWithOutput(misc_htm_manager_t restrict manager, mis
     int waitStatus = waitOnConditionForTime(manager->taskDone, manager->mutex, wakeTime);
     if (waitStatus == ETIMEDOUT) {
       if (manager->bufferPos != 0) {
-        ext_printf(manager->buffer);
+        ext_printf("%s", manager->buffer);
         ext_fflush_stdout();
         manager->bufferPos = 0;
       }
@@ -291,7 +291,7 @@ int misc_htm_runTopLevelTasksWithOutput(misc_htm_manager_t restrict manager, mis
   manager->numTopLevelTasks = 0;
   
   if (manager->bufferPos != 0) {
-    ext_printf(manager->buffer);
+    ext_printf("%s", manager->buffer);
     ext_fflush_stdout();
     manager->bufferPos = 0;
   }
@@ -782,7 +782,7 @@ void misc_htm_printf(misc_htm_manager_t manager, const char* format, ...)
     vsnprintf(buffer, BUFFER_LENGTH, format, argsPointer);
     va_end(argsPointer);
     
-    ext_printf(buffer);
+    ext_printf("%s", buffer);
     
     return;
   }
