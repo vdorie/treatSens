@@ -96,7 +96,7 @@ Matrices and data frames should include only complete cases.
 \author{Nicole Bohme Carnegie, Masataka Harada, and Jennifer Hill
 }
 \seealso{
-\code{\link{treatSens}} \code{\link{sensPlot}} \code{\link{summary.sensitivity}} \code{\link{glmer}}
+\code{\link{treatSens}} \code{\link{sensPlot}} \code{\link{summary.sensitivity}} \code{\link[lme4]{glmer}}
 }
 \examples{
 N = 300          #number of observations
