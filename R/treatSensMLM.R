@@ -150,9 +150,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   }
 
   n.obs = length(Y)
-  
-  cat("Fitting null models...\n")
-  
+
+  if (verbose) cat("Fitting null models...\n")
+
   #fit null model for treatment model & get residuals
   if(trt.level == "indiv"){
     if(!is.null(X)) {
@@ -310,8 +310,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
 
   sens.coef <- sens.se <- zeta.z <- zeta.y <- zz.se <- zy.se <- resp.s2 <- trt.s2 <- array(NA, dim = c(grid.dim[2], grid.dim[1], nsim), dimnames = list(round(zetaY,3),round(zetaZ,3),NULL))
   
-  cat("Computing final grid...\n")
-  
+  if (verbose) cat("Computing final grid...\n")
+
   #fill in grid
   cell = 0
   
@@ -586,8 +586,7 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
           if(!is.null(X)) {
             #debug(contYbinaryZU)
             ## results are n.samp - n.warm in length, so this gives us 1 sample but I've added a bit of warm up
-            out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, offset, p, g))
-            #out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+            out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
           } else {
             stop("Need to write Binary MLM code with no X") #out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
           }

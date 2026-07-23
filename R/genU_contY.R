@@ -439,8 +439,21 @@ contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j = 10, weights = NUL
   u <- rbinom(n.obs, 1L, p)
   
   for (j in seq_len(iter.j)) {
-    unpack[beta.y, beta.z, v.y, v.alpha, v.phi] <- fitLinearModels(data, offset, u)
-    
+    ## NB: plain sequential assignment, not unpack[...] <- ...; the latter's
+    ## custom "[<-" S3 dispatch relies on the interpreter's *tmp* rewriting of
+    ## complex assignments, which the byte compiler does not preserve for this
+    ## idiom once this function ships inside a compiled package (fails with
+    ## "object '*tmp*' not found" on every call, silently poisoning the grid
+    ## with NAs after the retry loop below gives up). fitLinearModels() only
+    ## returns the subset of these names implied by zeta.y/zeta.z being
+    ## nonzero, so mirror unpack's "leave unset names untouched" semantics.
+    fittedModels <- fitLinearModels(data, offset, u)
+    if (!is.null(fittedModels$beta.y))  beta.y  <- fittedModels$beta.y
+    if (!is.null(fittedModels$beta.z))  beta.z  <- fittedModels$beta.z
+    if (!is.null(fittedModels$v.y))     v.y     <- fittedModels$v.y
+    if (!is.null(fittedModels$v.alpha)) v.alpha <- fittedModels$v.alpha
+    if (!is.null(fittedModels$v.phi))   v.phi   <- fittedModels$v.phi
+
     for (i in seq_along(n.gp)) {
       Sigma.z <- diag(1,   n.gp[i]) + matrix(v.phi,   nrow = n.gp[i], ncol = n.gp[i])
       Sigma.y <- diag(v.y, n.gp[i]) + matrix(v.alpha, nrow = n.gp[i], ncol = n.gp[i])

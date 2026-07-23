@@ -280,7 +280,7 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     #Transform X with neg. reln to Y to limit plot to 1 & 2 quadrants.
     Xcoef.flg =  as.vector(ifelse(Xpartials[,2]>=0,1,-1))
     X.positive = t(t(X)*Xcoef.flg)
-    Xcoef.plot <- cbind(X.partials[,1], X.partials(Y, Z, X.positive, XY, resp.family, trt.family)[,2])
+    Xcoef.plot <- cbind(Xpartials[,1], X.partials(Y, Z, X.positive, XY, resp.family, trt.family)[,2])
     Xcoef <- Xpartials
   }
   
