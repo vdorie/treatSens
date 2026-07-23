@@ -115,7 +115,74 @@ test_that("treatSens fails with overridden zero.loc parameter", {
 
 ##Vince's code: test that zero loc breaks, but also that it runs correctly.
 test_that("treatSens runs correctly with numerical zero.loc", {
-  fit <- treatSens(testFormula, grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = 1 / 3) 
+  fit <- treatSens(testFormula, grid.dim = c(2, 2), nsim = 2, standardize = FALSE, zero.loc = 1 / 3)
   expect_is(fit, "sensitivity")
+})
+
+test_that("the zero-confounding grid cell recovers the naive null-model estimate", {
+  ## with zeta.z = zeta.y = 0 the offset method collapses to the null model,
+  ## so this cell of the grid must reproduce the naive glm estimate exactly -
+  ## a much stronger check than merely asserting the grid is finite.
+  fit <- suppressWarnings(treatSens(testFormula, spy.range = c(0, 2), spz.range = c(-2, 2),
+                        grid.dim = c(2, 2), nsim = 2, standardize = FALSE))
+
+  naiveTau <- unname(coef(glm(testFormula))["Z"])
+  expect_equal(unname(fit$tau0), naiveTau)
+
+  zeroYIndex <- which(as.numeric(rownames(fit$tau)) == 0)
+  zeroZIndex <- which(as.numeric(colnames(fit$tau)) == 0)
+  expect_length(zeroYIndex, 1L)
+  expect_length(zeroZIndex, 1L)
+  expect_equal(fit$tau[zeroYIndex, zeroZIndex, ], rep(naiveTau, dim(fit$tau)[3L]),
+              ignore_attr = TRUE)
+})
+
+test_that("treatSens supports sensParam = 'cor' (partial correlations)", {
+  ## regression test: this path used to crash because a local variable
+  ## (Xpartials) was shadowed by the X.partials() function of the same name
+  ## when building Xcoef.plot, so X.partials[,1] tried to subset a closure
+  fit <- suppressWarnings(
+    treatSens(testFormula, grid.dim = c(2, 2), nsim = 1, standardize = FALSE,
+              zero.loc = 1 / 3, sensParam = "cor"))
+  expect_is(fit, "sensitivity")
+  expect_identical(fit$sensParam, "cor")
+  expect_length(dim(fit$tau), 3L)
+  expect_true(all(is.finite(fit$tau)))
+  expect_true(all(is.finite(fit$se.tau)))
+})
+
+test_that("treatSens accepts all documented trt.family spellings for a continuous treatment", {
+  for (spelling in c("gaussian", "Gaussian", "normal", "identity", "continuous")) {
+    fit <- suppressWarnings(
+      treatSens(testFormula, trt.family = spelling, grid.dim = c(2, 2), nsim = 1,
+                standardize = FALSE, zero.loc = "full"))
+    expect_is(fit, "sensitivity")
+  }
+  expect_error(
+    treatSens(testFormula, trt.family = "bogus", grid.dim = c(2, 2), nsim = 1,
+              standardize = FALSE, zero.loc = "full"))
+})
+
+test_that("treatSens accepts all documented resp.family spellings", {
+  for (spelling in c("normal", "continuous", "gaussian")) {
+    fit <- suppressWarnings(
+      treatSens(testFormula, resp.family = spelling, grid.dim = c(2, 2), nsim = 1,
+                standardize = FALSE, zero.loc = "full"))
+    expect_is(fit, "sensitivity")
+  }
+  expect_error(
+    treatSens(testFormula, resp.family = "bogus", grid.dim = c(2, 2), nsim = 1,
+              standardize = FALSE, zero.loc = "full"))
+})
+
+test_that("treatSens validates grid.dim and the spy/spz range lengths", {
+  expect_error(
+    treatSens(testFormula, grid.dim = c(2, 2, 2), nsim = 1, standardize = FALSE, zero.loc = 1 / 3))
+  expect_error(
+    treatSens(testFormula, grid.dim = c(2, 2), nsim = 1, standardize = FALSE,
+              spy.range = c(0, 1, 2), spz.range = c(-1, 1)))
+  expect_error(
+    treatSens(testFormula, grid.dim = c(2, 2), nsim = 1, standardize = FALSE,
+              spy.range = c(0, 1), spz.range = c(-1, 0, 1)))
 })
 
