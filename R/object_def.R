@@ -5,7 +5,7 @@
 combine.sensitivity <- function(x1, x2){
   if (!inherits(x1, "sensitivity") || !inherits(x2, "sensitivity"))
     stop("Objects must be of class \"sensitivity\"")
-  if (!all.equal(c(x1$Y, x1$Z), c(x2$Y, x2$Z)))
+  if (!isTRUE(all.equal(c(x1$Y, x1$Z), c(x2$Y, x2$Z))))
     stop("Combining objects only allowed for sensitivity analyses on same data set")
   if (!(x1$sensParam == x2$sensParam))
     stop("Combining objects only allowed for sensitivity analyses using same type of sensitivity parameter")

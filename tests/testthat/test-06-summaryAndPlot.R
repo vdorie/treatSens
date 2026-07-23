@@ -104,4 +104,10 @@ test_that("combine.sensitivity rejects mismatched inputs", {
                                   spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
                                   standardize = FALSE, nthreads = 1))
   expect_error(combineSensitivity(glmFit1, bartFit2))
+
+  ## the data-mismatch guard (differing Y/Z): must raise the intended error, not
+  ## an "invalid argument to unary operator" from !all.equal on a non-TRUE result
+  glmFitDiff <- glmFit1
+  glmFitDiff$Y <- glmFit1$Y + 1
+  expect_error(combineSensitivity(glmFit1, glmFitDiff), "same data set")
 })
