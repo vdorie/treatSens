@@ -1,8 +1,8 @@
 ## based sorta on parallel::detectCores
 
 guessNumCores <- function(logical = FALSE) {
-  if (is.na(logical)) stop("logical cannot be NA")
   if (length(logical) != 1) stop("logical must be length 1")
+  if (is.na(logical)) stop("logical cannot be NA")
   
   cGuess <- .Call("treatSens_guessNumCores")
   if (logical == FALSE && !is.na(cGuess[1])) return(cGuess[1])

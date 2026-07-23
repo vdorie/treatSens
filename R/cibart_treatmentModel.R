@@ -41,12 +41,13 @@ bart <- function(k = chi(1.25, Inf), ntree = 50, keepevery = 10)
     stop('illegal bart treatment model: ntree must be > 0')
   if (keepevery <= 0)
     stop('illegal bart treatment model: keepevery must be > 0')
-  if (is.numeric(k) && k <= 0)
-    stop('illegal bart treatment model: k must be > 0')
-  else {
+  if (is.numeric(k)) {
+    if (k <= 0)
+      stop('illegal bart treatment model: k must be > 0')
+  } else {
     if (k$degreesOfFreedom < 0)
       stop('illegal bart treatment model: degreesOfFreedom for k must be >= 0')
-    if (k$scale < 0) 
+    if (k$scale < 0)
       stop('illegal bart treatment model: scale for k must be >= 0')
   }
   
