@@ -443,8 +443,15 @@ extern "C" {
     R_useDynamicSymbols(info, static_cast<Rboolean>(FALSE));
 
     // dbarts flat C API handshake: major must match, minor must be at least ours
-    if (dbarts_apiMajorVersion() != DBARTS_C_API_MAJOR || dbarts_apiMinorVersion() < DBARTS_C_API_MINOR)
-      Rf_error("treatSens was built against dbarts C API %d.%d but the installed dbarts provides %d.%d; reinstall treatSens",
+    //
+    // Pre-release lockstep check: the version constants do not move before
+    // 1.0-0, so the major/minor handshake alone can never fire and only the
+    // exact signature token catches a stale binary. Remove or downgrade it at
+    // the 1.0-0 freeze - post-release a legitimate minor append moves the hash
+    // and a hard equality would refuse every consumer until it is rebuilt.
+    if (dbarts_apiMajorVersion() != DBARTS_C_API_MAJOR || dbarts_apiMinorVersion() < DBARTS_C_API_MINOR ||
+        dbarts_apiHash() != DBARTS_C_API_HASH)
+      Rf_error("treatSens was built against dbarts C API %d.%d but the installed dbarts provides %d.%d, or the two carry different entry-point signatures; reinstall treatSens",
                DBARTS_C_API_MAJOR, DBARTS_C_API_MINOR, dbarts_apiMajorVersion(), dbarts_apiMinorVersion());
 
     misc_simd_init();
