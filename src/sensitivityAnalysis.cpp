@@ -170,7 +170,7 @@ namespace {
       dbarts_sampler_run(fit, 0, 1, &results);
 
       conditionalGibbsUpdate(control, data, scratch, zetaY, zetaZ, results.train, sigmaDraw);
-      dbarts_sampler_setResponse(fit, scratch.yMinusZetaU);
+      dbarts_sampler_setResponse(fit, scratch.yMinusZetaU, 1);
     }
 
     for (size_t s = 0; s < control.numSimsPerCell; ++s) {
@@ -181,7 +181,7 @@ namespace {
       dbarts_sampler_run(fit, 0, 1, &results);
 
       conditionalGibbsUpdate(control, data, scratch, zetaY, zetaZ, results.train, sigmaDraw);
-      dbarts_sampler_setResponse(fit, scratch.yMinusZetaU);
+      dbarts_sampler_setResponse(fit, scratch.yMinusZetaU, 1);
     }
 
     size_t estimateOffset = cell.offset * control.numSimsPerCell;
@@ -275,7 +275,7 @@ namespace cibart {
     subtractConfounderFromResponse(data, scratch, gridCells[0].zetaY);
     double sigmaEstimate = estimateSigma(data, scratch);
     dbarts_sampler_setSigma(fit, sigmaEstimate);
-    dbarts_sampler_setResponse(fit, scratch.yMinusZetaU);
+    dbarts_sampler_setResponse(fit, scratch.yMinusZetaU, 1);
 
     runGridCell(control, data, scratch, fit, gridCells[0], numInitialBurnIn,
                 trainStore, testStore, estimates, standardErrors);
@@ -288,7 +288,7 @@ namespace cibart {
       // simply change the response BART sees; the Gibbs update inside the cell
       // conditions on the new zetaY / zetaZ
       subtractConfounderFromResponse(data, scratch, gridCells[i].zetaY);
-      dbarts_sampler_setResponse(fit, scratch.yMinusZetaU);
+      dbarts_sampler_setResponse(fit, scratch.yMinusZetaU, 1);
 
       runGridCell(control, data, scratch, fit, gridCells[i], numCellSwitchBurnIn,
                   trainStore, testStore, estimates, standardErrors);
