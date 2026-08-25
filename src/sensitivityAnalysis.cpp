@@ -29,6 +29,7 @@
 
 #include "treatmentModel.hpp"
 
+#define DBARTS_REQUIRE_EXACT_ABI
 #define DBARTS_USE_STUBS
 #include <dbarts/dbarts.h>
 
@@ -256,7 +257,7 @@ namespace cibart {
 
     // the outcome sampler: gaussian family, created once and continued across
     // cells via setResponse; force single-threaded, inline execution
-    dbarts_sampler* fit = dbarts_sampler_create(outcomeControlExpr, outcomeModelExpr, outcomeDataExpr, "");
+    dbarts_sampler* fit = dbarts_sampler_create(outcomeControlExpr, outcomeModelExpr, outcomeDataExpr, DBARTS_FAMILY_AUTO);
     dbarts_sampler_setNumThreads(fit, 1);
     dbarts_sampler_setVerbose(fit, 0, 100);
 
