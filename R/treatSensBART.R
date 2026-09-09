@@ -190,7 +190,11 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   X.train <- if (is.null(X)) Z else cbind(X, Z)
   colnames(X.train) <- colnames(X.test)
 
-  null.resp <- dbarts::bart(x.train = X.train, y.train = Y, x.test = X.test, verbose = FALSE)
+  # bartBT is dbarts 0.9-x's bart under its own name: same arguments, same
+  # defaults. The modern bart() takes neither the BayesTree spelling nor those
+  # defaults, so this call names bartBT rather than relying on the forwarding
+  # shim (removed in dbarts 1.1-0)
+  null.resp <- dbarts::bartBT(x.train = X.train, y.train = Y, x.test = X.test, verbose = FALSE)
   Y.res <- Y - t(null.resp$yhat.train)  ## residual vectors from BART fit
   v_Y <- max(apply(Y.res, 2, var)) * (n.obs - 1) / (n.obs - NCOL(X) - 2)
   Y.res <- Y.res[,1]

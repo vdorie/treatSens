@@ -35,7 +35,7 @@ if (getRversion() >= "3.3.0") {
   importFrom(lme4, sigma)
 }
 
-importFrom(dbarts, bart, pdbart, dbarts, dbartsControl)
+importFrom(dbarts, bart, bartBT, pdbart, dbarts, dbartsControl)
 importClassesFrom(dbarts, dbartsSampler)
 
 importFrom(mvtnorm, dmvnorm, pmvnorm, rmvnorm)
