@@ -4,7 +4,10 @@
 #include <cstddef> // size_t
 #include <stdint.h> // uint_least32_t
 
-#include <external/Rinternals.h> // SEXP
+// dbarts.h's opaque sampler handle, forward declared so this header needs
+// neither dbarts.h (which the translation units include with their own
+// DBARTS_USE_STUBS) nor an R header
+struct dbarts_sampler_t;
 
 namespace cibart {
   enum EstimandType {
@@ -40,11 +43,9 @@ namespace cibart {
                          std::size_t numInitialBurnIn,
                          std::size_t numCellSwitchBurnIn,
                          std::size_t numTreeSamplesToThin,
-                         // the outcome BART's fully-resolved dbarts spec triple,
-                         // built R-side and re-created through the flat C API
-                         SEXP outcomeControlExpr,
-                         SEXP outcomeModelExpr,
-                         SEXP outcomeDataExpr,
+                         // the outcome BART, created R-side from its spec triple
+                         // and driven here through the flat C API
+                         ::dbarts_sampler_t* outcomeSampler,
                          uint_least32_t rngSeed, // seeds the confounder rng
                          double* estimates,      // numSimsPerCell x numZetaY x numZetaZ
                          double* standardErrors, // numZetaY x numZetaZ

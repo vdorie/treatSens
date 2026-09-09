@@ -5,18 +5,19 @@
 
 #include <cstddef> // size_t
 
-#include <external/Rinternals.h> // SEXP
+// dbarts.h's opaque sampler handle, forward declared so this header needs
+// neither dbarts.h nor an R header
+struct dbarts_sampler_t;
 
 namespace cibart {
   // Optional propensity model: a probit BART fit of Z on X, driven through the
-  // flat C API (dbarts.h). The fully-resolved dbarts spec triple is built in R
-  // and borrowed here (kept alive R-side for the analysis's duration).
+  // flat C API (dbarts.h). dbarts.h declares no creation entry, so the sampler
+  // is built in R from its spec triple and the handle is borrowed here (the R
+  // object is kept alive for the analysis's duration).
   struct BARTTreatmentModel : TreatmentModel {
-    SEXP controlExpr;
-    SEXP modelExpr;
-    SEXP dataExpr;
+    ::dbarts_sampler_t* fit;
 
-    BARTTreatmentModel(SEXP controlExpr, SEXP modelExpr, SEXP dataExpr);
+    BARTTreatmentModel(::dbarts_sampler_t* fit);
     ~BARTTreatmentModel();
   };
 }

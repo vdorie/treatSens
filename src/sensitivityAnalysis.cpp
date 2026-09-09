@@ -29,7 +29,6 @@
 
 #include "treatmentModel.hpp"
 
-#define DBARTS_REQUIRE_EXACT_ABI
 #define DBARTS_USE_STUBS
 #include <dbarts/dbarts.h>
 
@@ -51,7 +50,7 @@ namespace {
 
   // The plain configuration; the classic engine's in-C++ Control/Model/Data and
   // the function-pointer table are gone with the old ABI - the outcome sampler
-  // is driven through the flat C API (dbarts.h) from R-built specs.
+  // is created R-side and driven here through the flat C API (dbarts.h).
   struct Control {
     EstimandType estimand;
     TreatmentModel& treatmentModel;
@@ -211,9 +210,7 @@ namespace cibart {
                          size_t numInitialBurnIn,
                          size_t numCellSwitchBurnIn,
                          size_t numTreeSamplesToThin,
-                         SEXP outcomeControlExpr,
-                         SEXP outcomeModelExpr,
-                         SEXP outcomeDataExpr,
+                         dbarts_sampler* fit,
                          uint_least32_t rngSeed,
                          double* estimates,      // numZetaY x numZetaZ x numSimsPerCell
                          double* standardErrors, // numZetaY x numZetaZ
@@ -255,9 +252,8 @@ namespace cibart {
     // chain RNGs, seeded from R's stream at creation
     Scratch scratch(control, data, rngSeed);
 
-    // the outcome sampler: gaussian family, created once and continued across
-    // cells via setResponse; force single-threaded, inline execution
-    dbarts_sampler* fit = dbarts_sampler_create(outcomeControlExpr, outcomeModelExpr, outcomeDataExpr, DBARTS_FAMILY_AUTO);
+    // the outcome sampler: gaussian family, created R-side once and continued
+    // across cells via setResponse; force single-threaded, inline execution
     dbarts_sampler_setNumThreads(fit, 1);
     dbarts_sampler_setVerbose(fit, 0, 100);
 
