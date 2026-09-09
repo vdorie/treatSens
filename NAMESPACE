@@ -36,5 +36,6 @@ if (getRversion() >= "3.3.0") {
 }
 
 importFrom(dbarts, bart, pdbart, dbarts, dbartsControl)
+importClassesFrom(dbarts, dbartsSampler)
 
 importFrom(mvtnorm, dmvnorm, pmvnorm, rmvnorm)

@@ -24,9 +24,6 @@
 
 // the flat C API of the installed dbarts (dbarts.h); the stubs resolve each
 // entry point through R_GetCCallable on first use
-// pre-release lockstep guard: MAJOR/MINOR do not move before 1.0-0, so only
-// the token catches a stale binary; dropped at the coordinated 1.0 merge
-#define DBARTS_REQUIRE_EXACT_ABI
 #define DBARTS_USE_STUBS
 #include <dbarts/dbarts.h>
 
@@ -50,7 +47,21 @@ using std::strcmp;
 
 namespace {
   SEXP getListElement(SEXP list, const char *str);
-    
+
+  // dbarts.h declares no creation entry: the sampler is built in R and its
+  // engine pointer (dbartsSampler$getPointer()) handed down here, so the handle
+  // is whatever that external pointer holds
+  dbarts_sampler* samplerFromExpr(SEXP samplerExpr, const char* what)
+  {
+    if (TYPEOF(samplerExpr) != EXTPTRSXP)
+      Rf_error("%s must be a dbarts sampler's engine pointer", what);
+
+    dbarts_sampler* result = static_cast<dbarts_sampler*>(R_ExternalPtrAddr(samplerExpr));
+    if (result == NULL) Rf_error("%s is no longer valid", what);
+
+    return result;
+  }
+
   enum TreatmentModelType {
     PROBIT_EM,
     PROBIT,
@@ -58,7 +69,7 @@ namespace {
   };
   
   cibart::TreatmentModel* createTreatmentModel(SEXP modelExpr, TreatmentModelType* modelType,
-                                               SEXP propControlExpr, SEXP propModelExpr, SEXP propDataExpr)
+                                               SEXP propSamplerExpr)
   {
     SEXP classExpr = GET_CLASS(modelExpr);
     if (isNull(classExpr) || !IS_CHARACTER(classExpr)) Rf_error("treatment model not of appropriate class");
@@ -108,12 +119,12 @@ namespace {
     if (strcmp(className, "bartTreatmentModel") == 0) {
       *modelType = BART;
 
-      // the propensity model's dbarts spec triple is built R-side; ntree /
-      // keepevery / k are baked into it, so nothing is read off modelExpr here
-      if (propControlExpr == R_NilValue || propModelExpr == R_NilValue || propDataExpr == R_NilValue)
-        Rf_error("bart treatment model requires its dbarts specification");
+      // the propensity model's sampler is built R-side; ntree / keepevery / k
+      // are baked into its spec, so nothing is read off modelExpr here
+      if (propSamplerExpr == R_NilValue)
+        Rf_error("bart treatment model requires its dbarts sampler");
 
-      return new cibart::BARTTreatmentModel(propControlExpr, propModelExpr, propDataExpr);
+      return new cibart::BARTTreatmentModel(samplerFromExpr(propSamplerExpr, "the propensity sampler"));
     }
     
     Rf_error("unrecognized treatment model: '%s'", className);
@@ -204,8 +215,7 @@ namespace {
                               SEXP zetaY, SEXP zetaZ, SEXP theta,
                               SEXP estimandExpr, SEXP treatmentModelExpr,
                               SEXP sensControl, SEXP verboseExpr,
-                              SEXP outcomeControlExpr, SEXP outcomeModelExpr, SEXP outcomeDataExpr,
-                              SEXP propControlExpr, SEXP propModelExpr, SEXP propDataExpr)
+                              SEXP outcomeSamplerExpr, SEXP propSamplerExpr)
   {
     int* dims;
     
@@ -262,9 +272,11 @@ namespace {
       Rf_error("Illegal estimand type: %s. Must be 'ATE', 'ATT', or 'ATC'", estimandName);
     }
     
+    dbarts_sampler* outcomeSampler = samplerFromExpr(outcomeSamplerExpr, "the outcome sampler");
+
     TreatmentModelType treatmentModelType;
     cibart::TreatmentModel* treatmentModel = createTreatmentModel(treatmentModelExpr, &treatmentModelType,
-                                                                  propControlExpr, propModelExpr, propDataExpr);
+                                                                  propSamplerExpr);
     
     SEXP sensParameterExpr = getListElement(sensControl, "n.sim");
     if (sensParameterExpr == R_NilValue) Rf_error("n.sim must be specified in iteration control");
@@ -337,7 +349,7 @@ namespace {
                                    numInitialBurnIn,
                                    numCellSwitchBurnIn,
                                    numTreeSamplesToThin,
-                                   outcomeControlExpr, outcomeModelExpr, outcomeDataExpr,
+                                   outcomeSampler,
                                    rngSeed,
                                    REAL(fittedCoefficients),
                                    REAL(standardErrors),
@@ -429,7 +441,7 @@ extern "C" {
 #define DEF_FUNC(_N_, _F_, _A_) { _N_, std::bit_cast<DL_FUNC>(&_F_), _A_ }
   
   R_CallMethodDef R_callMethods[] = {
-    DEF_FUNC("treatSens_fitSensitivityAnalysis", fitSensitivityAnalysis, 17),
+    DEF_FUNC("treatSens_fitSensitivityAnalysis", fitSensitivityAnalysis, 13),
     DEF_FUNC("treatSens_guessNumCores", guessNumCores, 0),
     DEF_FUNC("treatSens_glmFit", glmFit, 5),
     {NULL, NULL, 0}

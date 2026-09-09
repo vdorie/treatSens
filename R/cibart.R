@@ -40,10 +40,10 @@ evaluateTreatmentModelArgument <- function(arg)
   result
 }
 
-## Builds the fully-resolved dbarts spec triple (control, model, data) that the
-## flat C API (dbarts.h) re-creates its engine from. The classic in-C++ Control/
-## Model/Data construction is gone with the old ABI, so we assemble the S4 specs
-## in R using dbarts's own constructors and prior resolution.
+## Builds the fully-resolved dbarts spec triple (control, model, data) the
+## sampler is created from. The classic in-C++ Control/Model/Data construction is
+## gone with the old ABI, so we assemble the S4 specs in R using dbarts's own
+## constructors and prior resolution.
 makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, node.prior)
 {
   ## placate R CMD check; these names resolve inside dbarts's parsePriors env
@@ -56,10 +56,10 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
                else dbarts::dbartsData(x, y, unname(as.matrix(x.test)))
   data.bart@n.cuts <- rep_len(100L, ncol(data.bart@x))
 
-  ## the flat C API's dbarts_sampler_create trusts data@sigma to calibrate the
-  ## residual-variance (chisq) prior scale; dbarts() fills an NA estimate before
-  ## building the engine, so mirror that here or the very first sigma draw is
-  ## NaN (gaussian only - probit is a fixed unit-scale family with no sigma)
+  ## sampler creation trusts data@sigma to calibrate the residual-variance
+  ## (chisq) prior scale; dbarts() fills an NA estimate before building the
+  ## engine, so mirror that here or the very first sigma draw is NaN (gaussian
+  ## only - probit is a fixed unit-scale family with no sigma)
   if (!binary && is.na(data.bart@sigma)) {
     estimateSigmaFromLinearModel <- get("estimateSigmaFromLinearModel", envir = asNamespace("dbarts"))
     data.bart@sigma <- estimateSigmaFromLinearModel(data.bart)
@@ -89,24 +89,39 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
   list(control = control.bart, model = model.bart, data = data.bart)
 }
 
+## Creates the sampler the C driver runs. dbarts.h declares no creation entry:
+## the engine is built here from the spec triple and the C side reads the handle
+## out of the object's external pointer with R_ExternalPtrAddr. The object is
+## kept alive in the calling frame for as long as the .Call holds its pointer.
+makeBartSampler <- function(specs)
+{
+  if (is.null(specs)) return(NULL)
+  methods::new("dbartsSampler", specs$control, specs$model, specs$data)
+}
+
+samplerPointer <- function(sampler) if (is.null(sampler)) NULL else sampler$getPointer()
+
 ## One contiguous zeta.z column-slab of the sensitivity grid, run in a worker.
 ## Seeds R's RNG deterministically first: the confounder generator is seeded
 ## from R's stream inside the C driver and the outcome / propensity BART chains
-## are seeded at dbarts_sampler_create, so a fixed per-chunk seed makes the slab
-## reproducible without any per-thread RNG injection (which the flat C API drops).
+## are seeded from that same stream when their samplers are created, so a fixed
+## per-chunk seed makes the slab reproducible without any per-thread RNG
+## injection (which the flat C API drops). The samplers are built in the worker,
+## after the seed is set, and never crossed a fork or a socket connection.
 fitSensitivityChunk <- function(seed, Y, Z, X, X.test, zetaY, zetaZ, theta,
                                 est.type, treatmentModel, control, verbose,
                                 outcomeSpecs, propSpecs)
 {
   set.seed(seed)
+  outcomeSampler <- makeBartSampler(outcomeSpecs)
+  propSampler <- makeBartSampler(propSpecs)
   .Call("treatSens_fitSensitivityAnalysis",
         Y, Z, X,
         X.test,
         zetaY, zetaZ,
         theta, est.type, treatmentModel,
         control, verbose,
-        outcomeSpecs$control, outcomeSpecs$model, outcomeSpecs$data,
-        propSpecs$control, propSpecs$model, propSpecs$data)
+        samplerPointer(outcomeSampler), samplerPointer(propSampler))
 }
 
 ## Fan the column-slabs out across workers: forked processes on Unix/macOS, a
@@ -181,14 +196,15 @@ cibart <- function(Y, Z, X, X.test,
   if (nChunks <= 1L || !forkable) {
     if (nChunks > 1L && !forkable && verbose)
       cat("parallel grid evaluation needs the 'parallel' package; running sequentially\n")
+    outcomeSampler <- makeBartSampler(outcomeSpecs)
+    propSampler <- makeBartSampler(propSpecs)
     return(.Call("treatSens_fitSensitivityAnalysis",
                  Y, Z, X,
                  X.test,
                  zetaY, zetaZ,
                  theta, est.type, treatmentModel,
                  control, verbose,
-                 outcomeSpecs$control, outcomeSpecs$model, outcomeSpecs$data,
-                 propSpecs$control, propSpecs$model, propSpecs$data))
+                 samplerPointer(outcomeSampler), samplerPointer(propSampler)))
   }
 
   ## contiguous zeta.z slabs keep each worker's sub-grid adjacent, so the cheap

@@ -7,7 +7,6 @@
 #include <external/random.h>
 #include <external/stats.h>
 
-#define DBARTS_REQUIRE_EXACT_ABI
 #define DBARTS_USE_STUBS
 #include <dbarts/dbarts.h>
 
@@ -25,7 +24,7 @@ namespace {
   // per-analysis state for the propensity sampler; the sampler continues its
   // chain across updateParameters calls (one sweep each)
   struct Scratch {
-    dbarts_sampler* fit;
+    dbarts_sampler* fit; // borrowed from the model
     const double* z; // treatment response, borrowed
     double* zHat;    // latest tree-only latent fit
     size_t numObservations;
@@ -33,8 +32,8 @@ namespace {
 }
 
 namespace cibart {
-  BARTTreatmentModel::BARTTreatmentModel(SEXP controlExpr, SEXP modelExpr, SEXP dataExpr) :
-    controlExpr(controlExpr), modelExpr(modelExpr), dataExpr(dataExpr)
+  BARTTreatmentModel::BARTTreatmentModel(dbarts_sampler* fit) :
+    fit(fit)
   {
     predictorsIncludeIntercept = false;
     includesLatentVariables = false;
@@ -58,9 +57,9 @@ namespace {
     scratch->z = z;
     scratch->zHat = new double[numObservations];
 
-    // probit family for the binary propensity model; the engine seeds its own
-    // chain RNG from R's stream at creation (main thread only)
-    scratch->fit = dbarts_sampler_create(model.controlExpr, model.modelExpr, model.dataExpr, DBARTS_FAMILY_PROBIT);
+    // the probit sampler for the binary propensity model, created R-side (the
+    // engine seeded its own chain RNG from R's stream there)
+    scratch->fit = model.fit;
     dbarts_sampler_setNumThreads(scratch->fit, 1);
     dbarts_sampler_setVerbose(scratch->fit, 0, 100);
 
@@ -71,6 +70,8 @@ namespace {
   {
     Scratch* scratch = static_cast<Scratch*>(scratchPtr);
     if (scratch != NULL) {
+      // releases the engine early; the R object that owns the handle outlives
+      // this call and is dropped by its caller right after
       if (scratch->fit != NULL) dbarts_sampler_destroy(scratch->fit);
       delete [] scratch->zHat;
       delete scratch;
