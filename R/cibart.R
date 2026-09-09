@@ -73,10 +73,13 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
                                         verbose = FALSE)
   control.bart@binary <- binary
 
+  ## dbarts's front-door consolidation folded the residual law (formerly a
+  ## separate resid.dist argument) into 'family' on the model spec below;
+  ## parsePriors itself no longer takes it, and gaussian is its default
   parsePriors <- get("parsePriors", envir = asNamespace("dbarts"))
   priorsCall <- as.call(list(parsePriors, control.bart, data.bart,
                              tree.prior = quote(cgm), node.prior = node.prior,
-                             resid.prior = quote(chisq), resid.dist = quote(gaussian),
+                             resid.prior = quote(chisq),
                              parentEnv = environment()))
   priors <- eval(priorsCall)
 
