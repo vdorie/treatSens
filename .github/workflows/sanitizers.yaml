@@ -1,0 +1,73 @@
+# ASAN + UBSAN over the compiled treatment-model sampler and its calls into
+# dbarts's C API, on an r-hub sanitizer container (instrumented R-devel
+# build). Modeled on stan4bart's sanitizers.yaml.
+#
+# dbarts is built from source here, so it is instrumented too: this package
+# drives dbarts's engine through dbarts.h, and a finding could land on either
+# side of that boundary.
+#
+# At the dbarts 1.0-0 merge, the dbarts ref below moves from bartcore to main
+# and the branch filters below to this repository's default branch.
+
+name: sanitizers
+
+on:
+  push:
+    branches: [dbarts-1.0]
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches: [master, dbarts-1.0]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: read-all
+
+jobs:
+  asan-ubsan:
+    runs-on: ubuntu-latest
+    name: clang ASAN+UBSAN
+    container:
+      image: ghcr.io/r-hub/containers/clang-asan:latest
+    env:
+      # leak detection is noisy against an uninstrumented R runtime; the
+      # target here is memory-access errors and undefined behavior
+      ASAN_OPTIONS: detect_leaks=0
+      UBSAN_OPTIONS: print_stacktrace=1
+      NOT_CRAN: true
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        shell: Rscript {0}
+        run: |
+          need <- setdiff(c("testthat", "mvtnorm", "lme4", "nlme", "remotes"),
+                          rownames(installed.packages()))
+          if (length(need)) install.packages(need, repos = "https://cloud.r-project.org")
+          remotes::install_github("vdorie/dbarts@bartcore", upgrade = "never")
+
+      - name: Install treatSens under sanitizers
+        run: R CMD INSTALL --preclean .
+
+      - name: Unit tests under ASAN+UBSAN
+        shell: bash
+        run: |
+          set -eo pipefail
+          # stop_on_failure makes a failed expectation quit non-zero;
+          # pipefail + set -e propagate it through tee
+          Rscript -e '
+            library(testthat)
+            test_dir("tests/testthat", package = "treatSens",
+                     load_package = "installed", stop_on_failure = TRUE)
+          ' 2>&1 | tee sanitizer-tests.log
+          # a sanitizer finding that does not fail an expectation (e.g. a UBSAN
+          # "runtime error:" printed during an otherwise-passing test) still fails
+          if grep -Eq "runtime error:|AddressSanitizer|SUMMARY: .*Sanitizer" sanitizer-tests.log; then
+            echo "::error::sanitizer reported a finding"; exit 1
+          fi
