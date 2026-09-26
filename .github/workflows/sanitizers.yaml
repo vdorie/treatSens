@@ -44,12 +44,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # the container ships no cmake (nloptr, under lme4) and no libuv (fs,
+      # under testthat)
+      - name: Install system libraries
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends cmake libuv1-dev libnlopt-dev
+
       - name: Install dependencies
         shell: Rscript {0}
         run: |
-          need <- setdiff(c("testthat", "mvtnorm", "lme4", "nlme", "remotes"),
-                          rownames(installed.packages()))
+          pkgs <- c("testthat", "mvtnorm", "lme4", "nlme", "remotes")
+          need <- setdiff(pkgs, rownames(installed.packages()))
           if (length(need)) install.packages(need, repos = "https://cloud.r-project.org")
+          # install.packages only warns on a failed build; fail the step here
+          missing <- setdiff(pkgs, rownames(installed.packages()))
+          if (length(missing)) stop("not installed: ", toString(missing))
           remotes::install_github("vdorie/dbarts@bartcore", upgrade = "never")
 
       - name: Install treatSens under sanitizers
