@@ -142,7 +142,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
   ## fit null model for treatment models & get residuals
   n.obs <- length(Y)
   
-  trt.model <- evaluateTreatmentModelArgument(matchedCall$trt.model)
+  trt.model <- evaluateTreatmentModelArgument(matchedCall$trt.model, parent.frame())
   
   if (is(trt.model, "bartTreatmentModel")) {
     if (!is.null(X)) {
@@ -292,8 +292,8 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
                                 n.thin      = nthin,
                                 n.thread    = if (is.null(nthreads)) guessNumCores() else nthreads)
 
-  ## this trick sets up the call in the frame the called us, so that any parameters
-  ## used in the trt.model specification are looked up there
+  ## the call carries the evaluated values, trt.model included, so cibart
+  ## resolves nothing from the frame it is evaluated in
   cibartCall <- call("cibart", Y, Z, X,
                      X.test, zetaY, zetaZ, theta,
                      est.type, trt.model,
