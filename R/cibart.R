@@ -44,7 +44,7 @@ evaluateTreatmentModelArgument <- function(arg)
 ## sampler is created from. The classic in-C++ Control/Model/Data construction is
 ## gone with the old ABI, so we assemble the S4 specs in R using dbarts's own
 ## constructors and prior resolution.
-makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, node.prior)
+makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, leaf.prior)
 {
   ## placate R CMD check; these names resolve inside dbarts's parsePriors env
   cgm <- chisq <- gaussian <- NULL
@@ -78,15 +78,15 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
   ## parsePriors itself no longer takes it, and gaussian is its default
   parsePriors <- get("parsePriors", envir = asNamespace("dbarts"))
   priorsCall <- as.call(list(parsePriors, control.bart, data.bart,
-                             tree.prior = quote(cgm), node.prior = node.prior,
+                             tree.prior = quote(cgm), leaf.prior = leaf.prior,
                              resid.prior = quote(chisq),
                              parentEnv = environment()))
   priors <- eval(priorsCall)
 
   model.bart <- methods::new("dbartsModel",
-                             priors$tree.prior, priors$node.prior,
-                             priors$node.hyperprior, priors$resid.prior,
-                             node.scale = if (binary) 3.0 else 0.5,
+                             priors$tree.prior, priors$leaf.prior,
+                             priors$leaf.hyperprior, priors$resid.prior,
+                             leaf.scale = if (binary) 3.0 else 0.5,
                              family = if (binary) "probit" else "gaussian")
 
   list(control = control.bart, model = model.bart, data = data.bart)
@@ -173,17 +173,17 @@ cibart <- function(Y, Z, X, X.test,
   outcomeSpecs <- makeBartSpecs(cbind(X, Z), as.double(Y), X.test, binary = FALSE,
                                 n.trees = 200L, n.thin = control$n.thin,
                                 n.sim = control$n.sim, n.burn = control$n.burn.init,
-                                node.prior = quote(normal(2.0)))
+                                leaf.prior = quote(normal(2.0)))
 
   ## optional propensity BART: predictors X, response Z (probit); no test data
   propSpecs <- NULL
   if (is(treatmentModel, "bartTreatmentModel")) {
     k <- treatmentModel$k
-    nodePrior <- if (is.numeric(k)) bquote(normal(.(k)))
+    leafPrior <- if (is.numeric(k)) bquote(normal(.(k)))
                  else bquote(normal(chi(.(k$degreesOfFreedom), .(k$scale))))
     propSpecs <- makeBartSpecs(X, as.double(Z), NULL, binary = TRUE,
                                n.trees = treatmentModel$ntree, n.thin = treatmentModel$keepevery,
-                               n.sim = 1L, n.burn = 0L, node.prior = nodePrior)
+                               n.sim = 1L, n.burn = 0L, leaf.prior = leafPrior)
   }
 
   numZetaZ <- length(zetaZ)
