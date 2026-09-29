@@ -13,30 +13,26 @@ cibartControl <- function(n.sim = 20L,
             class = c("cibartControl"))
 }
 
-## This assumes that it is 2 frames away from the user, i.e. it has been called by something
-## like treatSens.BART or cibart, which has been called (or evaluated such that) in the user's
-## environment. If you call it directly, you shouldn't.
-evaluateTreatmentModelArgument <- function(arg)
+## Evaluates a treatment model argument where the caller wrote it: the
+## constructors (probitEM, probit, bart, and probit's prior constructors, which
+## resolved through the namespace before) resolve by bare name and everything
+## else in 'env', the caller's frame, so a constructor's arguments can name the
+## caller's variables. A bare constructor name, or a string naming one, is
+## called at its defaults.
+evaluateTreatmentModelArgument <- function(arg, env)
 {
-  isAnyOf <- function(x, classes) any(sapply(classes, function(class) is(x, class)))
-  
   trtCall <- if (!is.null(arg)) arg else formals(cibart)$treatmentModel
-  
-  if (is.character(trtCall)) trtCall <- parse(text = trtCall)[[1]]
-  if (is.call(trtCall)) {
-    result <- eval(trtCall, getNamespace("treatSens"), parent.frame(2))
-  } else if (is.list(trtCall) && isAnyOf(trtCall, c("probitTreatmentModel", "probitEMTreatmentModel", "bartTreatmentModel"))) {
-    result <- trtCall
-  } else {
-    ## could be that an object was specified, could be just "probit" or "bart" which should be
-    ## evaluated in namespace; check the latter first
-    result <- tryCatch(eval(call(as.character(trtCall)), getNamespace("treatSens"), parent.frame(2)), error = function(e) e)
-    if (is(result, "error"))
-      result <- tryCatch(get(as.character(trtCall), parent.frame(2)), error = function(e) e)
-    
-    if (is(result, "error") || !isAnyOf(result, c("probitTreatmentModel", "probitEMTreatmentModel", "bartTreatmentModel")))
-      stop("treatment model of unrecognized type")
-  }
+  if (is.character(trtCall)) trtCall <- parse(text = trtCall)[[1L]]
+
+  vocabulary <- new.env(parent = env)
+  for (name in c("probitEM", "probit", "bart", "probitNormalPrior", "probitCauchyPrior", "probitStudentTPrior"))
+    assign(name, get(name, envir = getNamespace("treatSens")), envir = vocabulary)
+
+  result <- eval(trtCall, vocabulary)
+  if (is.function(result)) result <- result()
+
+  if (!inherits(result, c("probitTreatmentModel", "probitEMTreatmentModel", "bartTreatmentModel")))
+    stop("treatment model of unrecognized type")
   result
 }
 
@@ -160,7 +156,7 @@ cibart <- function(Y, Z, X, X.test,
 
   if (!is(control, "cibartControl")) stop("control must be of class cibartControl; call cibartControl() to create");
 
-  treatmentModel <- evaluateTreatmentModelArgument(matchedCall$treatmentModel)
+  treatmentModel <- evaluateTreatmentModelArgument(matchedCall$treatmentModel, parent.frame())
 
   if (is(treatmentModel, "probitTreatmentModel") && !identical(treatmentModel$family, "flat")) {
     treatmentModel$scale <- rep_len(treatmentModel$scale, ncol(X) + 1L)

@@ -130,3 +130,35 @@ test_that("massign warns on duplicated left-hand-side names", {
   expect_warning(
     runInNamespace(quote(massign[r, r] <- c(1, 2))))
 })
+
+test_that("a treatment model argument resolves where the caller wrote it", {
+  evaluateArg <- treatSens:::evaluateTreatmentModelArgument
+  ## stands in for cibart and treatSens.BART, which pass their matched argument
+  ## and their caller's frame
+  entry <- function(tm) evaluateArg(match.call()$tm, parent.frame())
+  wrapper <- function(...) entry(...)
+
+  ## a constructor's argument names the caller's variable
+  byLocal <- function(s) entry(tm = probit(family = "normal", scale = s))
+  expect_equal(byLocal(2)$scale, 2)
+
+  ## an object forwarded through a wrapper's dots
+  byDots <- function() {
+    model <- probitNormalPrior(3)
+    wrapper(tm = model)
+  }
+  expect_equal(byDots()$scale, 3)
+
+  ## a bare constructor name or a string is called at its defaults
+  expect_is(entry(tm = bart), "bartTreatmentModel")
+  expect_is(entry(tm = "probit"), "probitTreatmentModel")
+  expect_is(entry(tm = "probit(family = 'normal')"), "probitTreatmentModel")
+  expect_is(entry(), "probitEMTreatmentModel")
+  ## probit's prior constructors resolve by name, without the file's aliases
+  expect_equal(
+    evaluateArg(quote(probitNormalPrior(2)), globalenv())$scale, 2
+  )
+
+  notATreatmentModel <- 1
+  expect_error(entry(tm = notATreatmentModel), "unrecognized type")
+})
