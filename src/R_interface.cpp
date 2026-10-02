@@ -4,10 +4,6 @@
 #include <cstdint>
 #include <cstring> // memcpy
 #include <math.h> // nan
-#include <new> // placement new
-#if __cplusplus >= 201103L
-#  include <type_traits> // is_trivially_destructible
-#endif
 
 
 // R headers
@@ -32,6 +28,7 @@
 
 #include "sensitivityAnalysis.hpp"
 #include "guessNumCores.hpp"
+#include "transientStorage.hpp"
 
 #include "treatmentModel.hpp"
 #include "probitTreatmentModel.hpp"
@@ -65,35 +62,11 @@ namespace {
     return result;
   }
 
-  // Everything a .Call here allocates is R's: transient storage (R_alloc),
-  // reclaimed when the call returns or is jumped out of. The dbarts entries
-  // raise R errors - the run an interrupt, or a warning a handler turns into
-  // one - as do the glm fit and the argument checks, and a raise longjmps past
-  // these frames without running a destructor or a delete.
-  template <typename T>
-  T* allocateTransient(size_t length)
-  {
-    return reinterpret_cast<T*>(R_alloc(length, sizeof(T)));
-  }
-
-  // T is trivially destructible, so the storage is all there is to release
-  template <typename T, typename A>
-  T* createTransient(const A& argument)
-  {
-#if __cplusplus >= 201103L
-    static_assert(std::is_trivially_destructible<T>::value, "a transient object is never destroyed");
-#endif
-    return new (static_cast<void*>(allocateTransient<T>(1))) T(argument);
-  }
-
-  template <typename T, typename A1, typename A2>
-  T* createTransient(const A1& argument1, const A2& argument2)
-  {
-#if __cplusplus >= 201103L
-    static_assert(std::is_trivially_destructible<T>::value, "a transient object is never destroyed");
-#endif
-    return new (static_cast<void*>(allocateTransient<T>(1))) T(argument1, argument2);
-  }
+  // Everything a .Call here allocates is transient storage
+  // (transientStorage.hpp), so an R error raised anywhere under it strands
+  // nothing.
+  using cibart::allocateTransient;
+  using cibart::createTransient;
 
   cibart::TreatmentModel* createTreatmentModel(SEXP modelExpr, SEXP propSamplerExpr)
   {
@@ -134,7 +107,7 @@ namespace {
         break;
       }
       
-      return createTransient<cibart::ProbitTreatmentModel>(family, const_cast<const cibart::ProbitPrior*>(prior));
+      return createTransient<cibart::ProbitTreatmentModel>(family, prior);
     }
     
     if (strcmp(className, "bartTreatmentModel") == 0) {
