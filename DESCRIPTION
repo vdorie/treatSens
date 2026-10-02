@@ -31,7 +31,7 @@ Imports:
 Suggests:
     doParallel,
     foreach,
-    testthat (>= 0.9-0)
+    testthat (>= 2.0.0)
 LinkingTo:
     dbarts (>= 1.0-0)
 Description: Utilities to investigate sensitivity to unmeasured confounding in
