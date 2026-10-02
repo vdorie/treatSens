@@ -18,7 +18,6 @@ namespace cibart {
     ::dbarts_sampler_t* fit;
 
     BARTTreatmentModel(::dbarts_sampler_t* fit);
-    ~BARTTreatmentModel();
   };
 }
 

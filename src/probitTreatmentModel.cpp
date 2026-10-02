@@ -6,6 +6,7 @@
 #include <misc/stddef.h>
 
 #include <external/random.h>
+#include <external/Rinternals.h> // R_alloc
 #include <external/stats.h>
 #include <misc/linearAlgebra.h>
 
@@ -64,9 +65,17 @@ namespace {
     double* xCrossproduct; // cached for t dists
   };
 
+  // the scratch and its buffers are R transient storage (R_alloc), so a raise
+  // during the analysis strands none of it; destroyScratch has nothing to free
+  template <typename T>
+  T* allocateTransient(size_t length)
+  {
+    return reinterpret_cast<T*>(R_alloc(length, sizeof(T)));
+  }
+
   void* createScratch(cibart::TreatmentModel* restrict modelPtr, ext_rng* restrict generator, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
-    Scratch* scratch = new Scratch;
+    Scratch* scratch = allocateTransient<Scratch>(1);
     cibart::ProbitTreatmentModel& model(*static_cast<cibart::ProbitTreatmentModel*>(modelPtr));
     
     scratch->generator = generator;
@@ -95,14 +104,14 @@ namespace {
     scratch->numPredictors   = numPredictors;
     scratch->z = z;
     
-    scratch->latents      = new double[numObservations];
+    scratch->latents      = allocateTransient<double>(numObservations);
     // use some default values for latents
     for (size_t i = 0; i < numObservations; ++i) scratch->latents[i] = (z[i] == 1.0 ? 0.5 : -0.5);
-    scratch->coefficients = new double[numPredictors];
+    scratch->coefficients = allocateTransient<double>(numPredictors);
     misc_setVectorToConstant(scratch->coefficients, numPredictors, 0.0);
     scratch->sigma_sq = 1.0;
     
-    scratch->posteriorCovarianceInverseRightFactor = new double[numPredictors * numPredictors];
+    scratch->posteriorCovarianceInverseRightFactor = allocateTransient<double>(numPredictors * numPredictors);
     scratch->xCrossproduct = NULL;
     
     double* xCrossproduct = scratch->posteriorCovarianceInverseRightFactor;
@@ -111,7 +120,7 @@ namespace {
       const cibart::ProbitStudentTPrior& prior(*static_cast<const cibart::ProbitStudentTPrior*>(model.prior));
       
       // this only needs to be cached for T priors, and is otherwise computed where the factor goes
-      scratch->xCrossproduct = new double[numPredictors * numPredictors];
+      scratch->xCrossproduct = allocateTransient<double>(numPredictors * numPredictors);
       xCrossproduct = scratch->xCrossproduct;
       
       scratch->sigma_sq = 1.0 / ext_rng_simulateChiSquared(generator, prior.dof);
@@ -125,17 +134,7 @@ namespace {
     return scratch;
   }
   
-  void destroyScratch(cibart::TreatmentModel*, void* scratchPtr) {
-    Scratch* scratch = static_cast<Scratch*>(scratchPtr);
-    
-    if (scratch != NULL) {
-      delete [] scratch->xCrossproduct;
-      delete [] scratch->posteriorCovarianceInverseRightFactor;
-      delete [] scratch->coefficients;
-      delete [] scratch->latents;
-      delete scratch;
-    }
-  }
+  void destroyScratch(cibart::TreatmentModel*, void*) { }
   
   void updateParameters(cibart::TreatmentModel* restrict modelPtr, void* restrict scratchPtr, const double* restrict offset)
   {

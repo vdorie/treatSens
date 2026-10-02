@@ -2,9 +2,12 @@
 
 #include <cstddef> // size_t
 #include <cstdint>
-#include <cstdlib> // malloc, free for PoDs
 #include <cstring> // memcpy
 #include <math.h> // nan
+#include <new> // placement new
+#if __cplusplus >= 201103L
+#  include <type_traits> // is_trivially_destructible
+#endif
 
 
 // R headers
@@ -62,27 +65,47 @@ namespace {
     return result;
   }
 
-  enum TreatmentModelType {
-    PROBIT_EM,
-    PROBIT,
-    BART
-  };
-  
-  cibart::TreatmentModel* createTreatmentModel(SEXP modelExpr, TreatmentModelType* modelType,
-                                               SEXP propSamplerExpr)
+  // Everything a .Call here allocates is R's: transient storage (R_alloc),
+  // reclaimed when the call returns or is jumped out of. The dbarts entries
+  // raise R errors - the run an interrupt, or a warning a handler turns into
+  // one - as do the glm fit and the argument checks, and a raise longjmps past
+  // these frames without running a destructor or a delete.
+  template <typename T>
+  T* allocateTransient(size_t length)
+  {
+    return reinterpret_cast<T*>(R_alloc(length, sizeof(T)));
+  }
+
+  // T is trivially destructible, so the storage is all there is to release
+  template <typename T, typename A>
+  T* createTransient(const A& argument)
+  {
+#if __cplusplus >= 201103L
+    static_assert(std::is_trivially_destructible<T>::value, "a transient object is never destroyed");
+#endif
+    return new (static_cast<void*>(allocateTransient<T>(1))) T(argument);
+  }
+
+  template <typename T, typename A1, typename A2>
+  T* createTransient(const A1& argument1, const A2& argument2)
+  {
+#if __cplusplus >= 201103L
+    static_assert(std::is_trivially_destructible<T>::value, "a transient object is never destroyed");
+#endif
+    return new (static_cast<void*>(allocateTransient<T>(1))) T(argument1, argument2);
+  }
+
+  cibart::TreatmentModel* createTreatmentModel(SEXP modelExpr, SEXP propSamplerExpr)
   {
     SEXP classExpr = GET_CLASS(modelExpr);
     if (isNull(classExpr) || !IS_CHARACTER(classExpr)) Rf_error("treatment model not of appropriate class");
     
     const char* className = CHAR(STRING_ELT(classExpr, 0));
     if (strcmp(className, "probitEMTreatmentModel") == 0) {
-      *modelType = PROBIT_EM;
-      return new cibart::ProbitEMTreatmentModel(static_cast<size_t>(INTEGER(getListElement(modelExpr, "maxIter"))[0]));
+      return createTransient<cibart::ProbitEMTreatmentModel>(static_cast<size_t>(INTEGER(getListElement(modelExpr, "maxIter"))[0]));
     }
     
     if (strcmp(className, "probitTreatmentModel") == 0) {
-      *modelType = PROBIT;
-      
       SEXP familyExpr = getListElement(modelExpr, "family");
       if (isNull(familyExpr) || !IS_CHARACTER(familyExpr)) Rf_error("probit treatment model lacks family attribute");
       
@@ -99,57 +122,31 @@ namespace {
       cibart::ProbitPrior* prior = NULL;
       switch(family) {
         case cibart::PROBIT_PRIOR_STUDENT_T:
-        // prior = new cibart::ProbitStudentTPrior;
-        // these are PoDs which require that we malloc them
-        prior = static_cast<cibart::ProbitPrior*>(malloc(sizeof(cibart::ProbitStudentTPrior)));
+        // these are PoDs
+        prior = allocateTransient<cibart::ProbitStudentTPrior>(1);
         static_cast<cibart::ProbitStudentTPrior *>(prior)->scale = REAL(getListElement(modelExpr, "scale"));
         static_cast<cibart::ProbitStudentTPrior *>(prior)->dof   = REAL(getListElement(modelExpr, "df"))[0];
         break;
         case cibart::PROBIT_PRIOR_NORMAL:
-        // prior = new cibart::ProbitNormalPrior;
-        prior = static_cast<cibart::ProbitPrior*>(malloc(sizeof(cibart::ProbitNormalPrior)));
+        prior = allocateTransient<cibart::ProbitNormalPrior>(1);
         static_cast<cibart::ProbitNormalPrior *>(prior)->scale = REAL(getListElement(modelExpr, "scale"));
         case cibart::PROBIT_PRIOR_FLAT:
         break;
       }
       
-      return new cibart::ProbitTreatmentModel(family, prior);
+      return createTransient<cibart::ProbitTreatmentModel>(family, const_cast<const cibart::ProbitPrior*>(prior));
     }
     
     if (strcmp(className, "bartTreatmentModel") == 0) {
-      *modelType = BART;
-
       // the propensity model's sampler is built R-side; ntree / keepevery / k
       // are baked into its spec, so nothing is read off modelExpr here
       if (propSamplerExpr == R_NilValue)
         Rf_error("bart treatment model requires its dbarts sampler");
 
-      return new cibart::BARTTreatmentModel(samplerFromExpr(propSamplerExpr, "the propensity sampler"));
+      return createTransient<cibart::BARTTreatmentModel>(samplerFromExpr(propSamplerExpr, "the propensity sampler"));
     }
     
     Rf_error("unrecognized treatment model: '%s'", className);
-  }
-  
-  void destroyTreatmentModel(cibart::TreatmentModel* treatmentModelPtr, TreatmentModelType modelType)
-  {
-    switch(modelType) {
-      case PROBIT_EM:
-      delete static_cast<cibart::ProbitEMTreatmentModel*>(treatmentModelPtr);
-      break;
-      case PROBIT:
-      {
-        cibart::ProbitTreatmentModel* treatmentModel = static_cast<cibart::ProbitTreatmentModel*>(treatmentModelPtr);
-        // delete treatmentModel->prior;
-        free(const_cast<cibart::ProbitPrior*>(treatmentModel->prior));
-        delete treatmentModel;
-      }
-      break;
-      case BART:
-      {
-        delete static_cast<cibart::BARTTreatmentModel*>(treatmentModelPtr);
-      }
-      break;
-    }
   }
   
   SEXP glmFit(SEXP y, SEXP n, SEXP x, SEXP w, SEXP offset)
@@ -158,7 +155,7 @@ namespace {
     size_t numObs = static_cast<size_t>(XLENGTH(y));
     if (!isReal(y)) {
       if (!isInteger(y)) Rf_error("y must be of type real or integer");
-      yPtr = new double[numObs];
+      yPtr = allocateTransient<double>(numObs);
       int* yInt = INTEGER(y);
       
       for (size_t i = 0; i < numObs; ++i) 
@@ -195,15 +192,12 @@ namespace {
     }
     
     size_t scratchSize = glm_getDoubleScratchSize(numObs, numCoefs);
-    double* scratch = new double[scratchSize];
+    double* scratch = allocateTransient<double>(scratchSize);
     
     SEXP result = PROTECT(allocVector(REALSXP, static_cast<R_xlen_t>(numCoefs)));
     
     glm_fitGeneralizedLinearModel(yPtr == NULL ? REAL(y) : yPtr, nPtr, numObs, REAL(x), numCoefs, wPtr, offsetPtr,
                                   REAL(result), GLM_FAMILY_BINOMIAL, GLM_LINK_PROBIT, 30, scratch);
-    
-    delete [] scratch;
-    if (yPtr != NULL) delete [] yPtr;
     
     UNPROTECT(1);
     
@@ -274,9 +268,7 @@ namespace {
     
     dbarts_sampler* outcomeSampler = samplerFromExpr(outcomeSamplerExpr, "the outcome sampler");
 
-    TreatmentModelType treatmentModelType;
-    cibart::TreatmentModel* treatmentModel = createTreatmentModel(treatmentModelExpr, &treatmentModelType,
-                                                                  propSamplerExpr);
+    cibart::TreatmentModel* treatmentModel = createTreatmentModel(treatmentModelExpr, propSamplerExpr);
     
     SEXP sensParameterExpr = getListElement(sensControl, "n.sim");
     if (sensParameterExpr == R_NilValue) Rf_error("n.sim must be specified in iteration control");
@@ -356,8 +348,6 @@ namespace {
                                    verbose);
 
     UNPROTECT(3);
-    
-    destroyTreatmentModel(treatmentModel, treatmentModelType);
     
     return result;
   }

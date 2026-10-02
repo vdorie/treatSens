@@ -8,6 +8,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring> // memcpy
+#if __cplusplus >= 201103L
+#  include <type_traits> // is_trivially_destructible
+#endif
 
 #if !defined(HAVE_SYS_TIME_H) && defined(HAVE_GETTIMEOFDAY)
 #  undef HAVE_GETTIMEOFDAY
@@ -18,13 +21,13 @@
 #  include <time.h>
 #endif
 
-#include <misc/alloca.h>
 #include <misc/linearAlgebra.h>
 #include <misc/stats.h>
 
 #include <external/io.h>
 #include <external/linearAlgebra.h>
 #include <external/random.h>
+#include <external/Rinternals.h> // R_alloc, external pointers
 #include <external/stats.h>
 
 #include "treatmentModel.hpp"
@@ -47,6 +50,17 @@ using std::uint32_t;
 
 namespace {
   using namespace cibart;
+
+  // Every buffer below lives in R's transient storage (R_alloc), reclaimed
+  // when the .Call returns or is jumped out of. dbarts_sampler_run raises an
+  // interrupt as an R error and may raise a warning a handler turns into one,
+  // and the glm and setter entries raise too; any of them longjmps past these
+  // frames, so nothing here owns heap memory or carries a destructor.
+  template <typename T>
+  T* allocateTransient(size_t length)
+  {
+    return reinterpret_cast<T*>(R_alloc(length, sizeof(T)));
+  }
 
   // The plain configuration; the classic engine's in-C++ Control/Model/Data and
   // the function-pointer table are gone with the old ABI - the outcome sampler
@@ -82,7 +96,6 @@ namespace {
     Data(const double* y, const double* z, const double* x,
          size_t numObservations, size_t numPredictors, const double* x_test,
          size_t numTestObservations);
-    ~Data();
   };
 
   struct Scratch {
@@ -100,11 +113,18 @@ namespace {
     double* discardTrain;
     double* discardTest;
 
+    // malloc'd by the vendored generator; rngExpr is a PROTECTed external
+    // pointer whose finalizer frees it should a raise skip releaseScratch
     ext_rng* rng;
+    SEXP rngExpr;
 
+    // leaves rngExpr PROTECTed, for releaseScratch to unprotect
     Scratch(const Control& control, const Data& data, uint_least32_t rngSeed);
-    ~Scratch();
   };
+
+  // the normal-exit release: the treatment model's (an early release of the
+  // propensity sampler, for BART) and the generator, then rngExpr's protection
+  void releaseScratch(Scratch& scratch);
 
   struct GridCell {
     double zetaY;
@@ -112,6 +132,19 @@ namespace {
     size_t offset;
     size_t cellNumber;
   };
+
+#if __cplusplus >= 201103L
+  static_assert(std::is_trivially_destructible<Data>::value &&
+                std::is_trivially_destructible<Scratch>::value,
+                "a raise skips every destructor in the analysis's frames");
+#endif
+
+  void finalizeRng(SEXP rngExpr)
+  {
+    ext_rng* rng = static_cast<ext_rng*>(R_ExternalPtrAddr(rngExpr));
+    R_ClearExternalPtr(rngExpr);
+    ext_rng_destroy(rng);
+  }
 
   // forward declarations
   void sampleConfounders(const Data& data, Scratch& scratch);
@@ -222,7 +255,7 @@ namespace cibart {
     Data data(y, z, x, numObservations, numPredictors, x_test, numTestObservations);
 
     size_t numCells = numZetaY * numZetaZ;
-    GridCell* gridCells = new GridCell[numCells];
+    GridCell* gridCells = allocateTransient<GridCell>(numCells);
 
     size_t cellNumber = 0;
     for (size_t i = 0; i < numZetaY; ++i) {
@@ -257,8 +290,8 @@ namespace cibart {
     dbarts_sampler_setNumThreads(fit, 1);
     dbarts_sampler_setVerbose(fit, 0, 100);
 
-    double* trainStore = new double[numObservations * numSimsPerCell];
-    double* testStore = numTestObservations > 0 ? new double[numTestObservations * numSimsPerCell] : NULL;
+    double* trainStore = allocateTransient<double>(numObservations * numSimsPerCell);
+    double* testStore = numTestObservations > 0 ? allocateTransient<double>(numTestObservations * numSimsPerCell) : NULL;
 
 #ifdef HAVE_GETTIMEOFDAY
     struct timeval startTime, endTime;
@@ -302,10 +335,10 @@ namespace cibart {
 #endif
     if (verbose) ext_printf("running time (seconds): %f\n", subtractTimes(endTime, startTime));
 
-    delete [] testStore;
-    delete [] trainStore;
+    // a raise above skips these; the samplers' R objects then release the
+    // engines when collected, and rngExpr's finalizer the generator
+    releaseScratch(scratch);
     dbarts_sampler_destroy(fit);
-    delete [] gridCells;
   }
 }
 
@@ -329,8 +362,8 @@ namespace {
     size_t numPredictors = data.numPredictors + 2;
     const double* const& lm_x(data.x_train);
 
-    double* lsSolution = misc_stackAllocate(numPredictors, double);
-    double* residuals = misc_stackAllocate(data.numObservations, double);
+    double* lsSolution = allocateTransient<double>(numPredictors);
+    double* residuals = allocateTransient<double>(data.numObservations);
     char* lsMessage;
 
     int32_t lsResult = ext_findLeastSquaresFit(scratch.yMinusZetaU, data.numObservations, lm_x, numPredictors,
@@ -338,9 +371,6 @@ namespace {
     if (lsResult <= 0) ext_throwError("error estimating sigma: %s", lsMessage);
 
     double sumOfSquaredResiduals = ext_sumSquaresOfVectorElements(residuals, data.numObservations);
-
-    misc_stackFree(residuals);
-    misc_stackFree(lsSolution);
 
     return std::sqrt(sumOfSquaredResiduals / static_cast<double>(data.numObservations - numPredictors));
   }
@@ -449,7 +479,7 @@ namespace {
   {
     // create matrix [ 1 X Z ]; the sigma estimate uses [ 1 X Z ], the outcome
     // BART's predictors [ X Z ] and test matrix are built R-side into its spec
-    double* x_temp = new double[numObservations * (numPredictors + 2)];
+    double* x_temp = allocateTransient<double>(numObservations * (numPredictors + 2));
     misc_setVectorToConstant(x_temp, numObservations, 1.0);
     std::memcpy(x_temp + numObservations, x, numObservations * numPredictors * sizeof(double));
     std::memcpy(x_temp + numObservations * (numPredictors + 1), z, numObservations * sizeof(double));
@@ -457,24 +487,23 @@ namespace {
     x_train = x_temp;
   }
 
-  Data::~Data() {
-    delete [] x_train;
-    x_train = NULL;
-  }
-
   Scratch::Scratch(const Control& control, const Data& data, uint_least32_t rngSeed) :
     yMinusZetaU(NULL), p(NULL), u(NULL),
     treatmentModel(control.treatmentModel), treatmentScratch(NULL),
-    temp_numObs_1(NULL), temp_numObs_2(NULL), discardTrain(NULL), discardTest(NULL)
+    temp_numObs_1(NULL), temp_numObs_2(NULL), discardTrain(NULL), discardTest(NULL),
+    rng(NULL), rngExpr(R_NilValue)
   {
     // a standalone generator (default algorithm + standard-normal), reseeded
     // deterministically from R's stream so set.seed governs reproducibility
+    rngExpr = PROTECT(R_MakeExternalPtr(NULL, R_NilValue, R_NilValue));
+    R_RegisterCFinalizerEx(rngExpr, &finalizeRng, FALSE);
     rng = ext_rng_createDefault(false);
+    R_SetExternalPtrAddr(rngExpr, rng);
     ext_rng_setSeed(rng, rngSeed);
 
-    yMinusZetaU = new double[data.numObservations];
-    u = new double[data.numObservations];
-    p = new double[data.numObservations];
+    yMinusZetaU = allocateTransient<double>(data.numObservations);
+    u = allocateTransient<double>(data.numObservations);
+    p = allocateTransient<double>(data.numObservations);
     misc_setVectorToConstant(p, data.numObservations, control.theta);
 
     // [ 1 X ]
@@ -487,29 +516,22 @@ namespace {
 
     treatmentScratch = treatmentModel.createScratch(&treatmentModel, rng, treatment_x, data.numObservations, treatmentNumPredictors, data.z);
 
-    temp_numObs_1 = new double[data.numObservations];
-    temp_numObs_2 = new double[data.numObservations];
+    temp_numObs_1 = allocateTransient<double>(data.numObservations);
+    temp_numObs_2 = allocateTransient<double>(data.numObservations);
 
-    discardTrain = new double[data.numObservations];
-    discardTest = data.numTestObservations > 0 ? new double[data.numTestObservations] : NULL;
+    discardTrain = allocateTransient<double>(data.numObservations);
+    discardTest = data.numTestObservations > 0 ? allocateTransient<double>(data.numTestObservations) : NULL;
   }
 
-  Scratch::~Scratch()
+  void releaseScratch(Scratch& scratch)
   {
-    delete [] discardTest; discardTest = NULL;
-    delete [] discardTrain; discardTrain = NULL;
+    scratch.treatmentModel.destroyScratch(&scratch.treatmentModel, scratch.treatmentScratch);
+    scratch.treatmentScratch = NULL;
 
-    delete [] temp_numObs_2; temp_numObs_2 = NULL;
-    delete [] temp_numObs_1; temp_numObs_1 = NULL;
-
-    treatmentModel.destroyScratch(&treatmentModel, treatmentScratch);
-    treatmentScratch = NULL;
-
-    delete [] p; p = NULL;
-    delete [] u; u = NULL;
-    delete [] yMinusZetaU; yMinusZetaU = NULL;
-
-    ext_rng_destroy(rng);
+    R_ClearExternalPtr(scratch.rngExpr);
+    ext_rng_destroy(scratch.rng);
+    scratch.rng = NULL;
+    UNPROTECT(1); // rngExpr
   }
 
 #ifdef HAVE_GETTIMEOFDAY
