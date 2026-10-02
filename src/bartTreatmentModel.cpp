@@ -1,11 +1,11 @@
 #include "config.hpp"
 
 #include "bartTreatmentModel.hpp"
+#include "transientStorage.hpp"
 
 #include <cstddef> // size_t
 
 #include <external/random.h>
-#include <external/Rinternals.h> // R_alloc
 #include <external/stats.h>
 
 #define DBARTS_USE_STUBS
@@ -23,9 +23,9 @@ namespace {
   void getConditionalProbabilities(TreatmentModel* restrict model, void* restrict scratch, double zetaZ, double* restrict probU0, double* restrict probU1);
 
   // per-analysis state for the propensity sampler; the sampler continues its
-  // chain across updateParameters calls (one sweep each). It and zHat are R
-  // transient storage (R_alloc): the run below may raise, and a raise must
-  // strand nothing
+  // chain across updateParameters calls (one sweep each). It and zHat are
+  // transient storage (transientStorage.hpp): the run below may raise, and a
+  // raise must strand nothing
   struct Scratch {
     dbarts_sampler* fit; // borrowed from the model
     const double* z; // treatment response, borrowed
@@ -53,10 +53,10 @@ namespace {
   {
     BARTTreatmentModel& model(*static_cast<BARTTreatmentModel*>(modelPtr));
 
-    Scratch* scratch = reinterpret_cast<Scratch*>(R_alloc(1, sizeof(Scratch)));
+    Scratch* scratch = cibart::allocateTransient<Scratch>(1);
     scratch->numObservations = numObservations;
     scratch->z = z;
-    scratch->zHat = reinterpret_cast<double*>(R_alloc(numObservations, sizeof(double)));
+    scratch->zHat = cibart::allocateTransient<double>(numObservations);
 
     // the probit sampler for the binary propensity model, created R-side (the
     // engine seeded its own chain RNG from R's stream there)

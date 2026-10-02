@@ -1,12 +1,12 @@
 #include "config.hpp"
 
 #include "probitTreatmentModel.hpp"
+#include "transientStorage.hpp"
 
 #include <cstring>
 #include <misc/stddef.h>
 
 #include <external/random.h>
-#include <external/Rinternals.h> // R_alloc
 #include <external/stats.h>
 #include <misc/linearAlgebra.h>
 
@@ -65,14 +65,10 @@ namespace {
     double* xCrossproduct; // cached for t dists
   };
 
-  // the scratch and its buffers are R transient storage (R_alloc), so a raise
-  // during the analysis strands none of it; destroyScratch has nothing to free
-  template <typename T>
-  T* allocateTransient(size_t length)
-  {
-    return reinterpret_cast<T*>(R_alloc(length, sizeof(T)));
-  }
+  using cibart::allocateTransient;
 
+  // the scratch and its buffers are transient storage, so a raise during the
+  // analysis strands none of it; destroyScratch has nothing to free
   void* createScratch(cibart::TreatmentModel* restrict modelPtr, ext_rng* restrict generator, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
     Scratch* scratch = allocateTransient<Scratch>(1);

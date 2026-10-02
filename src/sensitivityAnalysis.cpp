@@ -27,9 +27,10 @@
 #include <external/io.h>
 #include <external/linearAlgebra.h>
 #include <external/random.h>
-#include <external/Rinternals.h> // R_alloc, external pointers
+#include <external/Rinternals.h> // external pointers
 #include <external/stats.h>
 
+#include "transientStorage.hpp"
 #include "treatmentModel.hpp"
 
 #define DBARTS_USE_STUBS
@@ -51,16 +52,9 @@ using std::uint32_t;
 namespace {
   using namespace cibart;
 
-  // Every buffer below lives in R's transient storage (R_alloc), reclaimed
-  // when the .Call returns or is jumped out of. dbarts_sampler_run raises an
-  // interrupt as an R error and may raise a warning a handler turns into one,
-  // and the glm and setter entries raise too; any of them longjmps past these
-  // frames, so nothing here owns heap memory or carries a destructor.
-  template <typename T>
-  T* allocateTransient(size_t length)
-  {
-    return reinterpret_cast<T*>(R_alloc(length, sizeof(T)));
-  }
+  // Every buffer below is transient storage (transientStorage.hpp): a raise
+  // under dbarts_sampler_run or any other entry longjmps past these frames, so
+  // nothing here owns heap memory or carries a destructor.
 
   // The plain configuration; the classic engine's in-C++ Control/Model/Data and
   // the function-pointer table are gone with the old ABI - the outcome sampler
