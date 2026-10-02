@@ -113,17 +113,19 @@ namespace {
     double* discardTrain;
     double* discardTest;
 
-    // malloc'd by the vendored generator; rngExpr is a PROTECTed external
-    // pointer whose finalizer frees it should a raise skip releaseScratch
+    // malloc'd by the vendored generator; rngExpr is the caller's PROTECTed
+    // external pointer, whose finalizer frees it should a raise skip
+    // releaseScratch
     ext_rng* rng;
     SEXP rngExpr;
 
-    // leaves rngExpr PROTECTed, for releaseScratch to unprotect
-    Scratch(const Control& control, const Data& data, uint_least32_t rngSeed);
+    // rngExpr is an empty external pointer, finalized by finalizeRng and kept
+    // PROTECTed by the caller for the scratch's lifetime
+    Scratch(const Control& control, const Data& data, uint_least32_t rngSeed, SEXP rngExpr);
   };
 
   // the normal-exit release: the treatment model's (an early release of the
-  // propensity sampler, for BART) and the generator, then rngExpr's protection
+  // propensity sampler, for BART) and the generator
   void releaseScratch(Scratch& scratch);
 
   struct GridCell {
@@ -282,8 +284,12 @@ namespace cibart {
 
     // the confounder Gibbs draws run on a dedicated, R-seeded generator (the
     // classic setRNGState path is gone); the BART engines draw from their own
-    // chain RNGs, seeded from R's stream at creation
-    Scratch scratch(control, data, rngSeed);
+    // chain RNGs, seeded from R's stream at creation. The generator is
+    // malloc'd, so it is held by an external pointer whose finalizer frees it
+    // should a raise skip releaseScratch
+    SEXP rngExpr = PROTECT(R_MakeExternalPtr(NULL, R_NilValue, R_NilValue));
+    R_RegisterCFinalizerEx(rngExpr, &finalizeRng, FALSE);
+    Scratch scratch(control, data, rngSeed, rngExpr);
 
     // the outcome sampler: gaussian family, created R-side once and continued
     // across cells via setResponse; force single-threaded, inline execution
@@ -338,6 +344,7 @@ namespace cibart {
     // a raise above skips these; the samplers' R objects then release the
     // engines when collected, and rngExpr's finalizer the generator
     releaseScratch(scratch);
+    UNPROTECT(1); // rngExpr
     dbarts_sampler_destroy(fit);
   }
 }
@@ -487,16 +494,14 @@ namespace {
     x_train = x_temp;
   }
 
-  Scratch::Scratch(const Control& control, const Data& data, uint_least32_t rngSeed) :
+  Scratch::Scratch(const Control& control, const Data& data, uint_least32_t rngSeed, SEXP rngExpr) :
     yMinusZetaU(NULL), p(NULL), u(NULL),
     treatmentModel(control.treatmentModel), treatmentScratch(NULL),
     temp_numObs_1(NULL), temp_numObs_2(NULL), discardTrain(NULL), discardTest(NULL),
-    rng(NULL), rngExpr(R_NilValue)
+    rng(NULL), rngExpr(rngExpr)
   {
     // a standalone generator (default algorithm + standard-normal), reseeded
     // deterministically from R's stream so set.seed governs reproducibility
-    rngExpr = PROTECT(R_MakeExternalPtr(NULL, R_NilValue, R_NilValue));
-    R_RegisterCFinalizerEx(rngExpr, &finalizeRng, FALSE);
     rng = ext_rng_createDefault(false);
     R_SetExternalPtrAddr(rngExpr, rng);
     ext_rng_setSeed(rng, rngSeed);
@@ -531,7 +536,6 @@ namespace {
     R_ClearExternalPtr(scratch.rngExpr);
     ext_rng_destroy(scratch.rng);
     scratch.rng = NULL;
-    UNPROTECT(1); // rngExpr
   }
 
 #ifdef HAVE_GETTIMEOFDAY
