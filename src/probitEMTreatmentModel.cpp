@@ -6,6 +6,7 @@
 #include <external/stats.h>
 #include <external/random.h>
 #include <external/linearAlgebra.h>
+#include <external/Rinternals.h> // R_alloc
 #include <glm/glm.h>
 
 #include <external/io.h>
@@ -41,9 +42,12 @@ namespace {
     double* glmScratch;
   };
 
+  // the scratch and its buffers are R transient storage (R_alloc), so a raise
+  // during the analysis - the glm fit's own included - strands none of it;
+  // destroyScratch has nothing to free
   void* createScratch(cibart::TreatmentModel* restrict, ext_rng* restrict, const double* restrict x, size_t numObservations, size_t numPredictors, const double* restrict z)
   {
-    Scratch* scratch = new Scratch;
+    Scratch* scratch = reinterpret_cast<Scratch*>(R_alloc(1, sizeof(Scratch)));
     
     /* ext_printf("probit EM model:\n");
     cibart::ProbitEMTreatmentModel& model(*((cibart::ProbitEMTreatmentModel*) modelPtr));
@@ -54,21 +58,13 @@ namespace {
     scratch->numPredictors   = numPredictors;
     scratch->z = z;
     
-    scratch->coefficients = new double[numPredictors];
-    scratch->glmScratch = new double[glm_getDoubleScratchSize(numObservations, numPredictors)];
+    scratch->coefficients = reinterpret_cast<double*>(R_alloc(numPredictors, sizeof(double)));
+    scratch->glmScratch = reinterpret_cast<double*>(R_alloc(glm_getDoubleScratchSize(numObservations, numPredictors), sizeof(double)));
     
     return scratch;
   }
   
-  void destroyScratch(cibart::TreatmentModel*, void* scratchPtr) {
-    Scratch* scratch = static_cast<Scratch*>(scratchPtr);
-    
-    if (scratch != NULL) {
-      delete [] scratch->glmScratch;
-      delete [] scratch->coefficients;
-      delete scratch;
-    }
-  }
+  void destroyScratch(cibart::TreatmentModel*, void*) { }
   
   void updateParameters(cibart::TreatmentModel* restrict modelPtr, void* restrict scratchPtr, const double* restrict offset)
   {
