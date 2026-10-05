@@ -26,6 +26,10 @@ local({
   }
   gen <- function(x, ...) UseMethod("gen")
   gen.default <- function(x, ...) resolveModel(...)
+  gen.plain <- function(x, ...) NextMethod()
+  sc <- function() signalCondition(simpleWarning("signalled only"))
+  deep <- function() deeper()
+  deeper <- function() stop("deep user failure")
   gen.next <- function(x, ...) NextMethod(trt.model = probit(family = "normal", scale = 33))
   writer <- function() {
     localScale <- 7
@@ -175,6 +179,73 @@ test_that("a string that arrives as a value is a model name, never code", {
   }
   ## a string literal written in the call keeps its old meaning: code
   expect_equal(inUser(resolveModel("probit(family = 'normal', scale = 3)"))$scale, 3)
+})
+
+## the signalled warnings below have no muffleWarning restart, so the test
+## reporter lists them as warnings; they are the point of the test
+test_that("a warning signalled without warning() is not held and changes nothing", {
+  built <- treatSens:::probit(family = "normal", scale = 4)
+  assign("built", built, envir = user)
+  assign("count", 0, envir = user)
+  assign("userEnv", user, envir = user)
+  ## dots that cannot be recovered
+  expect_identical(inUser(gen(structure(1, class = "plain"), trt.model = { sc(); built })), built)
+  ## a value that stands is not replaced
+  inMask <- masked(probit = function(...) {
+    user$sc()
+    treatSens:::probit(family = "normal", scale = 99)
+  })
+  expect_equal(inMask(viaDots(trt.model = probit()))$scale, 99)
+  ## and a success is evaluated once
+  expect_identical(inUser(viaDots(trt.model = { assign("count", count + 1, envir = userEnv); sc(); built })), built)
+  expect_equal(user$count, 1)
+})
+
+test_that("an error keeps the stack it was raised on", {
+  stackHas <- function(expr, pattern) {
+    seen <- NULL
+    try(withCallingHandlers(expr, error = function(e) {
+      seen <<- vapply(sys.calls(), function(cl) deparse(cl)[1L], "")
+    }), silent = TRUE)
+    any(grepl(pattern, seen, fixed = TRUE))
+  }
+  built <- quote(treatSens:::probit(family = "normal", scale = deep()))
+  expect_true(stackHas(eval(call("resolveModel", built), user), "deeper()"))
+  expect_true(stackHas(eval(call("gen", quote(structure(1, class = "plain")), trt.model = built), user), "deeper()"))
+  expect_true(stackHas(eval(call("viaDots", trt.model = quote(probit(family = "normal", scale = deep()))), user), "deeper()"))
+})
+
+test_that("dots that cannot be traced are evaluated once, as they stand", {
+  assign("count", 0, envir = user)
+  assign("userEnv", user, envir = user)
+  expect_error(inUser(gen(structure(1, class = "plain"),
+                          trt.model = { assign("count", count + 1, envir = userEnv); stop("failed once") })),
+               "failed once", fixed = TRUE)
+  expect_equal(user$count, 1)
+})
+
+test_that("held warnings are shown with their class, in order", {
+  inWarn <- masked(probit = function(...) {
+    warning(structure(class = c("firstWarning", "warning", "condition"), list(message = "first", call = NULL)))
+    warning("second")
+    treatSens:::probit(...)
+  })
+  seen <- character()
+  withCallingHandlers(inWarn(viaDots(trt.model = probit(family = "normal", scale = 2))),
+                      warning = function(w) {
+                        seen <<- c(seen, paste(class(w)[1L], conditionMessage(w)))
+                        invokeRestart("muffleWarning")
+                      })
+  expect_identical(seen, c("firstWarning first", "simpleWarning second"))
+})
+
+test_that("a constructor name that has no string form is refused as a string value", {
+  for (bad in c("probitNormalPrior", "probitCauchyPrior", "probitStudentTPrior")) {
+    assign("m", bad, envir = user)
+    for (call in list(quote(viaNamed(m)), quote(viaDots(trt.model = m)), quote(resolveModel(m)))) {
+      expect_error(eval(call, user), "treatment model of unrecognized type", fixed = TRUE)
+    }
+  }
 })
 
 test_that("treatSens.BART accepts a model forwarded through dots", {
