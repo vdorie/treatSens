@@ -26,9 +26,9 @@ cibartControl <- function(n.sim = 20L,
 ## as it stands is tried first, and only when it fails, or yields a value the
 ## argument refuses, is the call recovered as it was written and evaluated, over
 ## the vocabulary, in the frame that wrote it. Recovery can turn a failure into
-## a value, never change a value; with nothing to recover the first outcome
-## stands. The first attempt's warnings are held back and shown only when that
-## attempt is the one used. 'env' must be the frame the argument was matched in
+## a value, never change a value; with nothing to recover the argument is
+## evaluated as it stands. The first attempt's warnings are held back and shown only when that
+## attempt's value is the one used. 'env' must be the frame the argument was matched in
 ## (parent.frame() of the entry point), and the forwarding frames must still be
 ## on the stack.
 evaluateTreatmentModelArgument <- function(arg, env)
@@ -52,23 +52,25 @@ evaluateTreatmentModelArgument <- function(arg, env)
 
   if (!isDotsReference(trtCall)) return(evalIn(trtCall, env))
 
+  ## dots that cannot be traced to the call are evaluated as they stand, as an
+  ## ordinary argument is
+  written <- recoverForwardedArgument(trtCall, env)
+  if (isDotsReference(written$expr)) return(evalIn(trtCall, env))
+
   held <- list()
   outcome <- tryCatch(
     withCallingHandlers(evalIn(trtCall, env), warning = function(w) {
+      ## a warning signalled without warning() has no restart and cannot be held back
+      restart <- Find(function(r) identical(r$name, "muffleWarning"), computeRestarts(w))
+      if (is.null(restart)) return()
       held[[length(held) + 1L]] <<- w
-      invokeRestart("muffleWarning")
+      invokeRestart(restart)
     }),
     error = function(e) e)
-  showHeld <- function() for (w in held) warning(w)
 
   if (!inherits(outcome, "error")) {
-    showHeld()
+    for (w in held) warning(w)
     return(outcome)
-  }
-  written <- recoverForwardedArgument(trtCall, env)
-  if (isDotsReference(written$expr)) {
-    showHeld()
-    stop(outcome)
   }
   evalIn(written$expr, written$env)
 }
