@@ -14,12 +14,40 @@ local({
   viaDots <- function(...) resolveModel(...)
   viaDots2 <- function(...) viaDots(...)
   viaNamed <- function(tm) resolveModel(trt.model = tm)
+  resolveAt <- function(a, b, trt.model) {
+    matchedCall <- match.call()
+    treatSens:::evaluateTreatmentModelArgument(matchedCall$trt.model, parent.frame())
+  }
+  viaDotsAt <- function(...) resolveAt(...)
+  viaClosure <- function(...) lapply(1:2, function(i) resolveModel(...))[[1L]]
+  viaTwice <- function(...) {
+    try(resolveModel(...), silent = TRUE)
+    resolveModel(...)
+  }
+  gen <- function(x, ...) UseMethod("gen")
+  gen.default <- function(x, ...) resolveModel(...)
+  gen.next <- function(x, ...) NextMethod(trt.model = probit(family = "normal", scale = 33))
   writer <- function() {
     localScale <- 7
     viaDots(trt.model = probit(family = "normal", scale = localScale))
   }
 }, envir = user)
 inUser <- function(expr) eval(substitute(expr), user)
+## a workspace that masks a constructor name
+masked <- function(...) {
+  env <- new.env(parent = user)
+  list2env(list(...), env)
+  function(expr) eval(substitute(expr), env)
+}
+warningsOf <- function(expr) {
+  seen <- character()
+  value <- withCallingHandlers(tryCatch(expr, error = function(e) e),
+                               warning = function(w) {
+                                 seen <<- c(seen, conditionMessage(w))
+                                 invokeRestart("muffleWarning")
+                               })
+  list(value = value, warnings = seen)
+}
 
 
 test_that("direct calls are unchanged", {
@@ -69,6 +97,84 @@ test_that("other errors pass through unchanged", {
                       error = conditionMessage)
   expect_match(message, "noSuchVariable")
   expect_false(grepl("outside the argument", message, fixed = TRUE))
+})
+
+test_that("a forwarded call is recovered from the right dots element", {
+  expect_equal(inUser(viaDotsAt(1, 2, trt.model = probit(family = "normal", scale = 2)))$scale, 2)
+  expect_equal(inUser(viaDotsAt(1, trt.model = probit(family = "normal", scale = 3), 3))$scale, 3)
+})
+
+test_that("recovery turns a failure into a value but never changes a value", {
+  inMask <- masked(probit = function(...) treatSens:::probit(family = "normal", scale = 99))
+  expect_equal(inMask(viaDots(trt.model = probit()))$scale, 99)
+  ## a masking object the argument refuses is recovered, as the direct call is
+  for (mask in list(function(...) 1, 3, list(fit = 1))) {
+    inMask <- masked(probit = mask, bart = mask)
+    expect_equal(inMask(resolveModel(probit(family = "normal", scale = 2)))$scale, 2)
+    expect_equal(inMask(viaDots(trt.model = probit(family = "normal", scale = 2)))$scale, 2)
+    expect_is(inMask(viaDots(trt.model = bart())), "bartTreatmentModel")
+  }
+})
+
+test_that("a closure over the wrapper's dots is walked out of", {
+  expect_equal(inUser(viaClosure(trt.model = probit(family = "normal", scale = 2)))$scale, 2)
+})
+
+test_that("dots that cannot be traced to the call keep the original error", {
+  message <- "could not find function \"probit\"; outside the argument that takes it"
+  ## NextMethod(name = value) replaces the dots; the frame still records the generic's call
+  expect_error(inUser(gen(structure(1, class = "next"), trt.model = probit(family = "normal", scale = 5))),
+               message, fixed = TRUE)
+  ## a caller that is no frame on the stack
+  expect_error(do.call(user$viaDots, list(trt.model = quote(probit(family = "normal", scale = 2))), envir = user),
+               message, fixed = TRUE)
+  ## the error of the first attempt, not a substitute, and no stale warning from forcing it again
+  result <- warningsOf(do.call(user$viaTwice, list(trt.model = quote(probit())), envir = user))
+  expect_is(result$value, "error")
+  expect_match(conditionMessage(result$value), "could not find function \"probit\"", fixed = TRUE)
+  expect_identical(result$warnings, character())
+})
+
+test_that("warnings from forwarded calls arrive once and unmuffled", {
+  inWarn <- masked(probit = function(...) {
+    warning("mine")
+    treatSens:::probit(...)
+  })
+  result <- warningsOf(inWarn(viaDots(trt.model = probit(family = "normal", scale = 2))))
+  expect_identical(result$warnings, "mine")
+  ## a first attempt that fails and is recovered does not show its warnings a second time
+  result <- warningsOf(inUser(viaDots(trt.model = { warning("early"); probit() })))
+  expect_identical(result$warnings, "early")
+  ## a first attempt that is the one used (the error stands) does show them
+  result <- warningsOf(do.call(user$viaDots, list(trt.model = quote({ warning("early"); probit() })), envir = user))
+  expect_identical(result$warnings, "early")
+  ## direct
+  result <- warningsOf(inUser(resolveModel({ warning("direct"); treatSens:::probit() })))
+  expect_identical(result$warnings, "direct")
+})
+
+test_that("a forwarded prior constructor gets no hint", {
+  for (name in c("probitNormalPrior", "probitCauchyPrior", "probitStudentTPrior")) {
+    message <- tryCatch(eval(call("viaNamed", call(name)), user), error = conditionMessage)
+    expect_match(message, paste0("could not find function \"", name, "\""), fixed = TRUE)
+    expect_false(grepl("outside the argument", message, fixed = TRUE))
+  }
+})
+
+test_that("a string that arrives as a value is a model name, never code", {
+  assign("m", "bart", envir = user)
+  expect_is(inUser(viaNamed(m)), "bartTreatmentModel")
+  expect_is(inUser(viaDots(trt.model = m)), "bartTreatmentModel")
+  expect_is(inUser(resolveModel(m)), "bartTreatmentModel")
+  expect_is(inUser(resolveModel(m <- "probitEM")), "probitEMTreatmentModel")
+  for (bad in list("", NA_character_, c("probit", "bart"), "probit(family = 'normal')", "stop('ran')", "nosuch")) {
+    assign("m", bad, envir = user)
+    for (call in list(quote(viaNamed(m)), quote(viaDots(trt.model = m)), quote(resolveModel(m)))) {
+      expect_error(eval(call, user), "treatment model of unrecognized type", fixed = TRUE)
+    }
+  }
+  ## a string literal written in the call keeps its old meaning: code
+  expect_equal(inUser(resolveModel("probit(family = 'normal', scale = 3)"))$scale, 3)
 })
 
 test_that("treatSens.BART accepts a model forwarded through dots", {

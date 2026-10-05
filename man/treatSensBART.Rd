@@ -56,7 +56,7 @@ Unique options to \code{treatSens.BART} are given by the argument \code{trt.mode
   \item \code{probit(family = "cauchy", ...)} - family can be \code{"cauchy"}, \code{"t"}, \code{"normal"}, or \code{"flat"}. Additional options are, \code{scale = 4}, \code{c(df = 3, scale = 4)}, \code{scale = 4}, and none, respectively.
   \item \code{bart(k = chi(1.25, Inf), ntree = 50, keepevery = 10)} - uses binary \code{\link[dbarts]{bart}} with the given parameters. By default the node sensitivity parameter, \code{k}, is given a chi hyperprior.
 }
-The call is evaluated where it was written, so it may name local variables, including when it is passed through another function's \code{...}. Passed through a named argument of another function it cannot be found; write the model's name as a string, e.g. \code{"probit"}, there.
+The call is evaluated where it was written, so it may name local variables, including when it is passed through another function's \code{...}, provided the wrapper passes its dots on directly (not through \code{list(...)} or \code{NextMethod()}). Passed through a wrapper's named argument, the constructor is not found there; only a model's name as a string, e.g. \code{"probit"}, can be passed that way, and it gives that model's defaults.
 }
 \value{
   \code{treatSens.BART} returns an object of class "\code{sensitivity}". See \link{treatSens} for details.

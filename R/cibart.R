@@ -17,15 +17,20 @@ cibartControl <- function(n.sim = 20L,
 ## constructors (probitEM, probit, bart, and probit's prior constructors, which
 ## resolved through the namespace before) resolve by bare name and everything
 ## else in 'env', the caller's frame, so a constructor's arguments can name the
-## caller's variables. A bare constructor name, or a string naming one, is
-## called at its defaults.
+## caller's variables. A bare constructor name, or a string literal written in
+## the call, is evaluated as code; a string that arrives as a value (a
+## variable, a named-argument forward) must be one of the names in
+## treatmentModelNames and gives that model at its defaults.
 ##
 ## A call forwarded through a wrapper's dots is matched as ..N; evaluating that
-## as it stands is tried first, and only when it fails is the call recovered as
-## it was written and evaluated, over the vocabulary, in the frame that wrote
-## it. Recovery can turn a failure into a value, never change a value. 'env'
-## must be the frame the argument was matched in (parent.frame() of the entry
-## point), and the forwarding frames must still be on the stack.
+## as it stands is tried first, and only when it fails, or yields a value the
+## argument refuses, is the call recovered as it was written and evaluated, over
+## the vocabulary, in the frame that wrote it. Recovery can turn a failure into
+## a value, never change a value; with nothing to recover the first outcome
+## stands. The first attempt's warnings are held back and shown only when that
+## attempt is the one used. 'env' must be the frame the argument was matched in
+## (parent.frame() of the entry point), and the forwarding frames must still be
+## on the stack.
 evaluateTreatmentModelArgument <- function(arg, env)
 {
   trtCall <- if (!is.null(arg)) arg else formals(cibart)$treatmentModel
@@ -33,27 +38,42 @@ evaluateTreatmentModelArgument <- function(arg, env)
   evalIn <- function(expr, where) {
     if (is.character(expr)) expr <- parse(text = expr)[[1L]]
     result <- hintTreatmentModelForm(eval(expr, treatmentModelVocabulary(where)))
-    ## a string forwarded through a wrapper reaches here as a value
-    if (is.character(result) && length(result) == 1L)
-      result <- eval(parse(text = result)[[1L]], treatmentModelVocabulary(where))
+    if (is.character(result)) {
+      if (length(result) != 1L || is.na(result) || !(result %in% treatmentModelNames))
+        stop("treatment model of unrecognized type", call. = FALSE)
+      result <- get(result, envir = getNamespace("treatSens"))
+    }
     if (is.function(result)) result <- result()
+    ## refused here, so that a forwarded value the argument cannot take is recovered
+    if (!inherits(result, c("probitTreatmentModel", "probitEMTreatmentModel", "bartTreatmentModel")))
+      stop("treatment model of unrecognized type", call. = FALSE)
     result
   }
 
-  if (isDotsReference(trtCall)) {
-    result <- tryCatch(evalIn(trtCall, env), error = function(original) {
-      written <- recoverForwardedArgument(trtCall, env)
-      if (isDotsReference(written$expr)) stop(original)
-      evalIn(written$expr, written$env)
-    })
-  } else {
-    result <- evalIn(trtCall, env)
-  }
+  if (!isDotsReference(trtCall)) return(evalIn(trtCall, env))
 
-  if (!inherits(result, c("probitTreatmentModel", "probitEMTreatmentModel", "bartTreatmentModel")))
-    stop("treatment model of unrecognized type")
-  result
+  held <- list()
+  outcome <- tryCatch(
+    withCallingHandlers(evalIn(trtCall, env), warning = function(w) {
+      held[[length(held) + 1L]] <<- w
+      invokeRestart("muffleWarning")
+    }),
+    error = function(e) e)
+  showHeld <- function() for (w in held) warning(w)
+
+  if (!inherits(outcome, "error")) {
+    showHeld()
+    return(outcome)
+  }
+  written <- recoverForwardedArgument(trtCall, env)
+  if (isDotsReference(written$expr)) {
+    showHeld()
+    stop(outcome)
+  }
+  evalIn(written$expr, written$env)
 }
+
+treatmentModelNames <- c("probitEM", "probit", "bart")
 
 treatmentModelVocabulary <- function(env)
 {
@@ -69,23 +89,24 @@ isDotsReference <- function(expr)
 ## Forcing a promise a failed evaluation interrupted warns; that is expected
 ## here. A constructor forced outside the argument that takes it (a wrapper's
 ## named formal passed on, forced where it was written) fails with R's message,
-## extended with the spelling that works there; only the constructors that have
-## a string form are named. Any other error passes through unchanged.
+## extended with the spelling that works there, a string, which gives the
+## model's defaults; only the constructors that have a string form are named.
+## A calling handler, so the error keeps the stack it was raised on; any other
+## error passes through unchanged.
 hintTreatmentModelForm <- function(value)
 {
   restarted <- gettext("restarting interrupted promise evaluation", domain = "R")
-  withCallingHandlers(
-    tryCatch(value, error = function(e) {
-      for (name in c("probitEM", "probit", "bart")) {
+  withCallingHandlers(value,
+    error = function(e) {
+      for (name in treatmentModelNames) {
         if (identical(conditionMessage(e), gettextf("could not find function \"%s\"", name, domain = "R"))) {
           e$message <- paste0(conditionMessage(e),
                               "; outside the argument that takes it, write the model's name as a string, \"",
-                              name, "\"")
-          break
+                              name, "\", for its defaults")
+          stop(e)
         }
       }
-      stop(e)
-    }),
+    },
     warning = function(w) {
       if (identical(conditionMessage(w), restarted)) invokeRestart("muffleWarning")
     })
