@@ -19,21 +19,106 @@ cibartControl <- function(n.sim = 20L,
 ## else in 'env', the caller's frame, so a constructor's arguments can name the
 ## caller's variables. A bare constructor name, or a string naming one, is
 ## called at its defaults.
+##
+## A call forwarded through a wrapper's dots is matched as ..N; evaluating that
+## as it stands is tried first, and only when it fails is the call recovered as
+## it was written and evaluated, over the vocabulary, in the frame that wrote
+## it. Recovery can turn a failure into a value, never change a value. 'env'
+## must be the frame the argument was matched in (parent.frame() of the entry
+## point), and the forwarding frames must still be on the stack.
 evaluateTreatmentModelArgument <- function(arg, env)
 {
   trtCall <- if (!is.null(arg)) arg else formals(cibart)$treatmentModel
-  if (is.character(trtCall)) trtCall <- parse(text = trtCall)[[1L]]
 
-  vocabulary <- new.env(parent = env)
-  for (name in c("probitEM", "probit", "bart", "probitNormalPrior", "probitCauchyPrior", "probitStudentTPrior"))
-    assign(name, get(name, envir = getNamespace("treatSens")), envir = vocabulary)
+  evalIn <- function(expr, where) {
+    if (is.character(expr)) expr <- parse(text = expr)[[1L]]
+    result <- hintTreatmentModelForm(eval(expr, treatmentModelVocabulary(where)))
+    ## a string forwarded through a wrapper reaches here as a value
+    if (is.character(result) && length(result) == 1L)
+      result <- eval(parse(text = result)[[1L]], treatmentModelVocabulary(where))
+    if (is.function(result)) result <- result()
+    result
+  }
 
-  result <- eval(trtCall, vocabulary)
-  if (is.function(result)) result <- result()
+  if (isDotsReference(trtCall)) {
+    result <- tryCatch(evalIn(trtCall, env), error = function(original) {
+      written <- recoverForwardedArgument(trtCall, env)
+      if (isDotsReference(written$expr)) stop(original)
+      evalIn(written$expr, written$env)
+    })
+  } else {
+    result <- evalIn(trtCall, env)
+  }
 
   if (!inherits(result, c("probitTreatmentModel", "probitEMTreatmentModel", "bartTreatmentModel")))
     stop("treatment model of unrecognized type")
   result
+}
+
+treatmentModelVocabulary <- function(env)
+{
+  vocabulary <- new.env(parent = env)
+  for (name in c("probitEM", "probit", "bart", "probitNormalPrior", "probitCauchyPrior", "probitStudentTPrior"))
+    assign(name, get(name, envir = getNamespace("treatSens")), envir = vocabulary)
+  vocabulary
+}
+
+isDotsReference <- function(expr)
+  is.symbol(expr) && grepl("^\\.\\.[1-9][0-9]*$", as.character(expr))
+
+## Forcing a promise a failed evaluation interrupted warns; that is expected
+## here. A constructor forced outside the argument that takes it (a wrapper's
+## named formal passed on, forced where it was written) fails with R's message,
+## extended with the spelling that works there; only the constructors that have
+## a string form are named. Any other error passes through unchanged.
+hintTreatmentModelForm <- function(value)
+{
+  restarted <- gettext("restarting interrupted promise evaluation", domain = "R")
+  withCallingHandlers(
+    tryCatch(value, error = function(e) {
+      for (name in c("probitEM", "probit", "bart")) {
+        if (identical(conditionMessage(e), gettextf("could not find function \"%s\"", name, domain = "R"))) {
+          e$message <- paste0(conditionMessage(e),
+                              "; outside the argument that takes it, write the model's name as a string, \"",
+                              name, "\"")
+          break
+        }
+      }
+      stop(e)
+    }),
+    warning = function(w) {
+      if (identical(conditionMessage(w), restarted)) invokeRestart("muffleWarning")
+    })
+}
+
+## An argument's expression as written, and the frame it was written in, for an
+## argument matched as ..N. Each forwarding frame's own call names the Nth dots
+## element, so the walk back reaches the original; it stops where that is not
+## possible and returns the reference as it stands.
+recoverForwardedArgument <- function(expr, env)
+{
+  while (isDotsReference(expr)) {
+    recovered <- tryCatch({
+      ## a closure can reference dots its enclosing function owns
+      while (!exists("...", envir = env, inherits = FALSE)) env <- parent.env(env)
+      ## a frame's first place on the stack is its own call; later ones are
+      ## evaluations in it, whose caller did not write the dots
+      frame <- Position(function(f) identical(f, env), sys.frames())
+      parent <- sys.parents()[frame]
+      ## NextMethod(name = value) replaces the method's dots but the frame
+      ## still records the generic's call
+      if (frame > 1L && identical(sys.function(frame - 1L), NextMethod)) stop("dots replaced by NextMethod")
+      ## a caller that is no frame on the stack (do.call(envir = )) cannot be named
+      if (parent >= frame) stop("unknown caller")
+      caller <- sys.frame(parent)
+      dots <- match.call(sys.function(frame), sys.call(frame), expand.dots = FALSE, envir = caller)$...
+      list(dots[[as.integer(substring(expr, 3L))]], caller)
+    }, error = function(e) NULL)
+    if (is.null(recovered)) break
+    expr <- recovered[[1L]]
+    env <- recovered[[2L]]
+  }
+  list(expr = expr, env = env)
 }
 
 ## Builds the fully-resolved dbarts spec triple (control, model, data) the
