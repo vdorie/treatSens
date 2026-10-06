@@ -145,14 +145,11 @@ recoverForwardedArgument <- function(expr, env)
 }
 
 ## Builds the fully-resolved dbarts spec triple (control, model, data) the
-## sampler is created from. The classic in-C++ Control/Model/Data construction is
-## gone with the old ABI, so we assemble the S4 specs in R using dbarts's own
-## constructors and prior resolution.
+## sampler is created from: one dbartsSpec call given the leaf prior expression,
+## the family and the forest's tree count. The control names neither the tree
+## count nor the cut count; the cuts live on the data object.
 makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, leaf.prior)
 {
-  ## placate R CMD check; these names resolve inside dbarts's parsePriors env
-  cgm <- chisq <- gaussian <- NULL
-
   # drop dimnames so the engine matches the counterfactual test matrix to the
   # training predictors by position (they are column-aligned by construction)
   x <- unname(as.matrix(x))
@@ -160,40 +157,19 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
                else dbarts::dbartsData(x, y, unname(as.matrix(x.test)))
   data.bart@n.cuts <- rep_len(100L, ncol(data.bart@x))
 
-  ## sampler creation trusts data@sigma to calibrate the residual-variance
-  ## (chisq) prior scale; dbarts() fills an NA estimate before building the
-  ## engine, so mirror that here or the very first sigma draw is NaN (gaussian
-  ## only - probit is a fixed unit-scale family with no sigma)
-  if (!binary && is.na(data.bart@sigma)) {
-    estimateSigmaFromLinearModel <- get("estimateSigmaFromLinearModel", envir = asNamespace("dbarts"))
-    data.bart@sigma <- estimateSigmaFromLinearModel(data.bart)
-  }
-
   control.bart <- dbarts::dbartsControl(n.chains = 1L, n.samples = as.integer(n.sim),
                                         n.burn = as.integer(max(0L, n.burn)),
                                         n.thin = as.integer(n.thin), n.threads = 1L,
-                                        n.trees = as.integer(n.trees), n.cuts = 100L,
                                         keepTrainingFits = TRUE, updateState = FALSE,
                                         verbose = FALSE)
-  control.bart@binary <- binary
 
-  ## dbarts's front-door consolidation folded the residual law (formerly a
-  ## separate resid.dist argument) into 'family' on the model spec below;
-  ## parsePriors itself no longer takes it, and gaussian is its default
-  parsePriors <- get("parsePriors", envir = asNamespace("dbarts"))
-  priorsCall <- as.call(list(parsePriors, control.bart, data.bart,
-                             tree.prior = quote(cgm), leaf.prior = leaf.prior,
-                             resid.prior = quote(chisq),
-                             parentEnv = environment()))
-  priors <- eval(priorsCall)
+  # dbartsSpec reads the leaf prior and the forests as written in its call
+  spec <- eval(bquote(dbarts::dbartsSpec(
+    data.bart, control.bart, leaf.prior = .(leaf.prior),
+    forests = list(dbarts::dbartsForests$forest(n.trees = .(as.integer(n.trees)))),
+    family = .(if (binary) "probit" else "gaussian"))))
 
-  model.bart <- methods::new("dbartsModel",
-                             priors$tree.prior, priors$leaf.prior,
-                             priors$leaf.hyperprior, priors$resid.prior,
-                             leaf.scale = if (binary) 3.0 else 0.5,
-                             family = if (binary) "probit" else "gaussian")
-
-  list(control = control.bart, model = model.bart, data = data.bart)
+  list(control = spec$control, model = spec$model, data = spec$data)
 }
 
 ## Creates the sampler the C driver runs. dbarts.h declares no creation entry:
