@@ -1,7 +1,7 @@
 context("interrupt during a sensitivity analysis")
 
-## dbarts' run polls for R's interrupt and raises it as an R error, which
-## unwinds through the sensitivity loop; the loop's buffers are R storage, so
+## dbarts' run polls for R's interrupt and raises it as R's interrupt
+## condition, which unwinds through the sensitivity loop; the loop's buffers are R storage, so
 ## nothing is stranded and a later fit is unaffected. The interrupt is injected
 ## through dbarts' internal count hooks, which report an interrupt on the Nth
 ## poll without touching R's signal state. They are an internal entry whose
@@ -55,9 +55,10 @@ test_that("an interrupted analysis leaves a later one unaffected", {
     output <- capture.output(interrupted <- local({
       on.exit(countHooks(0L))
       countHooks(case$interruptAfterPolls)
-      tryCatch(fitOnce(case$model, verbose = TRUE), error = conditionMessage)
+      tryCatch(fitOnce(case$model, verbose = TRUE),
+               interrupt = function(cond) class(cond), error = conditionMessage)
     }))
-    expect_true(is.character(interrupted) && grepl("sampler run interrupted", interrupted))
+    expect_equal(interrupted, c("interrupt", "condition"))
     ## the interrupt landed inside the grid loop: after a cell completed and
     ## before the last did
     numCompleted <- sum(grepl("^Completed cell", output))
