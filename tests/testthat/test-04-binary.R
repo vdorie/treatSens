@@ -75,14 +75,25 @@ test_that("the null treatment fit runs dbarts's default chains, keeping nsim dra
   expect_equal(cap$n.samples, 2L)
   expect_equal(cap$n.threads, 2L)
 
+  ## the cases below pin the thread count the null fit is given and stop there,
+  ## before the grid, so no more than two processes ever run
+  local_mocked_bindings(pdbart = function(...) {
+                          cap <<- list(...)
+                          stop("captured")
+                        },
+                        .package = "treatSens")
+
   ## threads never exceed the chain count
-  fitWith(8)
+  expect_error(fitWith(8), "captured")
   expect_equal(cap$n.threads, 4L)
 
   ## an unstated thread count is the core guess, capped at the chain count
   local_mocked_bindings(guessNumCores = function(...) 2L, .package = "treatSens")
-  fitWith(NULL)
+  expect_error(fitWith(NULL), "captured")
   expect_equal(cap$n.threads, 2L)
+  local_mocked_bindings(guessNumCores = function(...) 16L, .package = "treatSens")
+  expect_error(fitWith(NULL), "captured")
+  expect_equal(cap$n.threads, 4L)
 })
 
 test_that("treatSens.BART evaluates the grid in parallel with a finite result", {
@@ -214,6 +225,8 @@ test_that("treatSens.BART defaults nthreads to a guessed core count", {
   ## 2-process cap for --as-cran checks (unlike the fixed nthreads = 1/2 cases
   ## covered above, which are deliberately kept within that limit)
   skip_on_cran()
+  ## the guess is mocked to two so the grid forks at most two workers
+  local_mocked_bindings(guessNumCores = function(...) 2L, .package = "treatSens")
   fit <- suppressWarnings(
     treatSens.BART(Y ~ Z + X, trt.model = probitEM, nsim = 2, nburn = 0,
                    spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
