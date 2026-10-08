@@ -150,15 +150,24 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
                       lapply(seq_len(ncol(X)), function(j) { m <- mean(X[,j]); s <- sd(X[,j]); c(m - 0.5 * s, m + 0.5 * s) })
                     else
                       list({ m <- mean(X); s <- sd(X); c(m - 0.5 * s, m + 0.5 * s) })
+      ## dbarts's default chain count, on threads (the default thread count
+      ## unless nthreads is given); each chain keeps ceiling(nsim / n.chains)
+      ## draws, so at least nsim in all, merged chain-major. The readers below
+      ## average over draws, so none needs exactly nsim.
+      null.chains  <- eval(formals(dbarts::bart)$n.chains)
+      null.draws   <- as.integer(ceiling(nsim / null.chains))
+      null.threads <- if (is.null(nthreads)) dbarts::guessNumCores() else nthreads
+      null.threads <- if (is.na(null.threads)) 1L else as.integer(min(null.threads, null.chains))
       if (is.numeric(trt.model$k)) {
         null.bart <- pdbart(X, Z, levs = diffLevels, pl = FALSE, verbose = FALSE,
-                            k = trt.model$k, n.trees = trt.model$ntree, n.burn = nburn, n.samples = nsim,
-                            n.chains = 1L)
+                            k = trt.model$k, n.trees = trt.model$ntree, n.burn = nburn, n.samples = null.draws,
+                            n.chains = null.chains, n.threads = null.threads)
       } else {
         chi <- function(...) invisible(NULL) # R CMD check
         null.bart <- pdbart(X, Z, levs = diffLevels, pl = FALSE, verbose = FALSE,
                             k = chi(trt.model$k$degreesOfFreedom, trt.model$k$scale), n.trees = trt.model$ntree,
-                            n.burn = nburn, n.samples = nsim, n.chains = 1L)
+                            n.burn = nburn, n.samples = null.draws, n.chains = null.chains,
+                            n.threads = null.threads)
       }
       null.trt  <- list(fitted.values = apply(pnorm(null.bart$yhat.train), 2, mean),
                         coef = c(NA_real_, sapply(null.bart$fd, function(pd) mean(apply(pd, 1, diff)))))

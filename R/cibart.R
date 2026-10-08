@@ -157,6 +157,8 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
                else dbarts::dbartsData(x, y, unname(as.matrix(x.test)))
   data.bart@n.cuts <- rep_len(100L, ncol(data.bart@x))
 
+  # one chain: the C driver is a single Gibbs chain (each sweep conditions on
+  # the last draw of the confounders and takes one chain's fit from run)
   control.bart <- dbarts::dbartsControl(n.chains = 1L, n.samples = as.integer(n.sim),
                                         n.burn = as.integer(max(0L, n.burn)),
                                         n.thin = as.integer(n.thin), n.threads = 1L,
