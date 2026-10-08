@@ -54,6 +54,37 @@ test_that("treatSens.BART fits basic example with bart treatment model", {
   expect_is(out.bin, "sensitivity")
 })
 
+test_that("the null treatment fit runs dbarts's default chains, keeping nsim draws in all", {
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+  cap <- NULL
+  ## the capture is of the call as made; the fit itself runs on two threads
+  local_mocked_bindings(pdbart = function(...) {
+                          cap <<- list(...)
+                          do.call(dbarts::pdbart, modifyList(cap, list(n.threads = 2L)))
+                        },
+                        .package = "treatSens")
+  fitWith <- function(nthreads) {
+    cap <<- NULL
+    suppressWarnings(treatSens.BART(Y ~ Z + X, trt.model = bart, nsim = 7, nburn = 1,
+                                    spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
+                                    standardize = FALSE, nthreads = nthreads))
+  }
+  fitWith(2)
+  expect_equal(cap$n.chains, eval(formals(dbarts::bart)$n.chains))
+  expect_equal(cap$n.chains, 4L)
+  expect_equal(cap$n.samples, 2L)
+  expect_equal(cap$n.threads, 2L)
+
+  ## threads never exceed the chain count
+  fitWith(8)
+  expect_equal(cap$n.threads, 4L)
+
+  ## an unstated thread count is the core guess, capped at the chain count
+  local_mocked_bindings(guessNumCores = function(...) 2L, .package = "treatSens")
+  fitWith(NULL)
+  expect_equal(cap$n.threads, 2L)
+})
+
 test_that("treatSens.BART evaluates the grid in parallel with a finite result", {
   skip_on_os("windows")  # keep the socket-cluster path out of routine CRAN checks
   skip_if_not_installed("parallel")

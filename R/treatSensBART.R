@@ -156,7 +156,7 @@ treatSens.BART <- function(formula,                # formula: assume treatment i
       ## average over draws, so none needs exactly nsim.
       null.chains  <- eval(formals(dbarts::bart)$n.chains)
       null.draws   <- as.integer(ceiling(nsim / null.chains))
-      null.threads <- if (is.null(nthreads)) dbarts::guessNumCores() else nthreads
+      null.threads <- if (is.null(nthreads)) guessNumCores() else nthreads
       null.threads <- if (is.na(null.threads)) 1L else as.integer(min(null.threads, null.chains))
       if (is.numeric(trt.model$k)) {
         null.bart <- pdbart(X, Z, levs = diffLevels, pl = FALSE, verbose = FALSE,
