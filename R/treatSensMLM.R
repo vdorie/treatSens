@@ -590,6 +590,9 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
   
   if(U.model == "binomial"){
     reps <- 0
+    ## a drawn U that is constant, or equal to the treatment or its complement, cannot be
+    ## used (the models fit with it are degenerate), so another is drawn; an error from the
+    ## sampler is not a bad draw and is not retried
     repeat{
       reps <- reps+1
       if(identical(trt.family$link,"probit")){
@@ -597,26 +600,24 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
           if(!is.null(X)) {
             #debug(contYbinaryZU)
             ## results are n.samp - n.warm in length, so this gives us 1 sample but I've added a bit of warm up
-            out.contYbinaryZU <- try(contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+            out.contYbinaryZU <- contYbinaryZU.mlm(Y, Z, X, zetaY, zetaZ, theta, iter.j, weights, offset, p, g)
           } else {
             stop("Need to write Binary MLM code with no X") #out.contYbinaryZU <- try(contYbinaryZU.noX(Y, Z, zetaY, zetaZ, theta, iter.j, weights, offset, p))
           }
         }else if(trt.level == "group"){
           if(!is.null(X)) {
             #debug(contYbinaryZU)
-            out.contYbinaryZU <- try(contYbinaryZU.mlm.gp(Y, Z, X, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+            out.contYbinaryZU <- contYbinaryZU.mlm.gp(Y, Z, X, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g)
           } else {
-            out.contYbinaryZU <- try(contYbinaryZU.mlm.gp.noX(Y, Z, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g))
+            out.contYbinaryZU <- contYbinaryZU.mlm.gp.noX(Y, Z, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g)
           }
         }
        }else {
         stop(paste("Only probit link is allowed."))
       }
-      if (!inherits(out.contYbinaryZU, "try-error")) {
-        U <- out.contYbinaryZU$U
-        p.est <- out.contYbinaryZU$p
-        if (length(unique(U))>1 && !identical(U,Z) && !identical(U,1-Z)) break
-      }
+      U <- out.contYbinaryZU$U
+      p.est <- out.contYbinaryZU$p
+      if (length(unique(U))>1 && !all(U == Z) && !all(U == 1-Z)) break
       if (reps > 5000) {
         U <- "No non-constant simulated U vectors in 5000 tries"
         p.est <- NULL
