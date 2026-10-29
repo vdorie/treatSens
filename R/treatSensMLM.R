@@ -191,6 +191,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
   nt = sum(Z==1)
   nc = sum(Z==0)
   
+  user.weights <- !is.null(weights)
+  
   if (!is.null(weights)) {
     if (is.character(weights)) {
       
@@ -303,7 +305,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     
   #register control.fit
   control.fit = list(resp.family=resp.family, trt.family=trt.family, U.model=U.model, 
-                     standardize=standardize, weights=weights, iter.j=iter.j, 
+                     standardize=standardize, weights=weights, user.weights=user.weights, iter.j=iter.j, 
                      offset = offset, p = NULL, g=group, trt.level = trt.level, v_alpha = v_alpha, v_phi = v_phi, Xstar = Xstar)
   
   range = calc.range(sensParam, grid.dim, spz.range, spy.range, buffer, U.model, zero.loc, Xcoef.plot, Y, Z, X, Y.res, Z.res, v_Y, v_Z, theta, sgnTau0, control.fit, null.trt, verbose = verbose, W = W)
@@ -550,10 +552,11 @@ fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
   
   fit.gls <- suppressWarnings(do.call("gls", args.resp))
     
-  sens.se <- switch(class(weights),
-                    "NULL" = fit.gls$varBeta[2,2],
-                    "character" = pweight(Z = Z, X = X, r = fit.gls$residuals, wt = weights), #pweight is custom function
-                    "numeric"   = pweight(Z = Z, X = X, r = fit.gls$residuals, wt = weights)) #pweight is custom function
+  ## weights given by the user: the sandwich standard error; none: the gls model's own
+  sens.se <- if (isTRUE(control.fit$user.weights))
+    pweight(Z = Z, X = X, r = fit.gls$residuals, wt = weights) #pweight is custom function
+  else
+    sqrt(fit.gls$varBeta[2,2])
   fit.trt <- do.call(if (trt.level == "indiv") "glmer" else glm, args.trt)
   
   list(sens.coef = fit.gls$coef[2],

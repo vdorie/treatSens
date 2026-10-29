@@ -70,7 +70,7 @@ An object of class "\code{sensitivity}" is a list containing the following compo
 }
 \item{tau}{individual estimated treatment effects corresponding to each grid point (combination of sensitivity parameters) and each drawing of simulated U.
 }
-\item{se.tau}{individual standard error estimates of treatment effects for each grid point and each drawing of simulated U.
+\item{se.tau}{individual standard error estimates of treatment effects for each grid point and each drawing of simulated U. When no \code{weights} are given this is the model standard error of the treatment coefficient in the fitted response model (so, at zero sensitivity, it equals \code{se.tau0}); when \code{weights} are given it is the clustered robust standard error.
 }
 \item{zeta.z}{individual estimated coefficients on U in the treatment model corresponding to each grid point and each drawing of simulated U.}
 \item{zeta.y}{individual estimated coefficients on U in the outcome model corresponding to each grid point and each drawing of simulated U.}

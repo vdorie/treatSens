@@ -69,3 +69,28 @@ test_that("treatSens.MLM fails when only one of spy.range/spz.range is given", {
     treatSens.MLM(mlmFormula, data = mlmData, grid.dim = c(2, 2), nsim = 1,
                  trt.level = "indiv", standardize = FALSE, spy.range = c(0, 1)))
 })
+
+test_that("treatSens.MLM reports the model standard error when no weights are given", {
+  ## the documented example of ?treatSens.MLM
+  N <- 300; g <- rep(1:10, each = 30)
+  set.seed(1); X <- matrix(rnorm(3 * N), N, 3)
+  set.seed(836)
+  U <- rnorm(N, 0, 1)
+  Z <- rnorm(N, X %*% c(.75, -.5, .25) + .5 * U, 1) + rep(rnorm(10), each = 30)
+  Y <- rnorm(N, X %*% c(.5, 1, -1.5) + .5 * U + .25 * Z, 2) + rep(rnorm(10), each = 30)
+  d <- data.frame(Y = Y, Z = Z, X1 = X[,1], X2 = X[,2], X3 = X[,3], g = g)
+  fitWith <- function(...)
+    suppressMessages(suppressWarnings(treatSens.MLM(Y ~ Z + X1 + X2 + X3 + (1 | g), data = d,
+      grid.dim = c(3, 2), nsim = 2, standardize = FALSE, zero.loc = "full", ...)))
+
+  fit <- fitWith()
+  i0 <- which(as.numeric(dimnames(fit$tau)[[1]]) == 0)
+  expect_equal(as.numeric(fit$se.tau[i0, , ]), rep(fit$se.tau0, 2 * dim(fit$tau)[2]), tolerance = 1e-7)
+
+  ## explicit weights keep the sandwich standard error (value recorded from the release before)
+  fitW <- fitWith(weights = rep(1, N))
+  expect_equal(as.numeric(fitW$se.tau[i0, , ]), rep(0.08594505, 2 * dim(fitW$tau)[2]), tolerance = 1e-6)
+
+  expect_true(any(grepl("Estimated treatment effects", capture.output(summary(fit)), fixed = TRUE)))
+  expect_silent(capture.output(print(fitW)))
+})
