@@ -208,7 +208,8 @@ test_that("a deterministic error of the binary-U sampler surfaces at once, a deg
   skip_if_not(packageVersion("testthat") >= "3.2.0")
 
   fit.treatSens.mlm <- treatSens:::fit.treatSens.mlm
-  z <- binMLMData$Z
+  ## treatSens.MLM holds the treatment as doubles and the sampler returns integers
+  z <- as.numeric(binMLMData$Z)
   valid <- as.integer(z)
   valid[1:2] <- 1L - valid[1:2]
   expect_true(length(unique(valid)) > 1L)
