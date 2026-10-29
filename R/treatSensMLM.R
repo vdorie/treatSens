@@ -36,6 +36,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
    # set seed
   set.seed(seed)
   
+  #one core is the serial path, as in treatSens
+  if (!is.null(core) && isTRUE(all(core == 1L))) core <- NULL
+  
   #extract variables from formula
   form.vars <- suppressWarnings(parse.formula.mlm(formula, response.covariates, data))  #can return warning about scale of variables, which is not an issue when standardizing
   
