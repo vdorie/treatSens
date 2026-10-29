@@ -42,6 +42,16 @@ mlmX <- matrix(rnorm(3 * nObs), nObs, 3)
 mlmData <- data.frame(Z = rnorm(nObs) + rep(rnorm(6), each = 10) + mlmX[,1], X1 = mlmX[,1], X2 = mlmX[,2], X3 = mlmX[,3], g = group)
 mlmData$Y <- rnorm(nObs) + rep(rnorm(6), each = 10) + .25 * mlmData$Z
 
+set.seed(11)
+nObs <- 40
+group <- rep(1:4, each = 10)
+X1 <- rnorm(nObs)
+X2 <- rnorm(nObs)
+U <- rbinom(nObs, 1, .5)
+Z <- rbinom(nObs, 1, pnorm(.5 * X1 - .25 * X2 + rep(rnorm(4, sd = .5), each = 10) + .5 * (U - .5)))
+Y <- rnorm(nObs) + rep(rnorm(4, sd = .5), each = 10) + .5 * X1 + .25 * Z + .5 * (U - .5)
+binMLMData <- data.frame(Y = Y, Z = Z, X1 = X1, X2 = X2, g = group)
+
 fitBinary <- function(...)
   treatSens(Y ~ Z + age, trt.family = binomial(link = "probit"), data = binData, nsim = 3, grid.dim = c(3, 2), ...)
 fitContinuous <- function(...)
@@ -49,6 +59,12 @@ fitContinuous <- function(...)
 fitMLM <- function(...)
   suppressWarnings(treatSens.MLM(Y ~ Z + X1 + X2 + X3 + (1 | g), data = mlmData, grid.dim = c(2, 2), nsim = 2,
                                  standardize = FALSE, zero.loc = "full", ...))
+
+## the singular-fit notes of lme4 are messages
+fitBinaryMLM <- function(...)
+  suppressMessages(suppressWarnings(
+    treatSens.MLM(Y ~ Z + X1 + X2 + (1 | g), data = binMLMData, trt.family = binomial(link = "probit"),
+                  grid.dim = c(2, 2), nsim = 1, iter.j = 1, standardize = FALSE, zero.loc = "full", ...)))
 
 test_that("rngStreams depends on the seed alone and leaves the caller's generator as it was", {
   oldKind <- RNGkind()
@@ -98,6 +114,30 @@ test_that("treatSens without cores gives the draws it always has", {
   expect_identical(fitBinary(core = NULL)$tau, fit$tau)
 })
 
+test_that("the binary-U multilevel sampler runs when a sensitivity parameter is zero", {
+  contYbinaryZU.mlm <- treatSens:::contYbinaryZU.mlm
+  x <- as.matrix(binMLMData[, c("X1", "X2")])
+  for (offset in c(TRUE, FALSE)) {
+    for (cy in c(0, 0.5)) {
+      for (cz in c(0, 0.5)) {
+        out <- suppressMessages(contYbinaryZU.mlm(binMLMData$Y, binMLMData$Z, x, cy, cz, 0.5, iter.j = 2L,
+                                                  weights = NULL, offset = offset, p = NULL, g = binMLMData$g))
+        expect_true(all(out$U %in% 0:1))
+        expect_length(out$U, nObs)
+        expect_true(all(out$p >= 0 & out$p <= 1))
+      }
+    }
+  }
+})
+
+test_that("treatSens.MLM with a binary treatment fits every grid cell, those with a zero sensitivity parameter included", {
+  fit <- fitBinaryMLM(core = NULL)
+  expect_true(any(as.numeric(dimnames(fit$tau)[[1L]]) == 0))
+  expect_true(any(as.numeric(dimnames(fit$tau)[[2L]]) == 0))
+  expect_true(all(is.finite(fit$tau)))
+  expect_true(all(is.finite(fit$se.tau)))
+})
+
 test_that("treatSens with a binary U reproduces under a seed on two cores", {
   skipUnlessCluster()
   oldKind <- RNGkind()
@@ -132,6 +172,14 @@ test_that("treatSens.MLM reproduces under a seed on two cores", {
   first <- fitMLM(core = 2)
   expect_true(all(is.finite(first$tau)))
   expect_identical(fitMLM(core = 2)$tau, first$tau)
+})
+
+test_that("treatSens.MLM with a binary U reproduces under a seed on two cores", {
+  skipUnlessCluster()
+
+  first <- fitBinaryMLM(core = 2)
+  expect_true(all(is.finite(first$tau)))
+  expect_identical(fitBinaryMLM(core = 2)$tau, first$tau)
 })
 
 test_that("treatSens.BART reproduces under a seed on two threads", {
