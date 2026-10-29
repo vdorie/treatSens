@@ -213,8 +213,9 @@ binaryCell <- function(zetaY = 0.5, zetaZ = 0.5, offset = TRUE)
                       U.model = "binomial", standardize = FALSE, weights = NULL, iter.j = 1L, offset = offset,
                       p = NULL, g = binMLMData$g)
   X <- as.matrix(binMLMData[, c("X1", "X2")])
-  list(z = z, fit = function() treatSens:::fit.treatSens.mlm("coef", binMLMData$Y, z, NULL, NULL, X, NULL, zetaY, zetaZ,
-                                                             1, 1, 0.5, control.fit))
+  list(z = z, X = X, control.fit = control.fit,
+       fit = function() treatSens:::fit.treatSens.mlm("coef", binMLMData$Y, z, NULL, NULL, X, NULL, zetaY, zetaZ,
+                                                      1, 1, 0.5, control.fit))
 }
 
 ## a mocked function that runs the scripted steps in turn: a character step is an error with that
@@ -228,6 +229,38 @@ scripted <- function(steps, counter)
     step
   }
 }
+
+test_that("treatSens.MLM without the offset reports the standard error of the confounder's coefficient, not its variance", {
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  ## the model's own standard error for a given U, from the summary of the gls fit
+  u <- rep(0:1, length.out = nrow(binMLMData))
+  d <- data.frame(Y = binMLMData$Y, Z = as.numeric(binMLMData$Z), X1 = binMLMData$X1, X2 = binMLMData$X2,
+                  U = u, g = binMLMData$g)
+  fitted <- nlme::gls(Y ~ Z + X1 + X2 + U, data = d, correlation = nlme::corCompSymm(form = ~1 | g))
+  se <- summary(fitted)$tTable["U", "Std.Error"]
+  expect_true(se < 1)  # a variance below one would sit below its standard error: the pin tells them apart
+
+  cell <- binaryCell(0, 0, offset = FALSE)
+  out <- suppressMessages(suppressWarnings(
+    treatSens:::fit.treatSens.mlm.u(binMLMData$Y, cell$z, cell$X, NULL, u, 0, 0, cell$control.fit)))
+  expect_equal(unname(out$zeta.y), unname(coef(fitted)["U"]))
+  expect_equal(out$zy.se, se)
+
+  ## and the tables of print() built from the draws: the same draw in every cell and run has no
+  ## spread between draws, so the printed standard error is the model's
+  local_mocked_bindings(contYbinaryZU.mlm = function(...) list(U = u, p = rep(0.5, nrow(binMLMData))),
+                        .package = "treatSens")
+  fit <- suppressMessages(suppressWarnings(
+    treatSens.MLM(Y ~ Z + X1 + X2 + (1 | g), data = binMLMData, trt.family = binomial(link = "probit"),
+                  grid.dim = c(2, 2), nsim = 2, iter.j = 1, standardize = FALSE, offset = FALSE,
+                  spy.range = c(0.3, 0.8), spz.range = c(0.3, 0.8), core = NULL)))
+  expect_equal(as.vector(fit$se.spy), rep(se, 8L))
+  shown <- capture.output(print(fit, digits = 6))
+  rows <- shown[seq(grep("^Standard error of zeta.y", shown) + 2L, length.out = 2L)]
+  printed <- as.numeric(unlist(lapply(strsplit(trimws(rows), " +"), `[`, -1L)))
+  expect_equal(printed, rep(round(se, 6L), 4L))
+})
 
 test_that("a degenerate draw of the binary-U sampler is drawn again", {
   skip_if_not(packageVersion("testthat") >= "3.2.0")

@@ -560,7 +560,7 @@ fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
        sens.se = sens.se, 	#SE of Z coef
        zeta.y = if (offset == TRUE) zetaY else fit.gls$coef[length(fit.gls$coef)],     	            #estimated coefficient of U in response model
        zeta.z = if (trt.level == "indiv") fixef(fit.trt)[2] else coef(fit.trt)[2], #estimated coef of U in trt model
-       zy.se  = if (offset == TRUE) NA else fit.gls$varBeta[nrow(fit.gls$varBeta), ncol(fit.gls$varBeta)],     #SE of U coef in response model
+       zy.se  = if (offset == TRUE) NA else sqrt(fit.gls$varBeta[nrow(fit.gls$varBeta), ncol(fit.gls$varBeta)]), #SE of U coef in response model
        zz.se  = summary(fit.trt)$coefficients[2,2],                                 #SE of U coef in trt model
        resp.sigma2 = fit.gls$sigma^2,
        trt.sigma2  = if (trt.level == "indiv") summary(fit.trt)$sigma^2 else sum(fit.trt$resid^2)/fit.trt$df.residual)
