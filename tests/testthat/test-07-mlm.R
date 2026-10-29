@@ -87,9 +87,9 @@ test_that("treatSens.MLM reports the model standard error when no weights are gi
   i0 <- which(as.numeric(dimnames(fit$tau)[[1]]) == 0)
   expect_equal(as.numeric(fit$se.tau[i0, , ]), rep(fit$se.tau0, 2 * dim(fit$tau)[2]), tolerance = 1e-7)
 
-  ## explicit weights keep the sandwich standard error (value recorded from the release before)
+  ## explicit weights give the cluster-robust standard error (value recorded)
   fitW <- fitWith(weights = rep(1, N))
-  expect_equal(as.numeric(fitW$se.tau[i0, , ]), rep(0.08594505, 2 * dim(fitW$tau)[2]), tolerance = 1e-6)
+  expect_equal(as.numeric(fitW$se.tau[i0, , ]), rep(0.0829431741, 2 * dim(fitW$tau)[2]), tolerance = 1e-6)
 
   expect_true(any(grepl("Estimated treatment effects", capture.output(summary(fit)), fixed = TRUE)))
   expect_silent(capture.output(print(fitW)))
@@ -112,7 +112,18 @@ expectedWeights <- function(type, Z, e, trim.wt = 10)
   pmin(w, mx)
 }
 
-expectZeroCell <- function(fit, d, fitted, X, type, se = TRUE)
+## hand computation of the cluster-robust standard error of the treatment coefficient:
+## CR1 over the full design, with the weighted least squares bread
+handClusterSE <- function(Z, X, r, w, g)
+{
+  D <- cbind(1, Z, X); N <- nrow(D); k <- ncol(D); G <- length(unique(g))
+  sc <- rowsum(r * w * D, g)
+  bread <- solve(crossprod(D, w * D))
+  V <- G / (G - 1) * (N - 1) / (N - k) * bread %*% crossprod(sc) %*% bread
+  sqrt(V[2, 2])
+}
+
+expectZeroCell <- function(fit, d, fitted, X, type)
 {
   w <- expectedWeights(type, d$Z, fitted)
   i0 <- which(as.numeric(dimnames(fit$tau)[[1]]) == 0)
@@ -122,8 +133,9 @@ expectZeroCell <- function(fit, d, fitted, X, type, se = TRUE)
                                      correlation = nlme::corCompSymm(form = ~1 | g), weights = ~1 / w))
   expect_equal(unname(fit$tau0), unname(coef(null)[2]), tolerance = 1e-4)
   expect_equal(as.numeric(fit$tau[i0, j0, ]), rep(unname(coef(null)[2]), dim(fit$tau)[3]), tolerance = 1e-4)
-  if (se) expect_equal(as.numeric(fit$se.tau[i0, j0, ]),
-               rep(treatSens:::pweight(d$Z, X, null$residuals, w), dim(fit$tau)[3]), tolerance = 1e-4)
+  expect_equal(as.numeric(fit$se.tau[i0, j0, ]),
+               rep(handClusterSE(d$Z, X, as.numeric(null$residuals), w, d$g), dim(fit$tau)[3]), tolerance = 1e-4)
+  expect_equal(fit$df, length(unique(d$g)) - 1)
 }
 
 test_that("treatSens.MLM builds the ATE, ATT and ATC weights at the individual level", {
@@ -152,7 +164,6 @@ test_that("treatSens.MLM builds the ATE, ATT and ATC weights at the group level"
   x2 <- rnorm(N)
   d <- data.frame(Z = zg[g], X1 = xg[g], X2 = x2, g = g)
   d$Y <- .5 * d$X1 + x2 + .5 * ug[g] + .25 * d$Z + rnorm(ng)[g] + rnorm(N)
-  ## (the standard error is not pinned here: the sandwich leaves out the response-only covariates)
   ## one group-level and one individual-level covariate, and an individual-level covariate alone
   for (form in list(Y ~ Z + X1 + X2 + (1 | g), Y ~ Z + X2 + (1 | g), Y ~ Z + X1 + (1 | g))) {
     for (type in c("ATE", "ATT", "ATC")) {
@@ -162,7 +173,7 @@ test_that("treatSens.MLM builds the ATE, ATT and ATC weights at the group level"
       expect_true(all(is.finite(res$tau)), info = type)
       Xm <- as.matrix(d[, setdiff(all.vars(form), c("Y", "Z", "g")), drop = FALSE])
       null.trt <- suppressWarnings(glm(Z ~ Xm, family = binomial(link = "probit"), data = d))
-      expectZeroCell(res, d, fitted(null.trt), Xm, type, se = FALSE)
+      expectZeroCell(res, d, fitted(null.trt), Xm, type)
     }
   }
 })
@@ -192,4 +203,68 @@ test_that("the group-level binary sampler takes a single group-level covariate w
     theta = .5, iter.j = 2, weights = NULL, offset = TRUE, p = NULL, g = g))
   expect_length(out$p, ng)
   expect_true(all(is.finite(out$p)))
+})
+
+test_that("treatSens.MLM and treatSens without weights give the results of the release before", {
+  set.seed(11); N <- 60; g <- rep(1:6, each = 10)
+  X <- matrix(rnorm(2 * N), N, 2); Z <- rnorm(N, X %*% c(.75, -.5)) + rep(rnorm(6), each = 10)
+  Y <- rnorm(N, X %*% c(.5, 1) + .25 * Z, 2) + rep(rnorm(6), each = 10)
+  d <- data.frame(Y = Y, Z = Z, X1 = X[,1], X2 = X[,2], g = g)
+  f1 <- suppressMessages(suppressWarnings(treatSens(Y ~ Z + X, grid.dim = c(3, 2), nsim = 2,
+    standardize = FALSE, zero.loc = "full", seed = 7)))
+  f2 <- suppressMessages(suppressWarnings(treatSens.MLM(Y ~ Z + X1 + X2 + (1 | g), data = d,
+    grid.dim = c(3, 2), nsim = 2, standardize = FALSE, zero.loc = "full", trt.level = "indiv")))
+  expect_null(f1$df)
+  expect_null(f2$df)
+
+  ## values recorded from master at 35d5e93
+  expect_equal(c(f1$tau), c(-0.2480265, 1.384465, -0.2480265, -0.2088436, -0.2480265, -0.7970085,
+    -0.2480265, 1.448108, -0.2480265, -0.258473, -0.2480265, -0.8477615), tolerance = 1e-6)
+  expect_equal(c(f1$se.tau), c(0.2325137, 0.2281857, 0.2325137, 0.02790415, 0.2325137, 0.0716012,
+    0.2325137, 0.2296241, 0.2325137, 0.03295105, 0.2325137, 0.0715451), tolerance = 1e-6)
+  expect_equal(c(f2$tau), c(-0.1393639, 0.9123971, -0.1393639, -0.1717864, -0.1393639, -0.3732457,
+    -0.1393639, 0.9123131, -0.1393639, -0.1684372, -0.1393639, -0.5131657), tolerance = 1e-6)
+  expect_equal(c(f2$se.tau), c(0.2596457, 0.2198087, 0.2596457, 0.04893261, 0.2596457, 0.06572278,
+    0.2596457, 0.217764, 0.2596457, 0.05532463, 0.2596457, 0.06552942), tolerance = 1e-6)
+
+  ## the contour coordinates of the summary (where tau = 0 and where significance is lost)
+  expect_identical(capture.output(summary(f1))[1:13], c("Coefficients on U where tau = 0:",
+    "     Y      Z", " 0.000 -0.979", " 1.852  0.000", " 0.000  0.326", "", "",
+    "Coefficients on U where significance level 0.05 is lost:", "     Y      Z",
+    " 0.578 -1.150", " 2.176 -0.305", "", ""))
+  expect_identical(capture.output(summary(f2))[1:13], c("Coefficients on U where tau = 0:",
+    "     Y     Z", " 0.000 -0.72", " 0.991  0.00", " 0.000  0.24", "", "",
+    "Coefficients on U where significance level 0.05 is lost:", "     Y      Z",
+    " 0.599 -0.830", " 1.142 -0.435", "", ""))
+})
+
+test_that("the significance contour of a weighted treatSens.MLM fit uses the t quantile", {
+  set.seed(2)
+  ng <- 40; m <- 5; N <- ng * m; g <- rep(1:ng, each = m)
+  xg <- rnorm(ng); ug <- rnorm(ng)
+  d <- data.frame(Z = as.numeric(.8 * xg + .5 * ug > 0)[g], X1 = xg[g], X2 = rnorm(N), g = g)
+  d$Y <- .5 * d$X1 + d$X2 + .5 * ug[g] + .25 * d$Z + rnorm(ng)[g] + rnorm(N)
+  capture.output(res <- suppressMessages(suppressWarnings(treatSens.MLM(Y ~ Z + X1 + X2 + (1 | g),
+    data = d, grid.dim = c(3, 3), nsim = 2, trt.level = "group", trt.family = binomial(link = "probit"),
+    standardize = FALSE, zero.loc = "full", weights = "ATE", verbose = FALSE))))
+  expect_equal(res$df, ng - 1)
+  expect_equal(treatSens:::sigQuantile(0.05, res$df), qt(0.025, ng - 1))
+  expect_equal(treatSens:::sigQuantile(0.05, NULL), qnorm(0.025))
+
+  withT <- capture.output(summary(res))
+  resNormal <- res; resNormal$df <- NULL
+  withNormal <- capture.output(summary(resNormal))
+  expect_false(any(grepl("is lost could not", withT, fixed = TRUE)))
+  expect_false(identical(withT, withNormal))
+
+  ## the contour of tau/se at the t quantile, computed by hand as the summary does
+  K <- dim(res$tau)[3]
+  W <- apply(res$se.tau^2, c(1, 2), mean); B <- apply(res$tau, c(1, 2), sd)^2
+  taus <- apply(res$tau, c(1, 2), mean)
+  zc <- as.numeric(dimnames(res$tau)[[2]]); yc <- as.numeric(dimnames(res$tau)[[1]])
+  cl <- contourLines(zc, yc, taus / sqrt(W + (1 + 1 / K) * B), levels = -sign(res$tau0) * qt(0.025, ng - 1))
+  expect_true(length(cl) > 0L)
+  m <- round(cbind(cl[[1]]$y, cl[[1]]$x), 3)
+  colnames(m) <- c("Y", "Z"); rownames(m) <- rep("", nrow(m))
+  expect_true(all(capture.output(print(m)) %in% withT))
 })

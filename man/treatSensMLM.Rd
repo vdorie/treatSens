@@ -4,7 +4,7 @@
 Performing Dual-Parameter Sensitivity Analysis in Multi-level Models
 }
 \description{
-\code{treatSens.MLM} performs dual-parameter sensitivity analysis for unobserved confounding for both continuous and binary treatment variables in multi-level models.
+\code{treatSens.MLM} performs dual-parameter sensitivity analysis for unobserved confounding for both continuous and binary treatment variables in multi-level models. This function is experimental: its interface and results may change.
 }
 \usage{
 treatSens.MLM(formula, response.covariates = NULL,
@@ -70,7 +70,7 @@ An object of class "\code{sensitivity}" is a list containing the following compo
 }
 \item{tau}{individual estimated treatment effects corresponding to each grid point (combination of sensitivity parameters) and each drawing of simulated U.
 }
-\item{se.tau}{individual standard error estimates of treatment effects for each grid point and each drawing of simulated U. When no \code{weights} are given this is the model standard error of the treatment coefficient in the fitted response model (so, at zero sensitivity, it equals \code{se.tau0}); when \code{weights} are given it is a heteroskedasticity-robust sandwich standard error that treats observations as independent (it does not cluster by group).
+\item{se.tau}{individual standard error estimates of treatment effects for each grid point and each drawing of simulated U. When no \code{weights} are given this is the model standard error of the treatment coefficient in the fitted response model (so, at zero sensitivity, it equals \code{se.tau0}). When \code{weights} are given it is a cluster-robust sandwich standard error with groups as clusters, computed over the full design of the fitted response model with the CR1 small-sample correction.}
 }
 \item{zeta.z}{individual estimated coefficients on U in the treatment model corresponding to each grid point and each drawing of simulated U.}
 \item{zeta.y}{individual estimated coefficients on U in the outcome model corresponding to each grid point and each drawing of simulated U.}
@@ -81,13 +81,14 @@ An object of class "\code{sensitivity}" is a list containing the following compo
 \item{X}{covariates}
 \item{sig2.trt}{individual residual variances for the treatment model corresponding to each grid point and each drawing of simulated U.}
 \item{sig2.resp}{individual residual variances for the outcome model corresponding to each grid point and each drawing of simulated U.}
+\item{df}{present only when \code{weights} are given: the degrees of freedom, the number of groups minus one, of the t distribution against which significance is judged in \code{summary} and \code{plot}. Without \code{weights} significance is judged against the normal distribution.}
 \item{tau0}{averaged estimated treatment effect assuming no unobserved confounding (i.e. naive model).}
 \item{se.tau0}{averaged standard error estimate of the treatment effect without unobserved confounding (i.e. naive model)}
 \item{Xcoef}{the coefficients on the covariates in the treatment model (1st column) and the outcome model (2nd column) without unobserved confounding (i.e. naive model).}
 \item{Xcoef.plot}{coefficients as for \code{Xcoef}, but after transforming covariates to have positive coefficients in the response model (X = -X, used for plotting purposes).}
 }
 \note{
-When \code{weights} are specified, \code{treatSens.MLM} returns heteroskedasticity-robust sandwich standard errors that do not cluster by group.
+When \code{weights} are specified, \code{treatSens.MLM} returns cluster-robust standard errors, clustered by group, and judges significance against a t distribution with one fewer degrees of freedom than there are groups.
 
 Matrices and data frames should include only complete cases.
 }

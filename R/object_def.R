@@ -30,7 +30,7 @@ combine.sensitivity <- function(x1, x2){
                  sp.z = c(gridpts1[,2], gridpts2[,2]), sp.y = c(gridpts1[,1], gridpts2[,1]), 
                  Y = x1$Y, Z = x1$Z, sig2.resp = c(sigRespLong1, sigRespLong2), sig2.trt = c(sigTrtLong1, sigTrtLong2),
             #should any of the following be averaged across objects?
-                 tau0 = x1$tau0, se.tau0 = x1$se.tau0,
+                 tau0 = x1$tau0, se.tau0 = x1$se.tau0, df = x1$df,
                  Xcoef = x1$Xcoef, Xcoef.plot = x1$Xcoef.plot,
                  varnames = x1$varnames,var_ytilde = x1$var_ytilde,var_ztilde = x1$var_ztilde, XpartCor = x1$XpartCor)
   class(result) <- "sensitivityCombo"
@@ -80,7 +80,7 @@ summary.sensitivity.default <- function(object, digits = 3, signif.level = 0.05,
   B = apply(object$tau, c(1,2), sd, na.rm = T)^2
   se.est = t(sqrt(W+(1+1/K)*B))
   
-  noSigCoords = contourLines(trt.coef, resp.coef, taus/t(se.est), levels = -sign(object$tau0)*qnorm(signif.level/2))
+  noSigCoords = contourLines(trt.coef, resp.coef, taus/t(se.est), levels = -sign(object$tau0)*sigQuantile(signif.level, object$df))
   if (inherits(unlist(noSigCoords), "NULL")) {
     cat("Sensitivity parameters where significance level", signif.level, "is lost could not be calculated.\n\n")
   } else {
@@ -144,7 +144,7 @@ summary.sensitivityCombo.default <- function(object, digits = 3, signif.level = 
   B = tapply(object$tau, list(Zcors, Ycors), sd, na.rm = T)^2
   se.est = sqrt(W+(1+1/K)*B)
     
-  noSigCoords = contourLines(trt.coef, resp.coef, taus/se.est, levels = -sign(object$tau0)*qnorm(signif.level/2))
+  noSigCoords = contourLines(trt.coef, resp.coef, taus/se.est, levels = -sign(object$tau0)*sigQuantile(signif.level, object$df))
   if (inherits(unlist(noSigCoords), "NULL")) {
     cat("Sensitivity parameters where significance level", signif.level, "is lost could not be calculated.\n\n")
   } else {
@@ -249,3 +249,8 @@ plot.sensitivityCombo = function(x,y,...){
 }  
 #}
 #)
+
+## quantile that judges significance: t with df degrees of freedom when df is given and
+## finite, the normal otherwise
+sigQuantile <- function(signif.level, df = NULL)
+  if (is.null(df) || !is.finite(df)) qnorm(signif.level/2) else qt(signif.level/2, df)

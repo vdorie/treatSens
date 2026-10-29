@@ -177,7 +177,7 @@ sensPlotMain = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.in
           add = T, col = col.zero,lty = lty.zero,labcex = labcex,...)
   
   contour(as.numeric(dimnames(x$sp.z)[[2]]), as.numeric(dimnames(x$sp.y)[[1]]), taus.est/se.est, labels = "N.S.",
-          levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = col.insig,
+          levels = c(-1, 1)*sigQuantile(signif.level, x$df), add = T, col = col.insig,
           lty = lty.insig, labcex = labcex, lwd = 2,...)
   
   if (!is.null(Xpart)) {
@@ -372,7 +372,7 @@ sensPlotCombo = function(x, contour.levels, col.zero, lty.zero, col.insig, lty.i
           add = T, col = col.zero,lty = lty.zero,labcex = labcex,...)
   
   contour(Zcors, Ycors, taus/se.taus, labels = "N.S.",
-          levels = c(-1, 1)*qnorm(signif.level/2), add = T, col = col.insig,
+          levels = c(-1, 1)*sigQuantile(signif.level, x$df), add = T, col = col.insig,
           lty = lty.insig, labcex = labcex, lwd = 2,...)
   
   if(x$model.type == "GLM"){

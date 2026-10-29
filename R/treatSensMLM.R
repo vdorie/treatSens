@@ -451,6 +451,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     class(result) <- "sensitivity"
   }
   
+  ## weighted fits are judged against t with one fewer degrees of freedom than groups
+  if (user.weights) result$df <- length(unique(group)) - 1L
+
   return(result)
 }
 
@@ -552,10 +555,12 @@ fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
   
   fit.gls <- suppressWarnings(do.call("gls", args.resp))
     
-  ## weights given by the user: the sandwich standard error; none: the gls model's own
-  sens.se <- if (isTRUE(control.fit$user.weights))
-    pweight(Z = Z, X = X, r = fit.gls$residuals, wt = weights) #pweight is custom function
-  else
+  ## weights given by the user: the cluster-robust standard error; none: the gls model's own
+  sens.se <- if (isTRUE(control.fit$user.weights)) {
+    Dz <- cbind(1, Z)
+    D <- cbind(Dz, X, W, if (offset == FALSE) U)
+    crse(D, r = fit.gls$residuals, wt = weights, g = g, coefIndex = ncol(Dz))
+  } else
     sqrt(fit.gls$varBeta[2,2])
   fit.trt <- do.call(if (trt.level == "indiv") "glmer" else glm, args.trt)
   

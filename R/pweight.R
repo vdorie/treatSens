@@ -50,3 +50,14 @@ pweight <- function(Z,X,r,wt,program=3){ # Z:treat, X:X, r:residual (from (g)lm 
   # return SE
   sqrt(V[1,1])
 }
+
+## Cluster-robust (CR1) standard error of one coefficient of a weighted least squares fit.
+## D: design matrix of the fit, r: residuals, wt: weights, g: group of each row,
+## coefIndex: column of D whose standard error is returned.
+crse <- function(D, r, wt, g, coefIndex = 2L) {
+  N <- nrow(D); k <- ncol(D); G <- length(unique(g))
+  s <- rowsum(r * wt * D, g)
+  bread <- solve(crossprod(D, wt * D))
+  V <- G / (G - 1) * (N - 1) / (N - k) * bread %*% crossprod(s) %*% bread
+  sqrt(V[coefIndex, coefIndex])
+}
