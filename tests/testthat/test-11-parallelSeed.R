@@ -4,7 +4,8 @@ context("treatSens seeded parallel runs")
 ## does not reach them: each task is given its own stream and sets it when it
 ## starts. These tests pin that two identical parallel calls agree exactly, and
 ## that the serial path, which draws from the main process's stream, is as it
-## was before the streams existed.
+## was before the streams existed. The last tests pin that a parallel call,
+## however it ends, stops its workers and leaves a sequential foreach backend.
 
 rngStreams <- treatSens:::rngStreams
 withRNGStream <- treatSens:::withRNGStream
@@ -144,4 +145,71 @@ test_that("treatSens.BART reproduces under a seed on two threads", {
   first <- fitBART()
   expect_true(all(is.finite(first$tau)))
   expect_identical(fitBART()$tau, first$tau)
+})
+
+## records the cluster a call starts, so a test can see whether it was stopped
+recordCluster <- function(env = parent.frame())
+{
+  record <- new.env()
+  makeCluster <- parallel::makeCluster
+  local_mocked_bindings(makeCluster = function(...) {
+                          record$cl <- makeCluster(...)
+                          record$cl
+                        },
+                        .package = "parallel", .env = env)
+  record
+}
+
+clusterAlive <- function(cl)
+  !is.null(cl) && tryCatch({ parallel::clusterEvalQ(cl, NULL); TRUE }, error = function(e) FALSE)
+
+expectSequentialBackend <- function()
+{
+  expect_identical(foreach::getDoParName(), "doSEQ")
+  ## a registered but stopped cluster would fail here
+  expect_identical(unlist(foreach::`%dopar%`(foreach::foreach(i = 1:2), i)), 1:2)
+}
+
+test_that("a parallel call that finishes stops its cluster and leaves a sequential foreach backend", {
+  skipUnlessCluster()
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  for (fit in list(fitBinary, fitMLM)) {
+    record <- recordCluster()
+    on.exit(if (clusterAlive(record$cl)) parallel::stopCluster(record$cl), add = TRUE)
+    fit(core = 2)
+    expect_s3_class(record$cl, "cluster")
+    expect_false(clusterAlive(record$cl))
+    expectSequentialBackend()
+  }
+})
+
+test_that("a parallel call that fails after its cluster starts stops it and leaves a sequential foreach backend", {
+  skipUnlessCluster()
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  ## the streams are made after the cluster starts
+  local_mocked_bindings(rngStreams = function(seed, n) stop("streams failed"), .package = "treatSens")
+  for (fit in list(fitBinary, fitContinuous, fitMLM)) {
+    record <- recordCluster()
+    on.exit(if (clusterAlive(record$cl)) parallel::stopCluster(record$cl), add = TRUE)
+    expect_error(fit(core = 2), "streams failed")
+    expect_s3_class(record$cl, "cluster")
+    expect_false(clusterAlive(record$cl))
+    expectSequentialBackend()
+  }
+})
+
+test_that("a parallel call whose workers fail stops its cluster and leaves a sequential foreach backend", {
+  skipUnlessCluster()
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  ## a stream no generator accepts: every task fails in its worker
+  local_mocked_bindings(rngStreams = function(seed, n) rep(list(c(10407L, 1L)), n), .package = "treatSens")
+  record <- recordCluster()
+  on.exit(if (clusterAlive(record$cl)) parallel::stopCluster(record$cl), add = TRUE)
+  expect_error(fitBinary(core = 2), "task 1 failed")
+  expect_s3_class(record$cl, "cluster")
+  expect_false(clusterAlive(record$cl))
+  expectSequentialBackend()
 })
