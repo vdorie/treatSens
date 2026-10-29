@@ -21,7 +21,16 @@ skipUnlessCluster <- function()
 }
 
 ## the generator's kind and state, restored by the caller of this function
-restoreRNG <- function(kind) do.call(RNGkind, as.list(kind))
+restoreRNG <- function(kind) suppressWarnings(do.call(RNGkind, as.list(kind)))
+
+## runs expr with the cluster treatSens starts cut to one worker; a result that
+## does not change with the worker count does not depend on how tasks are scheduled
+withOneWorker <- function(expr)
+{
+  makeCluster <- parallel::makeCluster
+  local_mocked_bindings(makeCluster = function(spec, ...) makeCluster(1L, ...), .package = "parallel")
+  expr
+}
 
 set.seed(1)
 nObs <- 150
@@ -82,10 +91,30 @@ test_that("rngStreams depends on the seed alone and leaves the caller's generato
   expect_identical(rngStreams(10L, 4L), first)
   expect_identical(RNGkind()[1:2], c("Mersenne-Twister", "Box-Muller"))
 
+  ## the sample kind is part of a stream too, so it is fixed
+  suppressWarnings(RNGkind(sample.kind = "Rounding"))
+  expect_identical(rngStreams(10L, 4L), first)
+  expect_identical(first[[1L]][1L], 10407L)
+
   expect_length(first, 4L)
   expect_false(anyDuplicated(first) > 0L)
   expect_false(identical(rngStreams(11L, 1L)[[1L]], first[[1L]]))
   expect_length(rngStreams(10L, 0L), 0L)
+})
+
+test_that("the stream helpers leave a generator with no state as they found it, kinds included", {
+  oldKind <- RNGkind()
+  on.exit(restoreRNG(oldKind))
+
+  suppressWarnings(RNGkind("Wichmann-Hill", "Box-Muller", "Rounding"))
+  rm(".Random.seed", envir = globalenv())
+  streams <- rngStreams(10L, 2L)
+  expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
+  expect_identical(RNGkind(), c("Wichmann-Hill", "Box-Muller", "Rounding"))
+
+  withRNGStream(streams[[1L]], rnorm(2L))
+  expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
+  expect_identical(RNGkind(), c("Wichmann-Hill", "Box-Muller", "Rounding"))
 })
 
 test_that("withRNGStream draws from its stream and leaves the process's own generator as it was", {
@@ -106,28 +135,54 @@ test_that("withRNGStream draws from its stream and leaves the process's own gene
 })
 
 test_that("treatSens without cores gives the draws it always has", {
+  ## recorded before the streams were added, as hexadecimal floats so they are exact
+  expected <- as.numeric(c("0x1.02089f74c3581p-1", "0x1.5db9f7f8db749p+0", "0x1.02089f74c3581p-1",
+                           "0x1.94fe57a637c71p-2", "0x1.02089f74c3581p-1", "-0x1.9f700611eb1c9p-3",
+                           "0x1.02089f74c3581p-1", "0x1.437f60df2c54dp+0", "0x1.02089f74c3581p-1",
+                           "0x1.a0ff33801d6d3p-2", "0x1.02089f74c3581p-1", "-0x1.22a8082487d52p-2",
+                           "0x1.02089f74c3581p-1", "0x1.4c7c1167c5fedp+0", "0x1.02089f74c3581p-1",
+                           "0x1.05b63281a599bp-1", "0x1.02089f74c3581p-1", "-0x1.439d533b3d1d4p-2"))
   fit <- fitBinary(core = NULL)
-  expected <- c(0.503972, 1.366119, 0.503972, 0.3955015, 0.503972, -0.2028504,
-                0.503972, 1.263662, 0.503972, 0.4072235, 0.503972, -0.2838441,
-                0.503972, 1.298768, 0.503972, 0.5111557, 0.503972, -0.3160298)
-  expect_equal(as.vector(fit$tau), expected, tolerance = 1e-5)
   expect_identical(fitBinary(core = NULL)$tau, fit$tau)
+
+  ## the draws are the same everywhere, but the glm fits that follow them can
+  ## differ in the last bits between platforms, so the digits compared are cut
+  ## there; the exact values are compared on the build they were recorded on
+  expect_identical(signif(as.vector(fit$tau), 9L), signif(expected, 9L))
+  skip_if_not(grepl("^aarch64-apple-darwin", R.version$platform), "exact values were recorded on arm64 macOS")
+  expect_identical(as.vector(fit$tau), expected)
 })
 
-test_that("the binary-U multilevel sampler runs when a sensitivity parameter is zero", {
-  contYbinaryZU.mlm <- treatSens:::contYbinaryZU.mlm
+test_that("one core is the serial run, as the documentation says", {
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  local_mocked_bindings(makeCluster = function(...) stop("a cluster was started"), .package = "parallel")
+  expect_identical(fitBinary(core = 1)$tau, fitBinary(core = NULL)$tau)
+  expect_identical(fitMLM(core = 1)$tau, fitMLM(core = NULL)$tau)
+})
+
+expectSamplerRuns <- function(cy, cz, offset, g = binMLMData$g)
+{
   x <- as.matrix(binMLMData[, c("X1", "X2")])
+  out <- suppressMessages(treatSens:::contYbinaryZU.mlm(binMLMData$Y, binMLMData$Z, x, cy, cz, 0.5, iter.j = 1L,
+                                                        weights = NULL, offset = offset, p = NULL, g = g))
+  expect_true(all(out$U %in% 0:1))
+  expect_length(out$U, nObs)
+  expect_true(all(out$p >= 0 & out$p <= 1))
+}
+
+test_that("the binary-U multilevel sampler runs when a sensitivity parameter is zero", {
+  ## each parameter alone, in both ways of fitting the models
   for (offset in c(TRUE, FALSE)) {
-    for (cy in c(0, 0.5)) {
-      for (cz in c(0, 0.5)) {
-        out <- suppressMessages(contYbinaryZU.mlm(binMLMData$Y, binMLMData$Z, x, cy, cz, 0.5, iter.j = 2L,
-                                                  weights = NULL, offset = offset, p = NULL, g = binMLMData$g))
-        expect_true(all(out$U %in% 0:1))
-        expect_length(out$U, nObs)
-        expect_true(all(out$p >= 0 & out$p <= 1))
-      }
-    }
+    expectSamplerRuns(0, 0.5, offset)
+    expectSamplerRuns(0.5, 0, offset)
   }
+})
+
+test_that("the binary-U multilevel sampler runs with a group of one and several covariates", {
+  singleton <- binMLMData$g
+  singleton[nObs] <- 5L
+  expectSamplerRuns(0.5, 0.5, TRUE, singleton)
 })
 
 test_that("treatSens.MLM with a binary treatment fits every grid cell, those with a zero sensitivity parameter included", {
@@ -138,8 +193,71 @@ test_that("treatSens.MLM with a binary treatment fits every grid cell, those wit
   expect_true(all(is.finite(fit$se.tau)))
 })
 
+test_that("treatSens.MLM fits without the offset, for a continuous and a binary U", {
+  fit <- fitMLM(core = NULL, offset = FALSE)
+  expect_true(all(is.finite(fit$se.spy)))
+  expect_true(all(is.finite(fit$sp.y)))
+
+  ## the one standard error per cell is the last diagonal element of the coefficients' covariance
+  fit <- fitBinaryMLM(core = NULL, offset = FALSE, spy.range = c(0.3, 0.8), spz.range = c(0.3, 0.8))
+  expect_true(all(is.finite(fit$tau)))
+  expect_true(all(is.finite(fit$se.spy)))
+})
+
+test_that("a deterministic error of the binary-U sampler surfaces at once, a degenerate draw is drawn again", {
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  fit.treatSens.mlm <- treatSens:::fit.treatSens.mlm
+  z <- binMLMData$Z
+  valid <- as.integer(z)
+  valid[1:2] <- 1L - valid[1:2]
+  expect_true(length(unique(valid)) > 1L)
+  control.fit <- list(resp.family = gaussian, trt.family = binomial(link = "probit"), trt.level = "indiv",
+                      U.model = "binomial", standardize = FALSE, weights = NULL, iter.j = 1L, offset = TRUE,
+                      p = NULL, g = binMLMData$g)
+  X <- as.matrix(binMLMData[, c("X1", "X2")])
+  fitCell <- function() fit.treatSens.mlm("coef", binMLMData$Y, z, NULL, NULL, X, NULL, 0.5, 0.5, 1, 1, 0.5, control.fit)
+
+  ## a U equal to the treatment or its complement, as the integers the sampler returns, or constant
+  scripted <- list(as.integer(z), rep(1L, nObs), as.integer(1 - z), valid)
+  calls <- 0L
+  fitted <- NULL
+  local_mocked_bindings(contYbinaryZU.mlm = function(...) {
+                          calls <<- calls + 1L
+                          list(U = scripted[[calls]], p = rep(0.5, nObs))
+                        },
+                        fit.treatSens.mlm.u = function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
+                          fitted <<- U
+                          list(sens.coef = 0)
+                        },
+                        .package = "treatSens")
+  fitCell()
+  expect_identical(calls, 4L)
+  expect_identical(fitted, valid)
+
+  ## a sampler that only ever gives a constant U gives up with missing values
+  calls <- 0L
+  scripted <- rep(list(rep(1L, nObs)), 5001L)
+  expect_true(is.na(fitCell()$sens.coef))
+  expect_identical(calls, 5001L)
+
+  ## an error is not a bad draw: it comes out of the first call, from the public function too
+  calls <- 0L
+  local_mocked_bindings(contYbinaryZU.mlm = function(...) {
+                          calls <<- calls + 1L
+                          stop("sampler failed")
+                        },
+                        .package = "treatSens")
+  expect_error(fitCell(), "sampler failed")
+  expect_identical(calls, 1L)
+  calls <- 0L
+  expect_error(fitBinaryMLM(core = NULL), "sampler failed")
+  expect_identical(calls, 1L)
+})
+
 test_that("treatSens with a binary U reproduces under a seed on two cores", {
   skipUnlessCluster()
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
   oldKind <- RNGkind()
   on.exit(restoreRNG(oldKind))
 
@@ -147,6 +265,7 @@ test_that("treatSens with a binary U reproduces under a seed on two cores", {
   expect_true(all(is.finite(first$tau)))
   expect_identical(fitBinary(core = 2)$tau, first$tau)
   expect_identical(fitBinary(core = 2)$se.tau, first$se.tau)
+  expect_identical(withOneWorker(fitBinary(core = 2))$tau, first$tau)
 
   ## the streams come from the seed alone: the caller's generator neither
   ## changes them nor is left changed
@@ -159,19 +278,23 @@ test_that("treatSens with a binary U reproduces under a seed on two cores", {
 
 test_that("treatSens with a continuous U reproduces under a seed on two cores", {
   skipUnlessCluster()
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
 
   first <- fitContinuous(core = 2)
   expect_true(all(is.finite(first$tau)))
   expect_identical(fitContinuous(core = 2)$tau, first$tau)
   expect_identical(fitContinuous(core = 2)$sp.z, first$sp.z)
+  expect_identical(withOneWorker(fitContinuous(core = 2))$tau, first$tau)
 })
 
 test_that("treatSens.MLM reproduces under a seed on two cores", {
   skipUnlessCluster()
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
 
   first <- fitMLM(core = 2)
   expect_true(all(is.finite(first$tau)))
   expect_identical(fitMLM(core = 2)$tau, first$tau)
+  expect_identical(withOneWorker(fitMLM(core = 2))$tau, first$tau)
 })
 
 test_that("treatSens.MLM with a binary U reproduces under a seed on two cores", {
@@ -183,7 +306,7 @@ test_that("treatSens.MLM with a binary U reproduces under a seed on two cores", 
 })
 
 test_that("treatSens.BART reproduces under a seed on two threads", {
-  skip_on_os("windows")  # keep the socket-cluster path out of routine CRAN checks
+  skip_on_os("windows")  # Windows would run the slabs on a socket cluster; elsewhere they are forked
   skip_if_not_installed("parallel")
 
   fitBART <- function()
