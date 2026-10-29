@@ -505,6 +505,37 @@ test_that("treatSens.BART reproduces under a seed on two threads", {
   expect_identical(fitBART()$tau, first$tau)
 })
 
+test_that("treatSens.BART reads the caller's generator state without finding it invalid", {
+  oldKind <- RNGkind()
+  on.exit(restoreRNG(oldKind))
+
+  ## the sampler matches its generator to the kinds in .Random.seed[1], a code that carries the
+  ## uniform and normal kinds in its low digits and, above them, the sample kind and, in R-devel, the
+  ## binomial kind (R-devel's default state starts at 110403); only the first two are the sampler's
+  ## to check, so no code that R itself accepts may be reported as invalid
+  fitBART <- function()
+    treatSens.BART(Y ~ Z + age, trt.model = probitEM, data = binData, nsim = 2, nburn = 1,
+                   spy.range = c(0, 2), spz.range = c(-2, 2), grid.dim = c(2, 2),
+                   standardize = FALSE, nthreads = 1)
+  expectNoSeedWarning <- function()
+  {
+    seedWarnings <- character()
+    fit <- withCallingHandlers(fitBART(), warning = function(w) {
+      seedWarnings <<- c(seedWarnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    })
+    expect_true(all(is.finite(fit$tau)))
+    expect_false(any(grepl("Random.seed", seedWarnings, fixed = TRUE)), info = RNGkind())
+  }
+
+  expectNoSeedWarning()
+  for (kinds in list(c("Wichmann-Hill", "Box-Muller"), c("Mersenne-Twister", "Inversion"), c("L'Ecuyer-CMRG", "Inversion"))) {
+    suppressWarnings(RNGkind(kinds[1L], kinds[2L], "Rounding"))
+    if (length(RNGkind()) > 3L) suppressWarnings(RNGkind(binom.kind = "Buggy BTPE"))
+    expectNoSeedWarning()
+  }
+})
+
 ## records the cluster a call starts, so a test can see whether it was stopped
 recordCluster <- function(env = parent.frame())
 {

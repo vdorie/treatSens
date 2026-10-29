@@ -171,6 +171,27 @@ void ext_rng_setState(ext_rng* generator, const void* v_state)
     memcpy(generator->state, v_state, stateLength);
 }
 
+// The standard-normal type packed into seed0. The bit layout changed in R 3.6.0
+// (sample.kind), so decode against the runtime R version, falling back to the
+// compile-time R_VERSION when the runtime version is unavailable.
+static ext_rng_standardNormal_t stdNormalTypeFromSeed0(uint_least32_t seed0)
+{
+  int major, minor, revision;
+  if (rc_getRuntimeVersion(&major, &minor, &revision) != 0) {
+#if R_VERSION < R_Version(3,6,0)
+    return (ext_rng_standardNormal_t) (seed0 / 100);
+#else
+    return (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
+#endif
+  } else {
+    if (major < 3 || (major == 3 && minor < 6)) {
+      return (ext_rng_standardNormal_t) (seed0 / 100);
+    } else {
+      return (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
+    }
+  }
+}
+
 ext_rng* ext_rng_createDefault(bool useNative)
 {
   ext_rng* result;
@@ -224,31 +245,24 @@ ext_rng* ext_rng_createDefault(bool useNative)
   
   uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
   
-  if (seed0 == (uint_least32_t) NA_INTEGER || seed0 > 11000) {
+  ext_rng_algorithm_t algorithmType = (ext_rng_algorithm_t) (seed0 % 100);
+  
+  ext_rng_standardNormal_t stdNormalType = stdNormalTypeFromSeed0(seed0);
+  
+  // Only the uniform and standard normal kinds are meaningful to this
+  // generator, so validate those two fields individually against the kinds it
+  // implements. R packs further method selectors into the higher digits of the
+  // encoded seed (sample.kind, binom.kind, and whatever it adds next); those
+  // are deliberately ignored, as a bound on the encoded value as a whole would
+  // reject seeds that are perfectly usable here.
+  if (seed0 == (uint_least32_t) NA_INTEGER ||
+      algorithmType >= EXT_RNG_ALGORITHM_INVALID ||
+      stdNormalType >= EXT_RNG_STANDARD_NORMAL_INVALID) {
     ext_issueWarning("'.Random.seed' is not a valid integer, so ignored");
     result = ext_rng_create(EXT_RNG_ALGORITHM_MERSENNE_TWISTER, NULL);
     if (result != NULL) ext_rng_setSeedFromClock(result);
     UNPROTECT(1);
     return result;
-  }
-  
-  ext_rng_algorithm_t algorithmType = (ext_rng_algorithm_t) (seed0 % 100);
-  
-  int major, minor, revision;
-  
-  ext_rng_standardNormal_t stdNormalType;
-  if (rc_getRuntimeVersion(&major, &minor, &revision) != 0) {
-#if R_VERSION < R_Version(3,6,0)
-    stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
-#else
-    stdNormalType = (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
-#endif
-  } else {
-    if (major < 3 || (major == 3 && minor < 6)) {
-      stdNormalType = (ext_rng_standardNormal_t) (seed0 / 100);
-    } else {
-      stdNormalType = (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
-    }
   }
   
   void* state = (void*) (1 + INTEGER(seedsExpr));
