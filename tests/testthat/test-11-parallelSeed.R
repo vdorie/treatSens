@@ -204,56 +204,184 @@ test_that("treatSens.MLM fits without the offset, for a continuous and a binary 
   expect_true(all(is.finite(fit$se.spy)))
 })
 
-test_that("a deterministic error of the binary-U sampler surfaces at once, a degenerate draw is drawn again", {
+## fit.treatSens.mlm for one cell of binMLMData, as treatSens.MLM calls it, which holds the
+## treatment as doubles while the sampler returns integers
+binaryCell <- function(zetaY = 0.5, zetaZ = 0.5, offset = TRUE)
+{
+  z <- as.numeric(binMLMData$Z)
+  control.fit <- list(resp.family = gaussian, trt.family = binomial(link = "probit"), trt.level = "indiv",
+                      U.model = "binomial", standardize = FALSE, weights = NULL, iter.j = 1L, offset = offset,
+                      p = NULL, g = binMLMData$g)
+  X <- as.matrix(binMLMData[, c("X1", "X2")])
+  list(z = z, fit = function() treatSens:::fit.treatSens.mlm("coef", binMLMData$Y, z, NULL, NULL, X, NULL, zetaY, zetaZ,
+                                                             1, 1, 0.5, control.fit))
+}
+
+## a mocked function that runs the scripted steps in turn: a character step is an error with that
+## message, anything else is the value returned
+scripted <- function(steps, counter)
+{
+  function(...) {
+    counter$n <- counter$n + 1L
+    step <- steps[[counter$n]]
+    if (is.character(step)) stop(step)
+    step
+  }
+}
+
+test_that("a degenerate draw of the binary-U sampler is drawn again", {
   skip_if_not(packageVersion("testthat") >= "3.2.0")
 
-  fit.treatSens.mlm <- treatSens:::fit.treatSens.mlm
-  ## treatSens.MLM holds the treatment as doubles and the sampler returns integers
-  z <- as.numeric(binMLMData$Z)
+  cell <- binaryCell()
+  z <- cell$z
   valid <- as.integer(z)
   valid[1:2] <- 1L - valid[1:2]
   expect_true(length(unique(valid)) > 1L)
-  control.fit <- list(resp.family = gaussian, trt.family = binomial(link = "probit"), trt.level = "indiv",
-                      U.model = "binomial", standardize = FALSE, weights = NULL, iter.j = 1L, offset = TRUE,
-                      p = NULL, g = binMLMData$g)
-  X <- as.matrix(binMLMData[, c("X1", "X2")])
-  fitCell <- function() fit.treatSens.mlm("coef", binMLMData$Y, z, NULL, NULL, X, NULL, 0.5, 0.5, 1, 1, 0.5, control.fit)
 
   ## a U equal to the treatment or its complement, as the integers the sampler returns, or constant
-  scripted <- list(as.integer(z), rep(1L, nObs), as.integer(1 - z), valid)
-  calls <- 0L
+  draws <- list(as.integer(z), rep(1L, nObs), as.integer(1 - z), valid)
+  counter <- new.env()
+  counter$n <- 0L
   fitted <- NULL
   local_mocked_bindings(contYbinaryZU.mlm = function(...) {
-                          calls <<- calls + 1L
-                          list(U = scripted[[calls]], p = rep(0.5, nObs))
+                          counter$n <- counter$n + 1L
+                          list(U = draws[[counter$n]], p = rep(0.5, nObs))
                         },
                         fit.treatSens.mlm.u = function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
                           fitted <<- U
                           list(sens.coef = 0)
                         },
                         .package = "treatSens")
-  fitCell()
-  expect_identical(calls, 4L)
+  cell$fit()
+  expect_identical(counter$n, 4L)
   expect_identical(fitted, valid)
 
   ## a sampler that only ever gives a constant U gives up with missing values
-  calls <- 0L
-  scripted <- rep(list(rep(1L, nObs)), 5001L)
-  expect_true(is.na(fitCell()$sens.coef))
-  expect_identical(calls, 5001L)
+  counter$n <- 0L
+  draws <- rep(list(rep(1L, nObs)), 5001L)
+  expect_true(is.na(cell$fit()$sens.coef))
+  expect_identical(counter$n, 5001L)
+})
 
-  ## an error is not a bad draw: it comes out of the first call, from the public function too
-  calls <- 0L
+test_that("an error of the binary-U sampler or of the models fit with its draw is drawn again", {
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  cell <- binaryCell()
+  valid <- as.integer(cell$z)
+  valid[1:2] <- 1L - valid[1:2]
+  draw <- list(U = valid, p = rep(0.5, nObs))
+
+  ## the sampler fails on a few draws, as glmer does when it does not converge
+  samplerCalls <- new.env()
+  samplerCalls$n <- 0L
+  local_mocked_bindings(contYbinaryZU.mlm = scripted(list("a", "b", "c", draw), samplerCalls),
+                        fit.treatSens.mlm.u = function(...) list(sens.coef = 0),
+                        .package = "treatSens")
+  expect_identical(cell$fit()$sens.coef, 0)
+  expect_identical(samplerCalls$n, 4L)
+
+  ## so do the models fit with a draw
+  fitCalls <- new.env()
+  fitCalls$n <- 0L
+  samplerCalls$n <- 0L
+  local_mocked_bindings(contYbinaryZU.mlm = function(...) { samplerCalls$n <- samplerCalls$n + 1L; draw },
+                        fit.treatSens.mlm.u = scripted(list("x", "y", list(sens.coef = 1)), fitCalls),
+                        .package = "treatSens")
+  expect_identical(cell$fit()$sens.coef, 1)
+  expect_identical(fitCalls$n, 3L)
+  expect_identical(samplerCalls$n, 3L)
+
+  ## a run of failures one short of the bound, broken by a degenerate draw, starts the count over
+  nFail <- treatSens:::maxDrawFailures - 1L
+  steps <- c(rep(list("a"), nFail), list(list(U = rep(1L, nObs), p = rep(0.5, nObs))), rep(list("a"), nFail), list(draw))
+  samplerCalls$n <- 0L
+  local_mocked_bindings(contYbinaryZU.mlm = scripted(steps, samplerCalls),
+                        fit.treatSens.mlm.u = function(...) list(sens.coef = 0),
+                        .package = "treatSens")
+  expect_identical(cell$fit()$sens.coef, 0)
+  expect_identical(samplerCalls$n, length(steps))
+})
+
+test_that("an error that every draw gives surfaces after the bound, with its message", {
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  bound <- treatSens:::maxDrawFailures
+  expect_true(bound >= 20L && bound <= 50L)
+  cell <- binaryCell()
+  valid <- as.integer(cell$z)
+  valid[1:2] <- 1L - valid[1:2]
+
+  calls <- new.env()
+  calls$n <- 0L
   local_mocked_bindings(contYbinaryZU.mlm = function(...) {
-                          calls <<- calls + 1L
+                          calls$n <- calls$n + 1L
                           stop("sampler failed")
                         },
                         .package = "treatSens")
-  expect_error(fitCell(), "sampler failed")
-  expect_identical(calls, 1L)
-  calls <- 0L
+  expect_error(cell$fit(), "sampler failed")
+  expect_identical(calls$n, bound)
+  ## from the public function too
+  calls$n <- 0L
   expect_error(fitBinaryMLM(core = NULL), "sampler failed")
-  expect_identical(calls, 1L)
+  expect_identical(calls$n, bound)
+
+  ## the models fit with the draws, when no draw can be fit
+  calls$n <- 0L
+  local_mocked_bindings(contYbinaryZU.mlm = function(...) list(U = valid, p = rep(0.5, nObs)),
+                        fit.treatSens.mlm.u = function(...) {
+                          calls$n <- calls$n + 1L
+                          stop("model failed")
+                        },
+                        .package = "treatSens")
+  expect_error(cell$fit(), "model failed")
+  expect_identical(calls$n, bound)
+})
+
+test_that("the treatment model failing on a draw is drawn again, with the draws it failed on", {
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  ## recorded from treatSens.MLM on binMLMData without the offset over a grid of c(4, 3) (seed 8): at
+  ## these Us glmer stops with "Downdated VtV is not positive definite" and "PIRLS loop resulted in NaN value"
+  failing <- list("1010010001000100011100000100000101001000", "1010010001010101010101100110001110011000")
+  failing <- lapply(failing, function(u) as.integer(strsplit(u, "")[[1L]]))
+  draws <- c(failing, list(rep(0:1, 20L)))
+  cell <- binaryCell(0, -2.214164672498927, offset = FALSE)
+  calls <- new.env()
+  calls$n <- 0L
+  local_mocked_bindings(contYbinaryZU.mlm = function(...) {
+                          calls$n <- calls$n + 1L
+                          list(U = draws[[calls$n]], p = rep(0.5, nObs))
+                        },
+                        .package = "treatSens")
+  fit <- suppressMessages(suppressWarnings(cell$fit()))
+  expect_true(is.finite(fit$sens.coef))
+  expect_true(is.finite(fit$zy.se))
+  expect_true(calls$n <= length(draws))
+})
+
+test_that("a cell is fit where the sampler's glmer fails on a draw, at the shape of a reported failure", {
+  skip_if_not(packageVersion("testthat") >= "3.2.0")
+
+  ## 40 groups of 4 with three covariates and a binary treatment: at a treatment coefficient of -2
+  ## glmer in the sampler does not converge on some of the draws (3 to 16 percent of them at 60 groups)
+  nG <- 40L
+  set.seed(7)
+  n <- nG * 4L
+  g <- rep(seq_len(nG), each = 4L)
+  x <- matrix(rnorm(3L * n), n, 3L)
+  u <- rbinom(n, 1L, 0.5)
+  z <- as.numeric(rbinom(n, 1L, pnorm(x %*% c(.75, -.5, .25) + 0.5 * (u - .5) + rep(rnorm(nG, sd = .7), each = 4L))))
+  y <- as.vector(rnorm(n, x %*% c(.5, 1, -1.5) + 0.5 * u + .25 * z, 2) + rep(rnorm(nG), each = 4L))
+  control.fit <- list(resp.family = gaussian, trt.family = binomial(link = "probit"), trt.level = "indiv",
+                      U.model = "binomial", standardize = FALSE, weights = NULL, iter.j = 1L, offset = TRUE,
+                      p = NULL, g = g)
+  ## the first draw of each of these seeds fails in this build
+  for (seed in c(2L, 7L, 16L)) {
+    set.seed(seed)
+    fit <- suppressMessages(suppressWarnings(
+      treatSens:::fit.treatSens.mlm("coef", y, z, NULL, NULL, x, NULL, 0.5, -2, 1, 1, 0.5, control.fit)))
+    expect_true(is.finite(fit$sens.coef))
+  }
 })
 
 test_that("treatSens with a binary U reproduces under a seed on two cores", {

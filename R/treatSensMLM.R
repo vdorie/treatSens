@@ -566,6 +566,18 @@ fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
        trt.sigma2  = if (trt.level == "indiv") summary(fit.trt)$sigma^2 else sum(fit.trt$resid^2)/fit.trt$df.residual)
 }
 
+## consecutive failed draws of U, in the sampler or in the models fit with the draw, after
+## which treatSens.MLM stops with the last error. A draw fails on its own for some
+## draws (glmer not converging: 3 to 16 percent of the fits seen), so a run of n has
+## probability near 0.16^n, below 1e-20 for 30, while an error no draw cures (a model
+## that cannot be fit, a group beyond pmvnorm's limit) costs 30 calls, not 5000.
+maxDrawFailures <- 30L
+
+## the result of a fit that gave no usable draw
+naFit <- function(p = NULL)
+  list(sens.coef = NA, sens.se = NA, zeta.y = NA, zeta.z = NA, zy.se = NA, zz.se = NA,
+       resp.sigma2 = NA, trt.sigma2 = NA, p = p)
+
 fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ, v_Y, v_Z, theta, control.fit) {
   resp.family = control.fit$resp.family
   trt.family = control.fit$trt.family
@@ -589,12 +601,8 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
   }
   
   if(U.model == "binomial"){
-    reps <- 0
-    ## a drawn U that is constant, or equal to the treatment or its complement, cannot be
-    ## used (the models fit with it are degenerate), so another is drawn; an error from the
-    ## sampler is not a bad draw and is not retried
-    repeat{
-      reps <- reps+1
+    ## one attempt draws U and fits the models with it; NULL is a drawn U that cannot be used
+    attempt <- function() {
       if(identical(trt.family$link,"probit")){
         if(trt.level == "indiv"){
           if(!is.null(X)) {
@@ -612,18 +620,37 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
             out.contYbinaryZU <- contYbinaryZU.mlm.gp.noX(Y, Z, W, Xstar, zetaY, zetaZ, theta, iter.j, weights, offset, p, g)
           }
         }
-       }else {
+      }else {
         stop(paste("Only probit link is allowed."))
       }
       U <- out.contYbinaryZU$U
-      p.est <- out.contYbinaryZU$p
-      if (length(unique(U))>1 && !all(U == Z) && !all(U == 1-Z)) break
-      if (reps > 5000) {
-        U <- "No non-constant simulated U vectors in 5000 tries"
-        p.est <- NULL
-        class(U) <- "try-error" #stop("No non-constant simulated U vectors in 5000 tries")
-        break
-      } 
+      if (length(unique(U)) <= 1 || all(U == Z) || all(U == 1-Z)) return(NULL)
+      if (std) U <- std.nonbinary(U)
+      result <- fit.treatSens.mlm.u(Y, Z, X, W, U, zetaY, zetaZ, control.fit)
+      result$p <- out.contYbinaryZU$p
+      result
+    }
+    
+    ## A drawn U that is constant, or equal to the treatment or its complement, cannot be
+    ## used (the models fit with it are degenerate), so another is drawn, up to 5000 times.
+    ## An error of the sampler or of the models fit with a draw depends on the draw (a
+    ## glmer that does not converge), so it is drawn again too, but a run of
+    ## maxDrawFailures in a row is an error that no draw will cure and is raised.
+    reps <- 0L
+    n.fail <- 0L
+    repeat{
+      reps <- reps + 1L
+      result <- try(attempt(), silent = TRUE)
+      if (inherits(result, "try-error")) {
+        n.fail <- n.fail + 1L
+        if (n.fail >= maxDrawFailures)
+          stop(conditionMessage(attr(result, "condition")), " (the last of ", n.fail,
+               " failed draws of U in a row)", call. = FALSE)
+      } else {
+        n.fail <- 0L
+        if (!is.null(result)) return(result)
+      }
+      if (reps > 5000L) return(naFit())
     }
   }
   
@@ -638,16 +665,6 @@ fit.treatSens.mlm <- function(sensParam, Y, Z, Y.res, Z.res, X, W, zetaY, zetaZ,
 
     return(result)
   }else{
-    return(list(
-      sens.coef = NA,
-      sens.se = NA, 	
-      zeta.y = NA, 	
-      zeta.z = NA,	
-      zy.se = NA, 
-      zz.se = NA,
-      resp.sigma2 = NA,
-      trt.sigma2 = NA,
-      p = p.est
-    ))
+    return(naFit(p.est))
   }
 }
