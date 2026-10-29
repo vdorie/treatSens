@@ -419,7 +419,7 @@ contYbinaryZU.mlm <- function(y, z, x, cy, cz, theta, iter.j = 10, weights = NUL
   g.ind <- lapply(seq_along(gps), function(i) which(g.ind == i))
   ## cache splits across groups
   y.g <- lapply(seq_along(gps), function(i) y[g.ind[[i]]])
-  x.g <- lapply(seq_along(gps), function(i) if (NCOL(x) == 1L) x[g.ind[[i]]] else x[g.ind[[i]],])
+  x.g <- lapply(seq_along(gps), function(i) if (NCOL(x) == 1L) x[g.ind[[i]]] else x[g.ind[[i]], , drop = FALSE])
   z.g <- lapply(seq_along(gps), function(i) z[g.ind[[i]]])
 
   p <- if (!is.null(p)) rep_len(p, n.obs) else rep_len(0.5, n.obs)
