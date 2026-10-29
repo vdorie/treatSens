@@ -528,11 +528,16 @@ test_that("treatSens.BART reads the caller's generator state without finding it 
     expect_false(any(grepl("Random.seed", seedWarnings, fixed = TRUE)), info = RNGkind())
   }
 
-  expectNoSeedWarning()
-  for (kinds in list(c("Wichmann-Hill", "Box-Muller"), c("Mersenne-Twister", "Inversion"), c("L'Ecuyer-CMRG", "Inversion"))) {
-    suppressWarnings(RNGkind(kinds[1L], kinds[2L], "Rounding"))
-    if (length(RNGkind()) > 3L) suppressWarnings(RNGkind(binom.kind = "Buggy BTPE"))
+  ## where R has a binomial kind, BTPE puts a digit above the sample kind's
+  binomKinds <- if (length(RNGkind()) > 3L) c("BTPE", "Buggy BTPE") else NA
+  for (binomKind in binomKinds) {
+    if (!is.na(binomKind)) suppressWarnings(RNGkind(binom.kind = binomKind))
     expectNoSeedWarning()
+    for (kinds in list(c("Wichmann-Hill", "Box-Muller"), c("Mersenne-Twister", "Inversion"), c("L'Ecuyer-CMRG", "Inversion"))) {
+      suppressWarnings(RNGkind(kinds[1L], kinds[2L], "Rounding"))
+      expectNoSeedWarning()
+    }
+    suppressWarnings(RNGkind("default", "default", "default"))
   }
 })
 

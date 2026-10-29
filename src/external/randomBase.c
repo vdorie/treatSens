@@ -255,7 +255,8 @@ ext_rng* ext_rng_createDefault(bool useNative)
   // encoded seed (sample.kind, binom.kind, and whatever it adds next); those
   // are deliberately ignored, as a bound on the encoded value as a whole would
   // reject seeds that are perfectly usable here.
-  if (seed0 == (uint_least32_t) NA_INTEGER ||
+  // R refuses a negative code, NA_INTEGER among them
+  if (INTEGER(seedsExpr)[0] < 0 ||
       algorithmType >= EXT_RNG_ALGORITHM_INVALID ||
       stdNormalType >= EXT_RNG_STANDARD_NORMAL_INVALID) {
     ext_issueWarning("'.Random.seed' is not a valid integer, so ignored");
@@ -417,20 +418,7 @@ ext_rng_standardNormal_t ext_rng_getDefaultStandardNormalType(void)
   
   uint_least32_t seed0 = (uint_least32_t) INTEGER(seedsExpr)[0];
   
-  int major, minor, revision;
-  if (rc_getRuntimeVersion(&major, &minor, &revision) != 0) {
-#if R_VERSION < R_Version(3,6,0)
-    return (ext_rng_standardNormal_t) (seed0 / 100);
-#else
-    return (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
-#endif
-  } else {
-    if (major < 3 || (major == 3 && minor < 6)) {
-      return (ext_rng_standardNormal_t) (seed0 / 100);
-    } else {
-      return (ext_rng_standardNormal_t) (seed0 % 10000 / 100);
-    }
-  }
+  return stdNormalTypeFromSeed0(seed0);
 }
 
 const char* ext_rng_getAlgorithmName(ext_rng_algorithm_t algorithm)
