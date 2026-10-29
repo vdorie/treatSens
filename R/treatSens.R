@@ -307,6 +307,8 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
     fe = requireNamespace("foreach", quietly = TRUE)
     if(dp & fe){
       cl<-parallel::makeCluster(core)    #SET NUMBER OF CORES TO BE USED.
+      #stop the workers and drop the backend on any exit, an error included
+      on.exit({foreach::registerDoSEQ(); parallel::stopCluster(cl)}, add = TRUE)
       doParallel::registerDoParallel(cl)
     }else{
       core = NULL
@@ -422,8 +424,6 @@ treatSens <- function(formula,         #formula: assume treatment is 1st term on
                    varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z, XpartCor = Xpartials)
     class(result) <- "sensitivity"
   }
-  
-  if(!is.null(core) && dp) parallel::stopCluster(cl)   # Stop using multicore.
   
   #options(warn = oldWarnings)
   
