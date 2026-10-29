@@ -217,7 +217,7 @@ test_that("treatSens.MLM and treatSens without weights give the results of the r
   expect_null(f1$df)
   expect_null(f2$df)
 
-  ## values recorded from master at 35d5e93
+  ## values from the unweighted build before this change
   expect_equal(c(f1$tau), c(-0.2480265, 1.384465, -0.2480265, -0.2088436, -0.2480265, -0.7970085,
     -0.2480265, 1.448108, -0.2480265, -0.258473, -0.2480265, -0.8477615), tolerance = 1e-6)
   expect_equal(c(f1$se.tau), c(0.2325137, 0.2281857, 0.2325137, 0.02790415, 0.2325137, 0.0716012,
@@ -267,4 +267,30 @@ test_that("the significance contour of a weighted treatSens.MLM fit uses the t q
   m <- round(cbind(cl[[1]]$y, cl[[1]]$x), 3)
   colnames(m) <- c("Y", "Z"); rownames(m) <- rep("", nrow(m))
   expect_true(all(capture.output(print(m)) %in% withT))
+
+  ## the plots draw the "N.S." contours at the same quantile
+  expect_equal(treatSens:::insigLevels(0.05, res$df), c(-1, 1) * qt(0.025, ng - 1))
+  expect_equal(treatSens:::insigLevels(0.05, NULL), c(-1, 1) * qnorm(0.025))
+
+  ## fits judged against different distributions are not combined
+  expect_error(treatSens:::combine.sensitivity(res, resNormal), "same degrees of freedom")
+})
+
+test_that("a weighted treatSens.MLM fit that models U (offset = FALSE) includes U in the design of its standard error", {
+  set.seed(5)
+  ng <- 30; m <- 4; g <- rep(seq_len(ng), each = m); N <- length(g)
+  xg <- rnorm(ng); x1 <- xg[g]; x2 <- rnorm(N)
+  z <- as.numeric(xg + rnorm(ng) > 0)[g]
+  U <- rep(rbinom(ng, 1, .5), each = m)
+  y <- .5 * x1 + x2 + .25 * z + .3 * U + rnorm(ng)[g] + rnorm(N)
+  w <- runif(N, .5, 2)
+  cf <- list(resp.family = gaussian, trt.family = binomial(link = "probit"), trt.level = "group",
+             weights = w, offset = FALSE, user.weights = TRUE, g = g)
+  fit <- suppressWarnings(treatSens:::fit.treatSens.mlm.u(y, z, matrix(x1, ncol = 1), matrix(x2, ncol = 1),
+                                                           U, .3, .3, cf))
+  dd <- data.frame(y = y, z = z, x1 = x1, x2 = x2, U = U, g = g, w = w)
+  null <- suppressWarnings(nlme::gls(y ~ z + x1 + x2 + U, data = dd,
+    correlation = nlme::corCompSymm(form = ~1 | g), weights = ~1 / w))
+  expect_equal(unname(fit$sens.se),
+               handClusterSE(z, cbind(x1, x2, U), as.numeric(null$residuals), w, g), tolerance = 1e-6)
 })

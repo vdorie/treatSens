@@ -473,62 +473,6 @@ dropFormulaTerm <- function(form, term)
 
 ## gets predictions for a specific value of U
 fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
-  resp.family <- control.fit$resp.family
-  trt.family  <- control.fit$trt.family
-  trt.level   <- control.fit$trt.level
-  weights <- control.fit$weights
-  offset  <- control.fit$offset
-  
-  args.resp <- list(family = resp.family, weights = weights)
-  if (offset == TRUE) {
-    args.resp$offset <- zetaY * U
-    args.resp$formula <- if (!is.null(W)) Y ~ Z + X + W + (1 | g) else Y ~ Z + X + (1 | g)
-  } else {
-    args.resp$formula <- if (!is.null(W)) Y ~ Z + X + W + U + (1 | g) else Y ~ Z + X + U + (1 | g)
-  }
-  
-  args.trt <- list(family = trt.family)
-  args.trt$formula <- if (trt.level == "indiv") Z ~ U + X + (1 | g) else Z ~ U + X
-  
-  if (is.null(X)) {
-    args.resp$formula <- dropFormulaTerm(args.resp$formula, "X")
-    args.trt$formula  <- dropFormulaTerm(args.trt$formula, "X")
-  }
-  
-  fit.glm <- suppressWarnings(do.call("glmer", args.resp))
-  
-  if (is.character(weights) || is.numeric(weights)) {
-    sens.se <- pweight(Z = Z, X = X, r = fit.glm$residuals, wt = weights)
-  } else {
-    sens.se <- summary(fit.glm)$coefficients[2,2]
-  }
-  
-  fit.trt <- do.call(if (trt.level == "indiv") "glmer" else glm, args.trt)
-  
-  list(sens.coef = fixef(fit.glm)[2],
-       sens.se = sens.se, 	#SE of Z coef
-       zeta.y = if (offset == TRUE) zetaY else fixef(fit.glm)[3],     	            #estimated coefficient of U in response model
-       zeta.z = if (trt.level == "indiv") fixef(fit.trt)[2] else coef(fit.trt)[2], #estimated coef of U in trt model
-       zy.se  = if (offset == TRUE) NA else summary(fit.glm)$coefficients[3,2],     #SE of U coef in response model
-       zz.se  = summary(fit.trt)$coefficients[2,2],                                 #SE of U coef in trt model
-       resp.sigma2 = summary(fit.glm)$sigma^2,
-       trt.sigma2  = if (trt.level == "indiv") summary(fit.trt)$sigma^2 else sum(fit.trt$resid^2)/fit.trt$df.residual)
-}
-
-
-dropFormulaTerm <- function(form, term)
-{
-  if (length(form) == 3L) {
-    if (form[[2L]] == term) return(form[[3L]])
-    if (form[[3L]] == term) return(form[[2L]])
-    form[[2L]] <- dropFormulaTerm(form[[2L]], term)
-    form[[3L]] <- dropFormulaTerm(form[[3L]], term)
-  }
-  form
-}
-
-## gets predictions for a specific value of U
-fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
   g <- control.fit$g
   resp.family <- control.fit$resp.family
   trt.family  <- control.fit$trt.family

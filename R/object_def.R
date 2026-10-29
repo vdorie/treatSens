@@ -11,6 +11,8 @@ combine.sensitivity <- function(x1, x2){
     stop("Combining objects only allowed for sensitivity analyses using same type of sensitivity parameter")
   if (!(x1$model.type == x2$model.type))
     stop("Combining objects only allowed for sensitivity analyses using same model")
+  if (!identical(x1$df, x2$df))
+    stop("Combining objects only allowed for sensitivity analyses using same degrees of freedom")
 
   grid1 = expand.grid(as.numeric(dimnames(x1$sp.y)[[1]]), as.numeric(dimnames(x1$sp.z)[[2]]))
   gridpts1 = matrix(c(rep(grid1[,1], dim(x1$tau)[3]), rep(grid1[,2], dim(x1$tau)[3])), ncol = 2)
@@ -254,3 +256,7 @@ plot.sensitivityCombo = function(x,y,...){
 ## finite, the normal otherwise
 sigQuantile <- function(signif.level, df = NULL)
   if (is.null(df) || !is.finite(df)) qnorm(signif.level/2) else qt(signif.level/2, df)
+
+## contour levels of the "not significant" region in plots
+insigLevels <- function(signif.level, df = NULL)
+  c(-1, 1) * sigQuantile(signif.level, df)
