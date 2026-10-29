@@ -47,7 +47,7 @@ treatSens.MLM(formula, response.covariates = NULL,
 }
   \item{offset}{Models are fit by setting zeta.z*U or zeta.y*U explicitly as an offset (rather than simply including generated U in the model). Only consistent with \code{sensParam = "coef"}. The default is \code{TRUE}.
 }
-  \item{core}{number of CPU cores used for parallel processing. The default is \code{NULL}, which implies single-threading. 
+  \item{core}{number of CPU cores used for parallel processing. The default is \code{NULL}, which implies single-threading. A parallel run reproduces under \code{seed}, whatever the number of cores, but differs from the single-threaded run of the same call.
 }
   \item{spy.range}{custom range for the sensitiviy parameter associated with Y (the coefficient on U in the outcome model or partial correlation of U with Y given X), e.g. \code{c(0,2)}. When this option is specified, \code{zetaz.range} must be also specified and \code{zero.loc} will be overridden. The default is \code{NULL}.
 }
