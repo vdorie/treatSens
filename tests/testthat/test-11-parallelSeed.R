@@ -94,7 +94,15 @@ test_that("rngStreams depends on the seed alone and leaves the caller's generato
   ## the sample kind is part of a stream too, so it is fixed
   suppressWarnings(RNGkind(sample.kind = "Rounding"))
   expect_identical(rngStreams(10L, 4L), first)
-  expect_identical(first[[1L]][1L], 10407L)
+  ## L'Ecuyer-CMRG, Inversion and Rejection; R-devel adds a binomial kind above
+  expect_identical(first[[1L]][1L] %% 100000L, 10407L)
+
+  ## so is the binomial kind, where R has one
+  if (length(RNGkind()) > 3L) {
+    suppressWarnings(RNGkind(binom.kind = "Buggy BTPE"))
+    expect_identical(rngStreams(10L, 4L), first)
+    expect_identical(RNGkind()[4L], "Buggy BTPE")
+  }
 
   expect_length(first, 4L)
   expect_false(anyDuplicated(first) > 0L)
@@ -107,14 +115,16 @@ test_that("the stream helpers leave a generator with no state as they found it, 
   on.exit(restoreRNG(oldKind))
 
   suppressWarnings(RNGkind("Wichmann-Hill", "Box-Muller", "Rounding"))
+  if (length(RNGkind()) > 3L) suppressWarnings(RNGkind(binom.kind = "Buggy BTPE"))
+  kinds <- RNGkind()
   rm(".Random.seed", envir = globalenv())
   streams <- rngStreams(10L, 2L)
   expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
-  expect_identical(RNGkind(), c("Wichmann-Hill", "Box-Muller", "Rounding"))
+  expect_identical(RNGkind(), kinds)
 
   withRNGStream(streams[[1L]], rnorm(2L))
   expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
-  expect_identical(RNGkind(), c("Wichmann-Hill", "Box-Muller", "Rounding"))
+  expect_identical(RNGkind(), kinds)
 })
 
 test_that("withRNGStream draws from its stream and leaves the process's own generator as it was", {

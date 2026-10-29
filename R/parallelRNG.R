@@ -18,7 +18,7 @@ withSavedRNG <- function(expr)
     if (hadSeed) {
       assign(".Random.seed", oldSeed, envir = global)
     } else {
-      suppressWarnings(RNGkind(oldKinds[1L], oldKinds[2L], oldKinds[3L]))
+      suppressWarnings(do.call(RNGkind, as.list(oldKinds)))
       if (exists(".Random.seed", envir = global, inherits = FALSE)) rm(".Random.seed", envir = global)
     }
   }, add = TRUE)
@@ -26,12 +26,15 @@ withSavedRNG <- function(expr)
 }
 
 ## n L'Ecuyer-CMRG streams that depend on the seed alone, not on the caller's RNG
-## kind or state, which are left as they were. The normal and sample kinds are
-## pinned because they are part of the state a stream carries.
+## kind or state, which are left as they were. The normal and sample kinds, and
+## the binomial kind where R has one, are pinned because they are part of the
+## state a stream carries.
 rngStreams <- function(seed, n)
 {
+  kinds <- list(seed, kind = "L'Ecuyer-CMRG", normal.kind = "Inversion", sample.kind = "Rejection")
+  if ("binom.kind" %in% names(formals(set.seed))) kinds$binom.kind <- "BTPE"
   withSavedRNG({
-    set.seed(seed, kind = "L'Ecuyer-CMRG", normal.kind = "Inversion", sample.kind = "Rejection")
+    do.call(set.seed, kinds)
     stream <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
     streams <- vector("list", n)
     for (i in seq_len(n)) {
