@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         shell: Rscript {0}
         run: |
-          pkgs <- c("testthat", "mvtnorm", "lme4", "nlme", "remotes")
+          pkgs <- c("testthat", "mvtnorm", "lme4", "nlme", "foreach", "doParallel", "remotes")
           need <- setdiff(pkgs, rownames(installed.packages()))
           if (length(need)) install.packages(need, repos = "https://cloud.r-project.org")
           # install.packages only warns on a failed build; fail the step here
