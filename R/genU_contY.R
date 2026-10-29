@@ -376,34 +376,25 @@ contYbinaryZU.mlm.fitLinearModels <- function(data, offset, u)
     
   result <- list()
   
+  ## both models are fit at a zero sensitivity parameter too: the coefficients
+  ## and variances of a model left unfit would be unset when the sampler uses them
   if (offset == FALSE) {
-    if (data$zeta.y != 0) {
-      fit.rsp <- lmer(y ~ z + x + u + (1 | g), data = df, weights = data$weights)
-      result$beta.y <- fixef(fit.rsp)
-      result$beta.y[length(result$beta.y)] <- data$zeta.y
-    }
-    if (data$zeta.z != 0) {
-      fit.trt <- glmer(z ~ x + u + (1 | g), data = df, family = binomial(link = "probit"))
-      result$beta.z <- fixef(fit.trt)
-      result$beta.z[length(result$beta.z)] <- data$zeta.z
-    }
+    fit.rsp <- lmer(y ~ z + x + u + (1 | g), data = df, weights = data$weights)
+    result$beta.y <- fixef(fit.rsp)
+    result$beta.y[length(result$beta.y)] <- data$zeta.y
+    fit.trt <- glmer(z ~ x + u + (1 | g), data = df, family = binomial(link = "probit"))
+    result$beta.z <- fixef(fit.trt)
+    result$beta.z[length(result$beta.z)] <- data$zeta.z
   } else {
-    if (data$zeta.y != 0) {
-      fit.rsp <- lmer(y ~ z + x + (1 | g), data = df, offset = data$zeta.y * u, weights = data$weights)
-      result$beta.y <- c(fixef(fit.rsp), data$zeta.y)
-    }
-    if (data$zeta.z != 0) {
-      fit.trt <- glmer(z ~ x + (1 | g), data = df, offset = data$zeta.z * u, family = binomial(link = "probit"))
-      result$beta.z <- c(fixef(fit.trt), data$zeta.z)
-    }
+    fit.rsp <- lmer(y ~ z + x + (1 | g), data = df, offset = data$zeta.y * u, weights = data$weights)
+    result$beta.y <- c(fixef(fit.rsp), data$zeta.y)
+    fit.trt <- glmer(z ~ x + (1 | g), data = df, offset = data$zeta.z * u, family = binomial(link = "probit"))
+    result$beta.z <- c(fixef(fit.trt), data$zeta.z)
   }
   
-  if (exists("fit.rsp")) {
-    result$v.y <- sigma(fit.rsp)^2
-    result$v.alpha <- lme4::VarCorr(fit.rsp)$g[1L]
-  }
-  if (exists("fit.trt"))
-    result$v.phi <- lme4::VarCorr(fit.trt)$g[1L]
+  result$v.y <- sigma(fit.rsp)^2
+  result$v.alpha <- lme4::VarCorr(fit.rsp)$g[1L]
+  result$v.phi <- lme4::VarCorr(fit.trt)$g[1L]
   
   result
 }
