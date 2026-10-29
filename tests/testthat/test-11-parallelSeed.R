@@ -147,8 +147,10 @@ test_that("treatSens without cores gives the draws it always has", {
 
   ## the draws are the same everywhere, but the glm fits that follow them can
   ## differ in the last bits between platforms, so the digits compared are cut
-  ## there; the exact values are compared on the build they were recorded on
+  ## there; the exact values are compared on the build they were recorded on, and not
+  ## on CRAN's machines, whose BLAS may not be the reference one
   expect_identical(signif(as.vector(fit$tau), 9L), signif(expected, 9L))
+  skip_on_cran()
   skip_if_not(grepl("^aarch64-apple-darwin", R.version$platform), "exact values were recorded on arm64 macOS")
   expect_identical(as.vector(fit$tau), expected)
 })
