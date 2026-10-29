@@ -10,11 +10,11 @@ name: sanitizers
 
 on:
   push:
-    branches: [master, dbarts-1.0]
+    branches: [master]
     paths-ignore:
       - '**.md'
   pull_request:
-    branches: [master, dbarts-1.0]
+    branches: [master]
     paths-ignore:
       - '**.md'
   workflow_dispatch:
