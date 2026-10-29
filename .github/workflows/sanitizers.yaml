@@ -5,15 +5,12 @@
 # dbarts is built from source here, so it is instrumented too: this package
 # drives dbarts's engine through dbarts.h, and a finding could land on either
 # side of that boundary.
-#
-# At the dbarts 1.0-0 merge, the dbarts ref below moves from bartcore to main
-# and the branch filters below to this repository's default branch.
 
 name: sanitizers
 
 on:
   push:
-    branches: [dbarts-1.0]
+    branches: [master, dbarts-1.0]
     paths-ignore:
       - '**.md'
   pull_request:
@@ -60,7 +57,7 @@ jobs:
           # install.packages only warns on a failed build; fail the step here
           missing <- setdiff(pkgs, rownames(installed.packages()))
           if (length(missing)) stop("not installed: ", toString(missing))
-          remotes::install_github("vdorie/dbarts@bartcore", upgrade = "never")
+          remotes::install_github("vdorie/dbarts@main", upgrade = "never")
 
       - name: Install treatSens under sanitizers
         run: R CMD INSTALL --preclean .
