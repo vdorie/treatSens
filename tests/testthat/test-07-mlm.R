@@ -154,7 +154,7 @@ test_that("treatSens.MLM builds the ATE, ATT and ATC weights at the group level"
   d$Y <- .5 * d$X1 + x2 + .5 * ug[g] + .25 * d$Z + rnorm(ng)[g] + rnorm(N)
   ## (the standard error is not pinned here: the sandwich leaves out the response-only covariates)
   ## one group-level and one individual-level covariate, and an individual-level covariate alone
-  for (form in list(Y ~ Z + X1 + X2 + (1 | g), Y ~ Z + X2 + (1 | g))) {
+  for (form in list(Y ~ Z + X1 + X2 + (1 | g), Y ~ Z + X2 + (1 | g), Y ~ Z + X1 + (1 | g))) {
     for (type in c("ATE", "ATT", "ATC")) {
       capture.output(res <- suppressMessages(suppressWarnings(treatSens.MLM(form, data = d,
         grid.dim = c(2, 2), nsim = 2, trt.level = "group", trt.family = binomial(link = "probit"),
@@ -165,4 +165,31 @@ test_that("treatSens.MLM builds the ATE, ATT and ATC weights at the group level"
       expectZeroCell(res, d, fitted(null.trt), Xm, type, se = FALSE)
     }
   }
+})
+
+test_that("treatSens.MLM at the group level handles a singleton group with two individual-level covariates", {
+  set.seed(3)
+  sz <- c(rep(3, 20), 1); ng <- length(sz); g <- rep(seq_len(ng), sz); N <- length(g)
+  Z <- rep(c(0, 1), length.out = ng)[g]
+  d <- data.frame(Z = Z, X2 = rnorm(N), X3 = rnorm(N), g = g)
+  d$Y <- d$X2 - d$X3 + .25 * Z + rnorm(ng)[g] + rnorm(N)
+  for (type in list(NULL, "ATE")) {
+    capture.output(res <- suppressMessages(suppressWarnings(treatSens.MLM(Y ~ Z + X2 + X3 + (1 | g),
+      data = d, grid.dim = c(2, 2), nsim = 1, trt.level = "group", trt.family = binomial(link = "probit"),
+      standardize = FALSE, zero.loc = "full", weights = type, verbose = FALSE))))
+    expect_true(all(is.finite(res$tau)))
+  }
+})
+
+test_that("the group-level binary sampler takes a single group-level covariate with no individual-level ones", {
+  ## no public call reaches this with one group-level column, so the sampler is called directly
+  set.seed(4)
+  ng <- 30; m <- 4; g <- rep(seq_len(ng), each = m); N <- length(g)
+  xg <- rnorm(ng); zg <- as.numeric(xg + rnorm(ng) > 0)
+  z <- zg[g]; x <- matrix(xg[g], ncol = 1)
+  y <- as.vector(.5 * x + .25 * z + rnorm(ng)[g] + rnorm(N))
+  out <- suppressWarnings(treatSens:::contYbinaryZU.mlm.gp(y, z, x, NULL, NULL, cy = .5, cz = .5,
+    theta = .5, iter.j = 2, weights = NULL, offset = TRUE, p = NULL, g = g))
+  expect_length(out$p, ng)
+  expect_true(all(is.finite(out$p)))
 })
