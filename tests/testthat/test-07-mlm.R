@@ -94,3 +94,75 @@ test_that("treatSens.MLM reports the model standard error when no weights are gi
   expect_true(any(grepl("Estimated treatment effects", capture.output(summary(fit)), fixed = TRUE)))
   expect_silent(capture.output(print(fitW)))
 })
+
+## weights "ATE", "ATT", "ATC" as documented in ?treatSens.MLM, from the fitted treatment
+## probabilities e, normalized and trimmed as in the code. At the zero cell (zeta.z = zeta.y = 0)
+## the response model is the null model, so tau is the weighted gls coefficient and se.tau
+## the sandwich standard error of the same fit.
+expectedWeights <- function(type, Z, e, trim.wt = 10)
+{
+  n <- length(Z); nt <- sum(Z == 1); nc <- sum(Z == 0)
+  if (type == "ATE") {
+    w <- ifelse(Z == 1, 1 / e, 1 / (1 - e)); w <- w * n / sum(w); mx <- trim.wt / 100 * n
+  } else if (type == "ATT") {
+    w <- ifelse(Z == 1, 1, e / (1 - e)); w[Z == 0] <- w[Z == 0] * nc / sum(w[Z == 0]); mx <- trim.wt / 100 * nt
+  } else {
+    w <- ifelse(Z == 0, 1, (1 - e) / e); w[Z == 1] <- w[Z == 1] * nt / sum(w[Z == 1]); mx <- trim.wt / 100 * nc
+  }
+  pmin(w, mx)
+}
+
+expectZeroCell <- function(fit, d, fitted, X, type, se = TRUE)
+{
+  w <- expectedWeights(type, d$Z, fitted)
+  i0 <- which(as.numeric(dimnames(fit$tau)[[1]]) == 0)
+  j0 <- which(as.numeric(dimnames(fit$tau)[[2]]) == 0)
+  dd <- data.frame(Y = d$Y, Z = d$Z, X, g = d$g, w = w)
+  null <- suppressWarnings(nlme::gls(stats::reformulate(c("Z", colnames(X)), "Y"), data = dd,
+                                     correlation = nlme::corCompSymm(form = ~1 | g), weights = ~1 / w))
+  expect_equal(unname(fit$tau0), unname(coef(null)[2]), tolerance = 1e-4)
+  expect_equal(as.numeric(fit$tau[i0, j0, ]), rep(unname(coef(null)[2]), dim(fit$tau)[3]), tolerance = 1e-4)
+  if (se) expect_equal(as.numeric(fit$se.tau[i0, j0, ]),
+               rep(treatSens:::pweight(d$Z, X, null$residuals, w), dim(fit$tau)[3]), tolerance = 1e-4)
+}
+
+test_that("treatSens.MLM builds the ATE, ATT and ATC weights at the individual level", {
+  set.seed(1)
+  N <- 60; g <- rep(1:6, each = 10)
+  X <- matrix(rnorm(N * 2), N, 2)
+  U <- rnorm(N)
+  Z <- as.numeric(X %*% c(.75, -.5) + .5 * U + rep(rnorm(6), each = 10) > 0)
+  Y <- rnorm(N, X %*% c(.5, 1) + .5 * U + .25 * Z, 2) + rep(rnorm(6), each = 10)
+  d <- data.frame(Y = Y, Z = Z, X1 = X[,1], X2 = X[,2], g = g)
+  null.trt <- suppressWarnings(lme4::glmer(Z ~ X + (1 | g), family = binomial(link = "probit")))
+  for (type in c("ATE", "ATT", "ATC")) {
+    capture.output(res <- suppressMessages(suppressWarnings(treatSens.MLM(Y ~ Z + X1 + X2 + (1 | g),
+      data = d, grid.dim = c(2, 2), nsim = 1, trt.level = "indiv", trt.family = binomial(link = "probit"),
+      standardize = FALSE, zero.loc = "full", weights = type, verbose = FALSE))))
+    expect_true(all(is.finite(res$tau)), info = type)
+    expectZeroCell(res, d, fitted(null.trt), `colnames<-`(X, c("X1", "X2")), type)
+  }
+})
+
+test_that("treatSens.MLM builds the ATE, ATT and ATC weights at the group level", {
+  set.seed(2)
+  ng <- 40; m <- 5; N <- ng * m; g <- rep(1:ng, each = m)
+  xg <- rnorm(ng); ug <- rnorm(ng)
+  zg <- as.numeric(.8 * xg + .5 * ug > 0)
+  x2 <- rnorm(N)
+  d <- data.frame(Z = zg[g], X1 = xg[g], X2 = x2, g = g)
+  d$Y <- .5 * d$X1 + x2 + .5 * ug[g] + .25 * d$Z + rnorm(ng)[g] + rnorm(N)
+  ## (the standard error is not pinned here: the sandwich leaves out the response-only covariates)
+  ## one group-level and one individual-level covariate, and an individual-level covariate alone
+  for (form in list(Y ~ Z + X1 + X2 + (1 | g), Y ~ Z + X2 + (1 | g))) {
+    for (type in c("ATE", "ATT", "ATC")) {
+      capture.output(res <- suppressMessages(suppressWarnings(treatSens.MLM(form, data = d,
+        grid.dim = c(2, 2), nsim = 2, trt.level = "group", trt.family = binomial(link = "probit"),
+        standardize = FALSE, zero.loc = "full", weights = type, verbose = FALSE))))
+      expect_true(all(is.finite(res$tau)), info = type)
+      Xm <- as.matrix(d[, setdiff(all.vars(form), c("Y", "Z", "g")), drop = FALSE])
+      null.trt <- suppressWarnings(glm(Z ~ Xm, family = binomial(link = "probit"), data = d))
+      expectZeroCell(res, d, fitted(null.trt), Xm, type, se = FALSE)
+    }
+  }
+})

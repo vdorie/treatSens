@@ -58,7 +58,7 @@ treatSens.MLM(formula, response.covariates = NULL,
 }
 \details{This function performs a dual-parameter sensitivity analysis for unobserved confounding by drawing simulated potential confounders U from the conditional distribution of U given observed response, treatment and covariates.
 
-Weights are calculated for any of three different estimands.  The weights for the ATE are calculated as \eqn{1/\hat{e}(x)}{1/e(x)} for the treatment group observations and \eqn{1/(1-\hat{e}(x))}{1/(1-e(x))} for the control group observations, where \eqn{\hat{e}(x)}{e(x)} denotes the estimated modification score (that is, the estimate of the probability of being treated conditional on observed covariates, \eqn{x}.  The weights for the ATT are 1 for the treatment group observations and \eqn{\hat{e}(x)/(1-\hat{e}(x))}{e(x)/(1-e(x))} for the control group observations.  The weights for the ATC are \eqn{(1-\hat{e}(x))/\hat{e}(x)}{(1-e(x))/e(x)} for the treatment group observations and 1 for the control group observations.  These weights are discussed in Carnegie et al (2014) and similar versions using the propensity score are discussed in a variety of places including Gelman and Hill, 2007.
+Weights are calculated for any of three different estimands.  The weights for the ATE are calculated as \eqn{1/\hat{e}(x)}{1/e(x)} for the treatment group observations and \eqn{1/(1-\hat{e}(x))}{1/(1-e(x))} for the control group observations, where \eqn{\hat{e}(x)}{e(x)} denotes the estimated modification score (that is, the estimate of the probability of being treated conditional on observed covariates, \eqn{x}, taken from the fitted values of the treatment model, which at the individual level include the group random effect.  The weights for the ATT are 1 for the treatment group observations and \eqn{\hat{e}(x)/(1-\hat{e}(x))}{e(x)/(1-e(x))} for the control group observations.  The weights for the ATC are \eqn{(1-\hat{e}(x))/\hat{e}(x)}{(1-e(x))/e(x)} for the treatment group observations and 1 for the control group observations.  These weights are discussed in Carnegie et al (2014) and similar versions using the propensity score are discussed in a variety of places including Gelman and Hill, 2007.
 }
 \value{
 \code{treatSens} returns an object of class "\code{sensitivity}".
@@ -70,7 +70,7 @@ An object of class "\code{sensitivity}" is a list containing the following compo
 }
 \item{tau}{individual estimated treatment effects corresponding to each grid point (combination of sensitivity parameters) and each drawing of simulated U.
 }
-\item{se.tau}{individual standard error estimates of treatment effects for each grid point and each drawing of simulated U. When no \code{weights} are given this is the model standard error of the treatment coefficient in the fitted response model (so, at zero sensitivity, it equals \code{se.tau0}); when \code{weights} are given it is the clustered robust standard error.
+\item{se.tau}{individual standard error estimates of treatment effects for each grid point and each drawing of simulated U. When no \code{weights} are given this is the model standard error of the treatment coefficient in the fitted response model (so, at zero sensitivity, it equals \code{se.tau0}); when \code{weights} are given it is a heteroskedasticity-robust sandwich standard error that treats observations as independent (it does not cluster by group).
 }
 \item{zeta.z}{individual estimated coefficients on U in the treatment model corresponding to each grid point and each drawing of simulated U.}
 \item{zeta.y}{individual estimated coefficients on U in the outcome model corresponding to each grid point and each drawing of simulated U.}
@@ -87,7 +87,7 @@ An object of class "\code{sensitivity}" is a list containing the following compo
 \item{Xcoef.plot}{coefficients as for \code{Xcoef}, but after transforming covariates to have positive coefficients in the response model (X = -X, used for plotting purposes).}
 }
 \note{
-When \code{weights} are specified, \code{treatSens} returns clustered robust standard errors.
+When \code{weights} are specified, \code{treatSens.MLM} returns heteroskedasticity-robust sandwich standard errors that do not cluster by group.
 
 Matrices and data frames should include only complete cases.
 }

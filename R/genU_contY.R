@@ -630,7 +630,7 @@ contYbinaryZU.mlm.gp <- function(y, z, x, w, xs, cy, cz, theta, iter.j=10, weigh
       y.g = y[g == gps[i]]
       z.g = z[g == gps[i]][1]
       x.g = switch(is.null(dim(xstar[g==gps[i],]))+1, apply(xstar[g == gps[i],],2,mean, na.rm = T), mean(xstar[g == gps[i],]))
-      w.g = switch(is.null(dim(xw[g==gps[i],]))+1, xw[g == gps[i],], matrix(xw[g == gps[i],], nrow = 1))
+      w.g = xw[g == gps[i], , drop = FALSE]
       
       y1prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
       z1prob = log(pnorm(c(1,x.g,1)%*%matrix(z.coef, ncol = 1))^(z.g)*(1-pnorm(c(1,x.g,1)%*%matrix(z.coef, ncol = 1)))^(1-z.g)) 
@@ -747,13 +747,13 @@ contYbinaryZU.mlm.gp.noX <- function(y, z, w, xs, cy, cz, theta, iter.j=10, weig
       y.g = y[g == gps[i]]
       z.g = z[g == gps[i]][1]
       if(!is.null(xstar)){
-        x.g = switch(is.null(dim(xstar[g==gps[i],]))+1, apply(xstar[g == gps[i],],2,mean, na.rm = T), xstar[g == gps[i],])
+        x.g = switch(is.null(dim(xstar[g==gps[i],]))+1, apply(xstar[g == gps[i],],2,mean, na.rm = T), mean(xstar[g == gps[i],]))
       }else{
         x.g = NULL
       }
       
       if(!is.null(w)){
-        w.g = switch(is.null(dim(w[g==gps[i],]))+1, w[g == gps[i],], matrix(w[g == gps[i],], nrow = 1))  
+        w.g = w[g == gps[i], , drop = FALSE]
         y1prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,1)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
         y0prob = dmvnorm(as.vector(y.g-cbind(1,z.g,w.g,0)%*%matrix(y.coef, ncol = 1)), rep(0, n.gp[i]), sigma = var.Ymat, log = TRUE) 
       }else{

@@ -203,19 +203,19 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
       #      stop(paste("trt.family must be either binomial or gaussian when \"ATE\", \"ATT\", or \"ATC\" is specified as weights."))}
       
       if (identical(weights,"ATE")) {
-        wts <- 1/null.trt$fitted
-        wts[Z==0] <-1/(1-null.trt$fitted[Z==0])
+        wts <- 1/fitted(null.trt)
+        wts[Z==0] <-1/(1-fitted(null.trt)[Z==0])
         wts = wts*n.obs/sum(wts) #normalizing weight
         cat("\"ATE\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect.","\n")}
       
       if (identical(weights,"ATT")) {
-        wts <- null.trt$fitted/(1-null.trt$fitted)
+        wts <- fitted(null.trt)/(1-fitted(null.trt))
         wts[Z==1] <-1
         wts[Z==0] = wts[Z==0]*(nc/sum(wts[Z==0])) #normalizing weight
         cat("\"ATT\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the treated.","\n")}
       
       if (identical(weights,"ATC")) {
-        wts <- (1-null.trt$fitted)/null.trt$fitted
+        wts <- (1-fitted(null.trt))/fitted(null.trt)
         wts[Z==0] <- 1
         wts[Z==1] = wts[Z==1]*(nt/sum(wts[Z==1])) #normalizing weight
         cat("\"ATC\" option is selected. Sensitivity analysis is performed with the default Weights for the average treatment effect in the controls","\n")}
