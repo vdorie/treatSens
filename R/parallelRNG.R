@@ -5,26 +5,33 @@
 ## picks a task up.
 
 ## Evaluates expr and then puts back the calling process's generator: kind and
-## state, or no state at all if it had none.
+## state, or, if it had no state, its kinds and no state. Kinds are kept apart
+## from the state then, so they are read before expr runs and set before the
+## state is dropped.
 withSavedRNG <- function(expr)
 {
   global <- globalenv()
   hadSeed <- exists(".Random.seed", envir = global, inherits = FALSE)
   if (hadSeed) oldSeed <- get(".Random.seed", envir = global, inherits = FALSE)
+  else oldKinds <- RNGkind()
   on.exit({
-    if (hadSeed) assign(".Random.seed", oldSeed, envir = global)
-    else if (exists(".Random.seed", envir = global, inherits = FALSE)) rm(".Random.seed", envir = global)
+    if (hadSeed) {
+      assign(".Random.seed", oldSeed, envir = global)
+    } else {
+      suppressWarnings(RNGkind(oldKinds[1L], oldKinds[2L], oldKinds[3L]))
+      if (exists(".Random.seed", envir = global, inherits = FALSE)) rm(".Random.seed", envir = global)
+    }
   }, add = TRUE)
   expr
 }
 
 ## n L'Ecuyer-CMRG streams that depend on the seed alone, not on the caller's RNG
-## kind or state, which are left as they were. The normal kind is pinned because
-## it is part of the state a stream carries.
+## kind or state, which are left as they were. The normal and sample kinds are
+## pinned because they are part of the state a stream carries.
 rngStreams <- function(seed, n)
 {
   withSavedRNG({
-    set.seed(seed, kind = "L'Ecuyer-CMRG", normal.kind = "Inversion")
+    set.seed(seed, kind = "L'Ecuyer-CMRG", normal.kind = "Inversion", sample.kind = "Rejection")
     stream <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
     streams <- vector("list", n)
     for (i in seq_len(n)) {
