@@ -329,28 +329,33 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
 
   if (!is.null(core) && U.model == "binomial"){
     ngrid = grid.dim[2]*grid.dim[1]
+    #one random stream per cell, from the seed alone, so a cell's draws do not depend on its worker
+    streams <- rngStreams(seed, ngrid)
     h = NULL #included for R CMD check
-    out.foreach <- foreach::"%dopar%"(foreach::foreach(h=ngrid:1,.combine=cbind,.verbose=F),{
-      j=grid.dim[1]-(h-1)%%grid.dim[1]
-      i=grid.dim[2]-((h-1)-(h-1)%%grid.dim[1])/grid.dim[1]
-      cell = cell +1
-      zY = zetaY[i]
-      zZ = zetaZ[j]
-      control.fit$p = NULL
-      out <- matrix(NA,8,nsim)
-      for(k in 1:nsim){
-        fit.sens <- fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
-     #   control.fit$p = fit.sens$p
-        out[1,k] <- fit.sens$sens.coef
-        out[2,k] <- fit.sens$sens.se
-        out[3,k] <- fit.sens$zeta.y
-        out[4,k] <- fit.sens$zeta.z
-        out[5,k] <- fit.sens$zy.se
-        out[6,k] <- fit.sens$zz.se
-        out[7,k] <- fit.sens$resp.sigma2
-        out[8,k] <- fit.sens$trt.sigma2
-      }
-      return(out)
+    stream = NULL #included for R CMD check
+    out.foreach <- foreach::"%dopar%"(foreach::foreach(h=ngrid:1,stream=streams[ngrid:1],.combine=cbind,.verbose=F),{
+      withRNGStream(stream, {
+        j=grid.dim[1]-(h-1)%%grid.dim[1]
+        i=grid.dim[2]-((h-1)-(h-1)%%grid.dim[1])/grid.dim[1]
+        cell = cell +1
+        zY = zetaY[i]
+        zZ = zetaZ[j]
+        control.fit$p = NULL
+        out <- matrix(NA,8,nsim)
+        for(k in 1:nsim){
+          fit.sens <- fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
+       #   control.fit$p = fit.sens$p
+          out[1,k] <- fit.sens$sens.coef
+          out[2,k] <- fit.sens$sens.se
+          out[3,k] <- fit.sens$zeta.y
+          out[4,k] <- fit.sens$zeta.z
+          out[5,k] <- fit.sens$zy.se
+          out[6,k] <- fit.sens$zz.se
+          out[7,k] <- fit.sens$resp.sigma2
+          out[8,k] <- fit.sens$trt.sigma2
+        }
+        out
+      })
     })
     out1 <- out2 <- out3 <- out4 <- out5 <- out6 <- out7 <- out8 <- numeric(ngrid*nsim)
     out1 <- out.foreach[1,]
@@ -371,6 +376,9 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
     resp.s2[,,] <- aperm(out7,c(3,2,1))[,,]
     trt.s2[,,] <- aperm(out8,c(3,2,1))[,,]
   } else {
+    #one random stream per cell and draw, from the seed alone, so a draw does not depend on its worker
+    if(!is.null(core)) streams <- rngStreams(seed, grid.dim[1]*grid.dim[2]*nsim)
+    stream = NULL #included for R CMD check
     for(i in grid.dim[2]:1) {
       for(j in grid.dim[1]:1) {
         cell = cell +1
@@ -397,8 +405,8 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
             trt.s2[i,j,k] <- fit.sens$trt.sigma2
           }        
         }else{ #code for multicore below. For debug change %dopar% to %do%.
-          fit.sens <- foreach::"%dopar%"(foreach::foreach(k=1:nsim,.combine=rbind,.verbose=F),{
-            fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit)
+          fit.sens <- foreach::"%dopar%"(foreach::foreach(k=1:nsim,stream=streams[(cell-1)*nsim+seq_len(nsim)],.combine=rbind,.verbose=F),{
+            withRNGStream(stream, fit.treatSens.mlm(sensParam, Y, Z, Y.res, Z.res, X, W, zY, zZ, v_Y, v_Z, theta, control.fit))
           })
           sens.coef[i,j,] <- unlist(fit.sens[,1])
           sens.se[i,j,] <- unlist(fit.sens[,2])
