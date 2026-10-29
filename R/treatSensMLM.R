@@ -432,7 +432,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
                    sp.z = zeta.z, sp.y = zeta.y, 
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, X = X, sig2.resp = resp.s2, sig2.trt = trt.s2,
-                   tau0 = null.resp$coef[2], se.tau0 = null.resp$varBeta[2,2],
+                   tau0 = null.resp$coef[2], se.tau0 = sqrt(null.resp$varBeta[2,2]),
                    Xcoef = switch((!is.null(Xcoef) & is.null(dim(Xcoef)))+1, Xcoef, matrix(Xcoef, nrow = 1)), 
                    Xcoef.plot = switch((!is.null(Xcoef.plot) & is.null(dim(Xcoef.plot)))+1, Xcoef.plot, matrix(Xcoef.plot, nrow = 1)),
                    varnames = all.vars(formula), var_ytilde = v_Y, var_ztilde = v_Z)
@@ -442,7 +442,7 @@ treatSens.MLM <- function(formula,         #formula: assume treatment is 1st ter
                    sp.z = zeta.z, sp.y = zeta.y, 
                    se.spz = zz.se, se.spy = zy.se, 
                    Y = Y, Z = Z, sig2.resp = resp.s2, sig2.trt = trt.s2,
-                   tau0 = null.resp$coef[2], se.tau0 = null.resp$varBeta[2,2],
+                   tau0 = null.resp$coef[2], se.tau0 = sqrt(null.resp$varBeta[2,2]),
                    Xcoef = switch((!is.null(Xcoef) & is.null(dim(Xcoef)))+1, Xcoef, matrix(Xcoef, nrow = 1)), 
                    Xcoef.plot = switch((!is.null(Xcoef.plot) & is.null(dim(Xcoef.plot)))+1, Xcoef.plot, matrix(Xcoef.plot, nrow = 1)),
                    varnames = all.vars(formula),var_ytilde = v_Y,var_ztilde = v_Z)

@@ -262,6 +262,19 @@ test_that("treatSens.MLM without the offset reports the standard error of the co
   expect_equal(printed, rep(round(se, 6L), 4L))
 })
 
+test_that("treatSens.MLM reports the standard error of the treatment effect without confounding, as documented, not its variance", {
+  ## the model's own standard error, from the summary of the gls fit, with and without covariates
+  for (covariates in c(TRUE, FALSE)) {
+    formula <- if (covariates) Y ~ Z + X1 + X2 + X3 else Y ~ Z
+    null <- nlme::gls(formula, data = mlmData, correlation = nlme::corCompSymm(form = ~1 | g))
+    fit <- suppressMessages(suppressWarnings(
+      treatSens.MLM(update(formula, . ~ . + (1 | g)), data = mlmData, grid.dim = c(2, 2), nsim = 2,
+                    standardize = FALSE, zero.loc = "full", core = NULL)))
+    expect_equal(fit$se.tau0, summary(null)$tTable["Z", "Std.Error"])
+    expect_equal(unname(fit$tau0), unname(coef(null)["Z"]))
+  }
+})
+
 test_that("a degenerate draw of the binary-U sampler is drawn again", {
   skip_if_not(packageVersion("testthat") >= "3.2.0")
 
