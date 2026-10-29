@@ -568,9 +568,10 @@ fit.treatSens.mlm.u <- function(Y, Z, X, W, U, zetaY, zetaZ, control.fit) {
 
 ## consecutive failed draws of U, in the sampler or in the models fit with the draw, after
 ## which treatSens.MLM stops with the last error. A draw fails on its own for some
-## draws (glmer not converging: 3 to 16 percent of the fits seen), so a run of n has
-## probability near 0.16^n, below 1e-20 for 30, while an error no draw cures (a model
-## that cannot be fit, a group beyond pmvnorm's limit) costs 30 calls, not 5000.
+## draws (glmer not converging: an attempt fits ten models and failed up to about a
+## third of the time in small groups at the grid's edge), so a run of n has probability
+## near 0.32^n, about 1e-15 for 30, while an error no draw cures (a model that cannot
+## be fit, a group beyond pmvnorm's limit) costs 30 calls, not 5000.
 maxDrawFailures <- 30L
 
 ## the result of a fit that gave no usable draw
