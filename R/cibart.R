@@ -153,9 +153,8 @@ makeBartSpecs <- function(x, y, x.test, binary, n.trees, n.thin, n.sim, n.burn, 
   # drop dimnames so the engine matches the counterfactual test matrix to the
   # training predictors by position (they are column-aligned by construction)
   x <- unname(as.matrix(x))
-  data.bart <- if (is.null(x.test)) dbarts::dbartsData(x, y)
-               else dbarts::dbartsData(x, y, unname(as.matrix(x.test)))
-  data.bart@n.cuts <- rep_len(100L, ncol(data.bart@x))
+  data.bart <- if (is.null(x.test)) dbarts::dbartsData(x, y, n.cuts = 100L)
+               else dbarts::dbartsData(x, y, unname(as.matrix(x.test)), n.cuts = 100L)
 
   # one chain: the C driver is a single Gibbs chain (each sweep conditions on
   # the last draw of the confounders and takes one chain's fit from run)
